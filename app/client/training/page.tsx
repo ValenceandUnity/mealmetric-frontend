@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { JsonPreview, getArrayItems, getEntityId } from "@/components/JsonPreview";
+import { PageShell } from "@/components/layout/PageShell";
+import { AssignmentCard } from "@/components/training/AssignmentCard";
+import { DebugPreview } from "@/components/ui/DebugPreview";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorBlock } from "@/components/ui/ErrorBlock";
+import { LoadingBlock } from "@/components/ui/LoadingBlock";
+import { Section } from "@/components/ui/Section";
+import { adaptTrainingAssignments } from "@/lib/adapters/training";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
 
@@ -64,76 +71,42 @@ export default function ClientTrainingHubPage() {
     };
   }, [status, user]);
 
-  const assignments = trainingData ? getArrayItems(trainingData) : [];
-
   if (status === "loading") {
-    return (
-      <section>
-        <h2>Loading training hub</h2>
-        <p>Validating your client session.</p>
-      </section>
-    );
+    return <LoadingBlock title="Loading training hub" message="Validating your client session." />;
   }
 
   if (status !== "authenticated" || !user) {
-    return (
-      <section>
-        <h2>Redirecting</h2>
-        <p>Client training routes require an authenticated client session.</p>
-      </section>
-    );
+    return <LoadingBlock title="Redirecting" message="Client training routes require an authenticated client session." />;
   }
 
+  const assignments = adaptTrainingAssignments(trainingData);
+
   return (
-    <div style={{ display: "grid", gap: 20 }}>
-      <section>
-        <h2 style={{ marginTop: 0 }}>Training Hub</h2>
-        <p>Assignment list loaded through <code>/api/client/training</code>.</p>
-        <nav>
-          <Link href="/client">Back to Client Home</Link>
-        </nav>
-      </section>
+    <PageShell
+      title="Training hub"
+      user={user}
+      navigation={<Link className="link-button" href="/client">Back to client home</Link>}
+    >
+      {loading ? <LoadingBlock title="Loading assignments" message="Fetching your current training assignments." /> : null}
+      {errorMessage ? <ErrorBlock title="Unable to load assignments" message={errorMessage} /> : null}
 
-      {loading ? (
-        <section>
-          <h3>Loading assignments</h3>
-          <p>Fetching your current training assignments.</p>
-        </section>
+      <Section title="Assignments">
+        {assignments.length > 0 ? (
+          <div className="stacked-list">
+            {assignments.map((assignment) => (
+              <AssignmentCard key={assignment.id ?? assignment.title} assignment={assignment} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="No assignments found" message="Assignments will appear here when the BFF returns active training work." />
+        )}
+      </Section>
+
+      {trainingData && assignments.length === 0 ? (
+        <Section title="Debug fallback">
+          <DebugPreview value={trainingData} label="Training payload fallback" />
+        </Section>
       ) : null}
-
-      {errorMessage ? (
-        <section>
-          <h3>Unable to load assignments</h3>
-          <p style={{ color: "#fca5a5" }}>{errorMessage}</p>
-        </section>
-      ) : null}
-
-      {!loading && !errorMessage && assignments.length === 0 ? (
-        <section>
-          <h3>No assignments found</h3>
-          <JsonPreview value={trainingData ?? []} />
-        </section>
-      ) : null}
-
-      {assignments.map((assignment, index) => {
-        const assignmentId = getEntityId(assignment);
-
-        return (
-          <section key={assignmentId ?? `assignment-${index}`}>
-            <h3 style={{ marginTop: 0 }}>
-              Assignment {assignmentId ? <code>{assignmentId}</code> : `#${index + 1}`}
-            </h3>
-            <JsonPreview value={assignment} />
-            {assignmentId ? (
-              <nav>
-                <Link href={`/client/training/${assignmentId}`}>Open Assignment Detail</Link>
-              </nav>
-            ) : (
-              <p>Assignment detail link unavailable because no assignment id was returned.</p>
-            )}
-          </section>
-        );
-      })}
-    </div>
+    </PageShell>
   );
 }

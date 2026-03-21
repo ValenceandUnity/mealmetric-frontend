@@ -26,11 +26,15 @@ export function LogoutButton() {
   }
 
   return (
-    <div style={{ display: "grid", gap: 8, alignContent: "start" }}>
+    <div className="grid">
       <button type="button" onClick={handleLogout} disabled={loading}>
         {loading ? "Signing out..." : "Sign out"}
       </button>
-      {errorMessage ? <span style={{ color: "#fca5a5" }}>{errorMessage}</span> : null}
+      {errorMessage ? (
+        <span className="status-text" style={{ color: "var(--danger)" }}>
+          {errorMessage}
+        </span>
+      ) : null}
     </div>
   );
 }

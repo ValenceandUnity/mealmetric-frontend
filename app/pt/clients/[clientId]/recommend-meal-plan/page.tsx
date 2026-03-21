@@ -2,15 +2,19 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
-import { JsonPreview, getArrayItems, getEntityId } from "@/components/JsonPreview";
+import { RecordCard } from "@/components/cards/RecordCard";
+import { SummaryCard } from "@/components/cards/SummaryCard";
 import { PageShell } from "@/components/layout/PageShell";
+import { DebugPreview } from "@/components/ui/DebugPreview";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { Section } from "@/components/ui/Section";
+import { adaptPTMealRecommendationWorkspace } from "@/lib/adapters/client-records";
 import { useSessionBootstrap } from "@/lib/client/session";
-import type { ApiResponse, JsonObject, JsonValue } from "@/lib/types/api";
+import type { ApiResponse, JsonValue } from "@/lib/types/api";
 
 type JsonApiResponse = ApiResponse<JsonValue>;
 
@@ -21,25 +25,6 @@ type MealRecommendationFormState = {
   expires_at: string;
 };
 
-function isObject(value: JsonValue): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function getTextField(value: JsonValue, keys: string[]): string | null {
-  if (!isObject(value)) {
-    return null;
-  }
-
-  for (const key of keys) {
-    const candidate = value[key];
-    if (typeof candidate === "string" && candidate.trim().length > 0) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
 function normalizeOptionalText(value: string): string | null {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
@@ -47,54 +32,12 @@ function normalizeOptionalText(value: string): string | null {
 
 function normalizeOptionalDatetime(value: string): string | null {
   const trimmed = value.trim();
-
   if (trimmed.length === 0) {
     return null;
   }
 
   const parsed = new Date(trimmed);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return trimmed;
-  }
-
-  return parsed.toISOString();
-}
-
-function getMealPlanLabel(mealPlan: JsonValue, fallbackIndex: number): string {
-  const title = getTextField(mealPlan, ["title", "name"]);
-  const vendor = getTextField(mealPlan, ["vendor", "vendor_name"]);
-  const mealPlanId = getTextField(mealPlan, ["id", "meal_plan_id"]);
-
-  const parts = [title, vendor].filter((value): value is string => Boolean(value));
-
-  if (mealPlanId) {
-    parts.push(mealPlanId);
-  }
-
-  if (parts.length > 0) {
-    return parts.join(" | ");
-  }
-
-  return `Meal Plan #${fallbackIndex + 1}`;
-}
-
-function getRecommendationSummary(recommendation: JsonValue) {
-  return {
-    id: getTextField(recommendation, ["id", "recommendation_id"]),
-    mealPlanId: getTextField(recommendation, ["meal_plan_id"]),
-    status: getTextField(recommendation, ["status"]),
-    recommendedAt: getTextField(recommendation, ["recommended_at"]),
-    expiresAt: getTextField(recommendation, ["expires_at"]),
-  };
-}
-
-function getMealPlanSummary(mealPlan: JsonValue) {
-  return {
-    id: getTextField(mealPlan, ["id", "meal_plan_id"]),
-    title: getTextField(mealPlan, ["title", "name"]),
-    vendor: getTextField(mealPlan, ["vendor", "vendor_name"]),
-  };
+  return Number.isNaN(parsed.getTime()) ? trimmed : parsed.toISOString();
 }
 
 export default function PTRecommendMealPlanPage() {
@@ -148,15 +91,11 @@ export default function PTRecommendMealPlanPage() {
 
         if (!mealPlansPayload.ok) {
           setLoadError(mealPlansPayload.error.message);
-          setMealPlansData(null);
-          setRecommendationsData(null);
           return;
         }
 
         if (!recommendationsPayload.ok) {
           setLoadError(recommendationsPayload.error.message);
-          setMealPlansData(null);
-          setRecommendationsData(null);
           return;
         }
 
@@ -165,8 +104,6 @@ export default function PTRecommendMealPlanPage() {
       } catch {
         if (active) {
           setLoadError("Unable to load meal plans and recommendations.");
-          setMealPlansData(null);
-          setRecommendationsData(null);
         }
       } finally {
         if (active) {
@@ -182,33 +119,24 @@ export default function PTRecommendMealPlanPage() {
     };
   }, [clientId, status, user]);
 
-  const mealPlans = mealPlansData ? getArrayItems(mealPlansData) : [];
-  const recommendations = recommendationsData ? getArrayItems(recommendationsData) : [];
-  const hasMealPlanOptions = mealPlans.some((mealPlan) => Boolean(getEntityId(mealPlan)));
+  const view = adaptPTMealRecommendationWorkspace(mealPlansData, recommendationsData);
 
   useEffect(() => {
-    if (formState.meal_plan_id || !hasMealPlanOptions || !mealPlansData) {
+    if (formState.meal_plan_id || view.mealPlans.length === 0) {
       return;
     }
 
-    const firstMealPlanId = getArrayItems(mealPlansData)
-      .map((mealPlan) => getEntityId(mealPlan))
-      .find((value) => Boolean(value));
-
-    if (firstMealPlanId) {
-      setFormState((current) => ({
-        ...current,
-        meal_plan_id: firstMealPlanId,
-      }));
+    const firstId = view.mealPlans.find((mealPlan) => Boolean(mealPlan.id))?.id;
+    if (firstId) {
+      setFormState((current) => ({ ...current, meal_plan_id: firstId }));
     }
-  }, [formState.meal_plan_id, hasMealPlanOptions, mealPlansData]);
+  }, [formState.meal_plan_id, view.mealPlans]);
 
   async function refreshRecommendations() {
     const response = await fetch(`/api/pt/clients/${clientId}/meal-plan-recommendations`, {
       cache: "no-store",
     });
     const payload = (await response.json()) as JsonApiResponse;
-
     if (!payload.ok) {
       throw new Error(payload.error.message);
     }
@@ -216,11 +144,11 @@ export default function PTRecommendMealPlanPage() {
     setRecommendationsData(payload.data);
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!formState.meal_plan_id.trim()) {
-      setSubmitError("Meal plan id is required.");
+      setSubmitError("Meal plan ID is required.");
       setSubmitSuccess(null);
       return;
     }
@@ -253,7 +181,7 @@ export default function PTRecommendMealPlanPage() {
       await refreshRecommendations();
       setSubmitSuccess("Meal recommendation created successfully.");
       setFormState((current) => ({
-        meal_plan_id: hasMealPlanOptions ? current.meal_plan_id : "",
+        ...current,
         rationale: "",
         recommended_at: "",
         expires_at: "",
@@ -275,200 +203,149 @@ export default function PTRecommendMealPlanPage() {
 
   return (
     <PageShell
-      title="Recommend Meal Plan"
+      title="Recommend meal plan"
       user={user}
       navigation={
-        <nav style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <Link href="/pt/clients">Back to PT Clients</Link>
-        </nav>
+        <>
+          <Link className="link-button" href={`/pt/clients/${clientId}`}>
+            Client overview
+          </Link>
+          <Link className="link-button" href="/pt/clients">
+            Back to clients
+          </Link>
+        </>
       }
     >
-      <Section title="Header / Navigation">
-        <p style={{ margin: 0 }}>
-          <strong>Client Id:</strong> <code>{clientId || "Unavailable"}</code>
-        </p>
-        <p style={{ margin: 0 }}>
-          Meal plans and client recommendations are loaded only through PT BFF routes under <code>/api/*</code>.
-        </p>
-      </Section>
-
-      {loading ? (
-        <LoadingBlock
-          title="Loading recommendation data"
-          message="Fetching PT meal plans and this client's existing meal recommendations."
-        />
-      ) : null}
-
+      {loading ? <LoadingBlock title="Loading recommendation data" message="Fetching PT meal plans and client recommendations." /> : null}
       {loadError ? <ErrorBlock title="Unable to load recommendation data" message={loadError} /> : null}
 
-      <Section title="Existing Recommendations">
-        {!loading && !loadError && recommendations.length === 0 ? (
-          <p>No meal recommendations returned for this client.</p>
-        ) : null}
-
-        {recommendations.map((recommendation, index) => {
-          const summary = getRecommendationSummary(recommendation);
-
-          return (
-            <div
-              key={summary.id ?? `recommendation-${index}`}
-              style={{ borderTop: index > 0 ? "1px solid #334155" : undefined, paddingTop: index > 0 ? 12 : 0 }}
-            >
-              <p style={{ margin: 0 }}>
-                <strong>Recommendation Id:</strong> <code>{summary.id ?? "Unavailable"}</code>
-              </p>
-              <p style={{ margin: 0 }}>
-                <strong>Meal Plan Id:</strong> <code>{summary.mealPlanId ?? "Unavailable"}</code>
-              </p>
-              <p style={{ margin: 0 }}>
-                <strong>Status:</strong> {summary.status ?? "Unavailable"}
-              </p>
-              <p style={{ margin: 0 }}>
-                <strong>Recommended At:</strong> {summary.recommendedAt ?? "Unavailable"}
-              </p>
-              <p style={{ margin: 0 }}>
-                <strong>Expires At:</strong> {summary.expiresAt ?? "Unavailable"}
-              </p>
-              <JsonPreview value={recommendation} />
+      {!loading && !loadError ? (
+        <>
+          <Section title="Recommendation workspace">
+            <div className="grid grid--2">
+              {view.summary.map((item) => (
+                <SummaryCard key={item.label} label={item.label} value={item.value} hint={item.hint} />
+              ))}
             </div>
-          );
-        })}
+            <p className="section__copy">
+              Guide the client with a plan, rationale, and timing without stepping outside the PT BFF routes.
+            </p>
+          </Section>
 
-        {!loading && !loadError ? <JsonPreview value={recommendationsData ?? []} /> : null}
-      </Section>
-
-      <Section title="Available Meal Plans">
-        {!loading && !loadError && mealPlans.length === 0 ? <p>No meal plans returned from PT search.</p> : null}
-
-        {mealPlans.map((mealPlan, index) => {
-          const summary = getMealPlanSummary(mealPlan);
-
-          return (
-            <div
-              key={summary.id ?? `meal-plan-${index}`}
-              style={{ borderTop: index > 0 ? "1px solid #334155" : undefined, paddingTop: index > 0 ? 12 : 0 }}
-            >
-              <p style={{ margin: 0 }}>
-                <strong>Title:</strong> {summary.title ?? "Unavailable"}
-              </p>
-              <p style={{ margin: 0 }}>
-                <strong>Id:</strong> <code>{summary.id ?? "Unavailable"}</code>
-              </p>
-              <p style={{ margin: 0 }}>
-                <strong>Vendor:</strong> {summary.vendor ?? "Unavailable"}
-              </p>
-              <JsonPreview value={mealPlan} />
-            </div>
-          );
-        })}
-
-        {!loading && !loadError ? <JsonPreview value={mealPlansData ?? []} /> : null}
-      </Section>
-
-      <Section title="Recommend Meal Plan Form">
-        <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
-          <label style={{ display: "grid", gap: 6 }}>
-            <span>Meal Plan Id</span>
-            {hasMealPlanOptions ? (
-              <select
-                value={formState.meal_plan_id}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    meal_plan_id: event.target.value,
-                  }))
-                }
-                disabled={submitting || loading || Boolean(loadError)}
-              >
-                <option value="" disabled>
-                  Select a meal plan
-                </option>
-                {mealPlans.map((mealPlan, index) => {
-                  const mealPlanId = getEntityId(mealPlan);
-
-                  if (!mealPlanId) {
-                    return null;
+          <Section title="Create recommendation">
+            <form className="form-grid" onSubmit={handleSubmit}>
+              <div className="field">
+                <span>Meal plan</span>
+                {view.mealPlans.some((mealPlan) => Boolean(mealPlan.id)) ? (
+                  <select
+                    value={formState.meal_plan_id}
+                    onChange={(event) => setFormState((current) => ({ ...current, meal_plan_id: event.target.value }))}
+                    disabled={submitting}
+                  >
+                    {view.mealPlans.map((mealPlan) =>
+                      mealPlan.id ? (
+                        <option key={mealPlan.id} value={mealPlan.id}>
+                          {mealPlan.title}
+                        </option>
+                      ) : null,
+                    )}
+                  </select>
+                ) : (
+                  <input
+                    value={formState.meal_plan_id}
+                    onChange={(event) => setFormState((current) => ({ ...current, meal_plan_id: event.target.value }))}
+                    disabled={submitting}
+                  />
+                )}
+              </div>
+              <div className="field">
+                <label htmlFor="rationale">Recommendation rationale</label>
+                <textarea
+                  id="rationale"
+                  rows={4}
+                  value={formState.rationale}
+                  onChange={(event) => setFormState((current) => ({ ...current, rationale: event.target.value }))}
+                  disabled={submitting}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="recommended_at">Recommended at</label>
+                <input
+                  id="recommended_at"
+                  type="datetime-local"
+                  value={formState.recommended_at}
+                  onChange={(event) =>
+                    setFormState((current) => ({ ...current, recommended_at: event.target.value }))
                   }
+                  disabled={submitting}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="expires_at">Expires at</label>
+                <input
+                  id="expires_at"
+                  type="datetime-local"
+                  value={formState.expires_at}
+                  onChange={(event) => setFormState((current) => ({ ...current, expires_at: event.target.value }))}
+                  disabled={submitting}
+                />
+              </div>
+              <button type="submit" disabled={submitting}>
+                {submitting ? "Submitting..." : "Recommend meal plan"}
+              </button>
+            </form>
+            {submitSuccess ? <p className="status-text status-text--success">{submitSuccess}</p> : null}
+            {submitError ? <p className="status-text status-text--danger">{submitError}</p> : null}
+          </Section>
 
-                  return (
-                    <option key={mealPlanId} value={mealPlanId}>
-                      {getMealPlanLabel(mealPlan, index)}
-                    </option>
-                  );
-                })}
-              </select>
+          <Section title="Recommendable plans">
+            {view.mealPlans.length > 0 ? (
+              <div className="stacked-list">
+                {view.mealPlans.map((mealPlan, index) => (
+                  <RecordCard
+                    key={mealPlan.id ?? `${mealPlan.title}-${index}`}
+                    eyebrow={mealPlan.vendor ?? "Meal plan"}
+                    title={mealPlan.title}
+                    description={mealPlan.description}
+                    metadata={mealPlan.id ? [{ label: "Meal plan ID", value: mealPlan.id }] : []}
+                  />
+                ))}
+              </div>
             ) : (
-              <input
-                type="text"
-                value={formState.meal_plan_id}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    meal_plan_id: event.target.value,
-                  }))
-                }
-                placeholder="Enter meal plan id"
-                disabled={submitting || loading || Boolean(loadError)}
+              <EmptyState
+                title="No meal plans returned"
+                message="The PT meal-plan search route did not return recommendable plans."
               />
             )}
-          </label>
+          </Section>
 
-          <label style={{ display: "grid", gap: 6 }}>
-            <span>Rationale</span>
-            <textarea
-              value={formState.rationale}
-              onChange={(event) =>
-                setFormState((current) => ({
-                  ...current,
-                  rationale: event.target.value,
-                }))
-              }
-              placeholder="Optional rationale"
-              rows={4}
-              disabled={submitting || loading || Boolean(loadError)}
-            />
-          </label>
-
-          <label style={{ display: "grid", gap: 6 }}>
-            <span>Recommended At</span>
-            <input
-              type="datetime-local"
-              value={formState.recommended_at}
-              onChange={(event) =>
-                setFormState((current) => ({
-                  ...current,
-                  recommended_at: event.target.value,
-                }))
-              }
-              disabled={submitting || loading || Boolean(loadError)}
-            />
-          </label>
-
-          <label style={{ display: "grid", gap: 6 }}>
-            <span>Expires At</span>
-            <input
-              type="datetime-local"
-              value={formState.expires_at}
-              onChange={(event) =>
-                setFormState((current) => ({
-                  ...current,
-                  expires_at: event.target.value,
-                }))
-              }
-              disabled={submitting || loading || Boolean(loadError)}
-            />
-          </label>
-
-          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-            <button type="submit" disabled={submitting || loading || Boolean(loadError)}>
-              {submitting ? "Submitting..." : "Recommend Meal Plan"}
-            </button>
-            {submitSuccess ? <span>{submitSuccess}</span> : null}
-          </div>
-        </form>
-
-        {submitError ? <ErrorBlock title="Unable to create meal recommendation" message={submitError} /> : null}
-      </Section>
+          <Section title="Recommendation history">
+            {view.recommendations.length > 0 ? (
+              <div className="stacked-list">
+                {view.recommendations.map((recommendation, index) => (
+                  <RecordCard
+                    key={recommendation.id ?? `${recommendation.title}-${index}`}
+                    eyebrow={recommendation.eyebrow}
+                    title={recommendation.title}
+                    description={recommendation.description}
+                    metadata={recommendation.metadata}
+                  />
+                ))}
+              </div>
+            ) : (
+              <>
+                <EmptyState
+                  title="No recommendations returned"
+                  message="This client does not yet have meal-plan recommendations from the PT endpoints."
+                />
+                {view.debugData ? (
+                  <DebugPreview value={view.debugData} label="Meal recommendations payload fallback" />
+                ) : null}
+              </>
+            )}
+          </Section>
+        </>
+      ) : null}
     </PageShell>
   );
 }

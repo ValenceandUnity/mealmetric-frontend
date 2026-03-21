@@ -7,16 +7,9 @@ type LoadingBlockProps = {
 
 export function LoadingBlock({ title, message }: LoadingBlockProps) {
   return (
-    <section
-      style={{
-        border: "1px solid #334155",
-        borderRadius: 12,
-        padding: 20,
-        background: "#111827",
-      }}
-    >
-      <h3 style={{ marginTop: 0 }}>{title}</h3>
-      {message ? <p style={{ marginBottom: 0 }}>{message}</p> : null}
+    <section className="surface surface--soft">
+      <h2 className="section__title">{title}</h2>
+      {message ? <p className="section__copy">{message}</p> : null}
     </section>
   );
 }

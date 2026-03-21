@@ -2,23 +2,21 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
-import { JsonPreview } from "@/components/JsonPreview";
+import { PageShell } from "@/components/layout/PageShell";
+import { WorkoutLogForm, type WorkoutLogFormState } from "@/components/training/WorkoutLogForm";
+import { DebugPreview } from "@/components/ui/DebugPreview";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorBlock } from "@/components/ui/ErrorBlock";
+import { LoadingBlock } from "@/components/ui/LoadingBlock";
+import { Section } from "@/components/ui/Section";
+import { adaptAssignmentDetail } from "@/lib/adapters/training";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
 
 type AssignmentDetailResponse = ApiResponse<JsonValue>;
 type WorkoutLogResponse = ApiResponse<JsonValue>;
-
-type WorkoutLogFormState = {
-  assignmentId: string;
-  routineId: string;
-  performedAt: string;
-  durationMinutes: string;
-  completionStatus: string;
-  clientNotes: string;
-};
 
 function createInitialFormState(assignmentId: string): WorkoutLogFormState {
   return {
@@ -33,10 +31,7 @@ function createInitialFormState(assignmentId: string): WorkoutLogFormState {
 
 export default function AssignmentDetailPage() {
   const params = useParams<{ assignmentId: string }>();
-  const assignmentId = useMemo(() => {
-    const raw = params?.assignmentId;
-    return typeof raw === "string" ? raw : "";
-  }, [params]);
+  const assignmentId = typeof params?.assignmentId === "string" ? params.assignmentId : "";
 
   const { status, user } = useSessionBootstrap({
     requiredRole: "client",
@@ -146,138 +141,70 @@ export default function AssignmentDetailPage() {
   }
 
   if (status === "loading") {
-    return (
-      <section>
-        <h2>Loading assignment detail</h2>
-        <p>Validating your client session.</p>
-      </section>
-    );
+    return <LoadingBlock title="Loading assignment detail" message="Validating your client session." />;
   }
 
   if (status !== "authenticated" || !user) {
-    return (
-      <section>
-        <h2>Redirecting</h2>
-        <p>Client training routes require an authenticated client session.</p>
-      </section>
-    );
+    return <LoadingBlock title="Redirecting" message="Client training routes require an authenticated client session." />;
   }
 
+  const view = adaptAssignmentDetail(detailData);
+
   return (
-    <div style={{ display: "grid", gap: 20 }}>
-      <section>
-        <h2 style={{ marginTop: 0 }}>Assignment Detail</h2>
-        <p>
-          Assignment id: <code>{assignmentId || "missing"}</code>
-        </p>
-        <nav>
-          <Link href="/client/training">Back to Training Hub</Link>
-        </nav>
-      </section>
+    <PageShell
+      title={view.summary.title}
+      user={user}
+      navigation={<Link className="link-button" href="/client/training">Back to training hub</Link>}
+    >
+      {detailLoading ? <LoadingBlock title="Loading assignment" message={`Fetching assignment detail for ${assignmentId}.`} /> : null}
+      {detailError ? <ErrorBlock title="Unable to load assignment detail" message={detailError} /> : null}
 
-      {detailLoading ? (
-        <section>
-          <h3>Loading assignment</h3>
-          <p>Fetching assignment detail from <code>/api/client/training/assignments/{assignmentId}</code>.</p>
-        </section>
-      ) : null}
-
-      {detailError ? (
-        <section>
-          <h3>Unable to load assignment detail</h3>
-          <p style={{ color: "#fca5a5" }}>{detailError}</p>
-        </section>
-      ) : null}
-
-      {detailData ? (
+      {!detailLoading && !detailError ? (
         <>
-          <section>
-            <h3 style={{ marginTop: 0 }}>Assignment Summary</h3>
-            <JsonPreview value={detailData} />
-          </section>
+          <Section title="Assignment summary">
+            <div className="meta-list">
+              <span><strong>Status:</strong> {view.summary.status ?? "Unavailable"}</span>
+              <span><strong>Package:</strong> {view.summary.packageId ?? "Unavailable"}</span>
+              <span><strong>Window:</strong> {view.summary.schedule}</span>
+              <span><strong>Checklist:</strong> {view.summary.checklistCount}</span>
+            </div>
+            <p className="section__copy">{view.summary.description}</p>
+          </Section>
 
-          <section>
-            <h3 style={{ marginTop: 0 }}>Checklist / Structure Preview</h3>
-            <JsonPreview value={detailData} />
-          </section>
+          <Section title="Checklist">
+            {view.checklist.length > 0 ? (
+              <ul className="checklist">
+                {view.checklist.map((item) => (
+                  <li key={item}>
+                    <span className="checklist__dot" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState title="Checklist unavailable" message="The assignment detail payload did not expose checklist entries." />
+            )}
+          </Section>
+
+          <Section title="Workout log">
+            <p className="section__copy">This submits only to /api/client/training/workout-logs.</p>
+            <WorkoutLogForm
+              formState={formState}
+              onChange={(key, value) => setFormState((current) => ({ ...current, [key]: value }))}
+              onSubmit={handleSubmit}
+              loading={submitLoading}
+            />
+            {submitSuccess ? <p className="status-text status-text--success">{submitSuccess}</p> : null}
+            {submitError ? <p className="status-text status-text--danger">{submitError}</p> : null}
+          </Section>
+
+          {detailData && view.checklist.length === 0 ? (
+            <Section title="Debug fallback">
+              <DebugPreview value={detailData} label="Assignment payload fallback" />
+            </Section>
+          ) : null}
         </>
       ) : null}
-
-      <section>
-        <h3 style={{ marginTop: 0 }}>Submit Workout Log</h3>
-        <p>This posts only to <code>/api/client/training/workout-logs</code>.</p>
-        <form onSubmit={handleSubmit}>
-          <div>
-            <label htmlFor="assignmentId">Assignment Id</label>
-            <input
-              id="assignmentId"
-              value={formState.assignmentId}
-              onChange={(event) =>
-                setFormState((current) => ({ ...current, assignmentId: event.target.value }))
-              }
-            />
-          </div>
-          <div>
-            <label htmlFor="routineId">Routine Id</label>
-            <input
-              id="routineId"
-              value={formState.routineId}
-              onChange={(event) =>
-                setFormState((current) => ({ ...current, routineId: event.target.value }))
-              }
-            />
-          </div>
-          <div>
-            <label htmlFor="performedAt">Performed At</label>
-            <input
-              id="performedAt"
-              value={formState.performedAt}
-              onChange={(event) =>
-                setFormState((current) => ({ ...current, performedAt: event.target.value }))
-              }
-            />
-          </div>
-          <div>
-            <label htmlFor="durationMinutes">Duration Minutes</label>
-            <input
-              id="durationMinutes"
-              type="number"
-              min="0"
-              value={formState.durationMinutes}
-              onChange={(event) =>
-                setFormState((current) => ({ ...current, durationMinutes: event.target.value }))
-              }
-            />
-          </div>
-          <div>
-            <label htmlFor="completionStatus">Completion Status</label>
-            <input
-              id="completionStatus"
-              value={formState.completionStatus}
-              onChange={(event) =>
-                setFormState((current) => ({ ...current, completionStatus: event.target.value }))
-              }
-            />
-          </div>
-          <div>
-            <label htmlFor="clientNotes">Client Notes</label>
-            <textarea
-              id="clientNotes"
-              rows={4}
-              value={formState.clientNotes}
-              onChange={(event) =>
-                setFormState((current) => ({ ...current, clientNotes: event.target.value }))
-              }
-            />
-          </div>
-          <button type="submit" disabled={submitLoading}>
-            {submitLoading ? "Submitting..." : "Submit Workout Log"}
-          </button>
-        </form>
-
-        {submitSuccess ? <p style={{ color: "#86efac" }}>{submitSuccess}</p> : null}
-        {submitError ? <p style={{ color: "#fca5a5" }}>{submitError}</p> : null}
-      </section>
-    </div>
+    </PageShell>
   );
 }

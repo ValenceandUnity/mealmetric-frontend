@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { JsonPreview } from "@/components/JsonPreview";
 import { LogoutButton } from "@/components/LogoutButton";
+import { SummaryCard } from "@/components/cards/SummaryCard";
 import { PageShell } from "@/components/layout/PageShell";
+import { DebugPreview } from "@/components/ui/DebugPreview";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { Section } from "@/components/ui/Section";
+import { adaptPTDashboard } from "@/lib/adapters/dashboard";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, PTDashboardResponse } from "@/lib/types/api";
 
@@ -77,40 +80,78 @@ export default function PTDashboardPage() {
     return <LoadingBlock title="Redirecting" message="PT access requires an authenticated PT session." />;
   }
 
+  const view = dashboardData ? adaptPTDashboard(dashboardData) : null;
+
   return (
     <PageShell
-      title="PT Dashboard"
+      title="Coach dashboard"
       user={user}
       navigation={
         <>
-          <Link href="/pt/clients">Clients</Link>{" "}
-          <Link href="/pt/settings">Settings</Link>{" "}
-          <Link href="/">Back to Landing</Link>
+          <Link className="link-button" href="/pt/clients">Clients</Link>
+          <Link className="link-button" href="/pt/settings">Settings</Link>
         </>
       }
       actions={<LogoutButton />}
     >
-      {loading ? (
-        <LoadingBlock
-          title="Loading dashboard data"
-          message="Calling /api/pt/dashboard through the BFF."
-        />
-      ) : null}
-
+      {loading ? <LoadingBlock title="Loading dashboard data" message="Calling /api/pt/dashboard through the BFF." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load PT dashboard" message={errorMessage} /> : null}
 
-      {dashboardData ? (
+      {view && dashboardData ? (
         <>
-          <Section title="Profile">
-            <JsonPreview value={dashboardData.profile} />
+          <Section title="PT summary">
+            <div className="grid grid--2">
+              {view.summary.map((item) => (
+                <SummaryCard key={item.label} label={item.label} value={item.value} hint={item.hint} />
+              ))}
+            </div>
           </Section>
 
-          <Section title="Clients Preview">
-            <JsonPreview value={dashboardData.clients} />
+          <Section title="Client overview">
+            {view.clients.length > 0 ? (
+              <div className="stacked-list">
+                {view.clients.map((client) => (
+                  <article key={client.id ?? client.title} className="list-card">
+                    <h3 className="list-card__title">{client.title}</h3>
+                    <p className="list-card__copy">{client.subtitle}</p>
+                    {client.id ? (
+                      <div className="row">
+                        <Link className="link-button" href={`/pt/clients/${client.id}/metrics`}>Metrics</Link>
+                        <Link className="link-button" href={`/pt/clients/${client.id}/assign`}>Training</Link>
+                        <Link className="link-button" href={`/pt/clients/${client.id}/recommend-meal-plan`}>Recommend meal plan</Link>
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState title="No clients returned" message="Client accounts will appear here when the BFF dashboard payload includes them." />
+            )}
           </Section>
 
-          <Section title="Packages Preview">
-            <JsonPreview value={dashboardData.packages} />
+          <Section title="Packages overview">
+            {view.packages.length > 0 ? (
+              <div className="stacked-list">
+                {view.packages.map((pkg) => (
+                  <article key={pkg.id ?? pkg.title} className="list-card">
+                    <h3 className="list-card__title">{pkg.title}</h3>
+                    <p className="list-card__copy">{pkg.subtitle}</p>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState title="No packages returned" message="Package inventory will appear here when the PT dashboard exposes it." />
+            )}
+          </Section>
+
+          <Section title="Recommendations">
+            <p className="section__copy">
+              Use the client workspace to create assignment and meal-plan recommendations without breaking the BFF boundary.
+            </p>
+            <Link className="link-button link-button--accent" href="/pt/clients">Open client command center</Link>
+            {view.summary.length === 0 ? (
+              <DebugPreview value={dashboardData.profile} label="Profile debug fallback" />
+            ) : null}
           </Section>
         </>
       ) : null}

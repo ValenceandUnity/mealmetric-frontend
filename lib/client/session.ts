@@ -31,12 +31,54 @@ type UseSessionBootstrapOptions = {
 
 type SessionApiResponse = ApiResponse<SessionStatusResponse>;
 
-export function dashboardPathForRole(role: UserRole): "/client" | "/pt" | null {
+function isSessionUser(value: unknown): value is SessionUser {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.email === "string" &&
+    typeof candidate.role === "string"
+  );
+}
+
+function normalizeSessionStatusResponse(payload: unknown): SessionStatusResponse | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const candidate = payload as Record<string, unknown>;
+  const data =
+    "data" in candidate && candidate.data && typeof candidate.data === "object"
+      ? (candidate.data as Record<string, unknown>)
+      : candidate;
+
+  if (data.authenticated === false) {
+    return {
+      authenticated: false,
+    };
+  }
+
+  if (data.authenticated === true && isSessionUser(data.user)) {
+    return {
+      authenticated: true,
+      user: data.user,
+    };
+  }
+
+  return null;
+}
+
+export function dashboardPathForRole(role: UserRole): "/client" | "/pt" | "/vendor" | null {
   switch (role) {
     case "client":
       return "/client";
     case "pt":
       return "/pt";
+    case "vendor":
+      return "/vendor";
     default:
       return null;
   }
@@ -66,12 +108,13 @@ export function useSessionBootstrap(
           cache: "no-store",
         });
         const payload = (await response.json()) as SessionApiResponse;
+        const sessionStatus = normalizeSessionStatusResponse(payload);
 
         if (!active) {
           return;
         }
 
-        if (!payload.ok || !payload.data.authenticated) {
+        if (!sessionStatus || !sessionStatus.authenticated) {
           setState({
             status: "unauthenticated",
             user: null,
@@ -83,7 +126,7 @@ export function useSessionBootstrap(
           return;
         }
 
-        const user = payload.data.user;
+        const user = sessionStatus.user;
         const dashboardPath = dashboardPathForRole(user.role);
 
         if (!dashboardPath) {

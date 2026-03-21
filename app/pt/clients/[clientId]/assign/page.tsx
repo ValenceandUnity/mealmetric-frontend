@@ -2,15 +2,19 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
-import { JsonPreview, getArrayItems, getEntityId } from "@/components/JsonPreview";
+import { RecordCard } from "@/components/cards/RecordCard";
+import { SummaryCard } from "@/components/cards/SummaryCard";
 import { PageShell } from "@/components/layout/PageShell";
+import { DebugPreview } from "@/components/ui/DebugPreview";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { Section } from "@/components/ui/Section";
+import { adaptPTAssignmentWorkspace } from "@/lib/adapters/client-records";
 import { useSessionBootstrap } from "@/lib/client/session";
-import type { ApiResponse, JsonObject, JsonValue } from "@/lib/types/api";
+import type { ApiResponse, JsonValue } from "@/lib/types/api";
 
 type JsonApiResponse = ApiResponse<JsonValue>;
 
@@ -20,62 +24,8 @@ type AssignmentFormState = {
   end_date: string;
 };
 
-function isObject(value: JsonValue): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function getTextField(value: JsonValue, keys: string[]): string | null {
-  if (!isObject(value)) {
-    return null;
-  }
-
-  for (const key of keys) {
-    const candidate = value[key];
-    if (typeof candidate === "string" && candidate.trim().length > 0) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
 function formatOptionalDate(value: string): string | null {
   return value.trim().length > 0 ? value : null;
-}
-
-function getPackageLabel(pkg: JsonValue, fallbackIndex: number): string {
-  const title = getTextField(pkg, ["name", "title", "package_name"]);
-  const packageId = getEntityId(pkg);
-
-  if (title && packageId) {
-    return `${title} (${packageId})`;
-  }
-
-  if (title) {
-    return title;
-  }
-
-  if (packageId) {
-    return packageId;
-  }
-
-  return `Package #${fallbackIndex + 1}`;
-}
-
-function getAssignmentSummary(assignment: JsonValue): {
-  assignmentId: string | null;
-  trainingPackageId: string | null;
-  status: string | null;
-  startDate: string | null;
-  endDate: string | null;
-} {
-  return {
-    assignmentId: getTextField(assignment, ["assignment_id", "id"]),
-    trainingPackageId: getTextField(assignment, ["training_package_id", "package_id"]),
-    status: getTextField(assignment, ["status"]),
-    startDate: getTextField(assignment, ["start_date"]),
-    endDate: getTextField(assignment, ["end_date"]),
-  };
 }
 
 export default function PTClientAssignPage() {
@@ -128,15 +78,11 @@ export default function PTClientAssignPage() {
 
         if (!packagesPayload.ok) {
           setLoadError(packagesPayload.error.message);
-          setPackagesData(null);
-          setAssignmentsData(null);
           return;
         }
 
         if (!assignmentsPayload.ok) {
           setLoadError(assignmentsPayload.error.message);
-          setPackagesData(null);
-          setAssignmentsData(null);
           return;
         }
 
@@ -145,8 +91,6 @@ export default function PTClientAssignPage() {
       } catch {
         if (active) {
           setLoadError("Unable to load packages and assignments.");
-          setPackagesData(null);
-          setAssignmentsData(null);
         }
       } finally {
         if (active) {
@@ -162,31 +106,22 @@ export default function PTClientAssignPage() {
     };
   }, [clientId, status, user]);
 
-  const packages = packagesData ? getArrayItems(packagesData) : [];
-  const assignments = assignmentsData ? getArrayItems(assignmentsData) : [];
-  const hasPackageOptions = packages.some((pkg) => Boolean(getEntityId(pkg)));
+  const view = adaptPTAssignmentWorkspace(packagesData, assignmentsData);
 
   useEffect(() => {
-    if (formState.training_package_id || !hasPackageOptions || !packagesData) {
+    if (formState.training_package_id || view.packageOptions.length === 0) {
       return;
     }
 
-    const firstPackageId = getArrayItems(packagesData)
-      .map((pkg) => getEntityId(pkg))
-      .find((value) => Boolean(value));
-
-    if (firstPackageId) {
-      setFormState((current) => ({
-        ...current,
-        training_package_id: firstPackageId,
-      }));
+    const firstId = view.packageOptions.find((pkg) => Boolean(pkg.id))?.id;
+    if (firstId) {
+      setFormState((current) => ({ ...current, training_package_id: firstId }));
     }
-  }, [formState.training_package_id, hasPackageOptions, packagesData]);
+  }, [formState.training_package_id, view.packageOptions]);
 
   async function refreshAssignments() {
     const response = await fetch(`/api/pt/clients/${clientId}/assignments`, { cache: "no-store" });
     const payload = (await response.json()) as JsonApiResponse;
-
     if (!payload.ok) {
       throw new Error(payload.error.message);
     }
@@ -194,7 +129,7 @@ export default function PTClientAssignPage() {
     setAssignmentsData(payload.data);
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!formState.training_package_id.trim()) {
@@ -230,7 +165,7 @@ export default function PTClientAssignPage() {
       await refreshAssignments();
       setSubmitSuccess("Assignment created successfully.");
       setFormState((current) => ({
-        training_package_id: hasPackageOptions ? current.training_package_id : "",
+        ...current,
         start_date: "",
         end_date: "",
       }));
@@ -251,177 +186,139 @@ export default function PTClientAssignPage() {
 
   return (
     <PageShell
-      title="Assign Training Package"
+      title="Assign training package"
       user={user}
       navigation={
-        <nav style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <Link href="/pt/clients">Back to PT Clients</Link>
-        </nav>
+        <>
+          <Link className="link-button" href={`/pt/clients/${clientId}`}>
+            Client overview
+          </Link>
+          <Link className="link-button" href="/pt/clients">
+            Back to clients
+          </Link>
+        </>
       }
     >
-      <Section title="Header">
-        <p style={{ margin: 0 }}>
-          <strong>Client Id:</strong> <code>{clientId || "Unavailable"}</code>
-        </p>
-        <p style={{ margin: 0 }}>Assignments and packages are loaded only through PT BFF routes under <code>/api/*</code>.</p>
-      </Section>
-
-      {loading ? (
-        <LoadingBlock
-          title="Loading assignment data"
-          message="Fetching available PT packages and this client's existing assignments."
-        />
-      ) : null}
-
+      {loading ? <LoadingBlock title="Loading assignment data" message="Fetching PT packages and existing assignments." /> : null}
       {loadError ? <ErrorBlock title="Unable to load assignment data" message={loadError} /> : null}
 
-      <Section title="Existing Assignments">
-        {!loading && !loadError && assignments.length === 0 ? (
-          <p>No assignments returned for this client.</p>
-        ) : null}
-
-        {assignments.map((assignment, index) => {
-          const summary = getAssignmentSummary(assignment);
-
-          return (
-            <div
-              key={summary.assignmentId ?? `assignment-${index}`}
-              style={{ borderTop: index > 0 ? "1px solid #334155" : undefined, paddingTop: index > 0 ? 12 : 0 }}
-            >
-              <p style={{ margin: 0 }}>
-                <strong>Assignment:</strong> <code>{summary.assignmentId ?? "Unavailable"}</code>
-              </p>
-              <p style={{ margin: 0 }}>
-                <strong>Package:</strong> <code>{summary.trainingPackageId ?? "Unavailable"}</code>
-              </p>
-              <p style={{ margin: 0 }}>
-                <strong>Status:</strong> {summary.status ?? "Unavailable"}
-              </p>
-              <p style={{ margin: 0 }}>
-                <strong>Dates:</strong> {summary.startDate ?? "No start date"} to {summary.endDate ?? "No end date"}
-              </p>
-              <JsonPreview value={assignment} />
+      {!loading && !loadError ? (
+        <>
+          <Section title="Assignment workspace">
+            <div className="grid grid--2">
+              {view.summary.map((item) => (
+                <SummaryCard key={item.label} label={item.label} value={item.value} hint={item.hint} />
+              ))}
             </div>
-          );
-        })}
+            <p className="section__copy">Client ID: {clientId || "Unavailable"}</p>
+          </Section>
 
-        {!loading && !loadError ? <JsonPreview value={assignmentsData ?? []} /> : null}
-      </Section>
+          <Section title="Create assignment">
+            <form className="form-grid" onSubmit={handleSubmit}>
+              <div className="field">
+                <span>Training package</span>
+                {view.packageOptions.some((pkg) => Boolean(pkg.id)) ? (
+                  <select
+                    value={formState.training_package_id}
+                    onChange={(event) =>
+                      setFormState((current) => ({ ...current, training_package_id: event.target.value }))
+                    }
+                    disabled={submitting}
+                  >
+                    {view.packageOptions.map((pkg) =>
+                      pkg.id ? (
+                        <option key={pkg.id} value={pkg.id}>
+                          {pkg.title}
+                        </option>
+                      ) : null,
+                    )}
+                  </select>
+                ) : (
+                  <input
+                    value={formState.training_package_id}
+                    onChange={(event) =>
+                      setFormState((current) => ({ ...current, training_package_id: event.target.value }))
+                    }
+                    disabled={submitting}
+                  />
+                )}
+              </div>
+              <div className="field">
+                <label htmlFor="start_date">Start date</label>
+                <input
+                  id="start_date"
+                  type="date"
+                  value={formState.start_date}
+                  onChange={(event) => setFormState((current) => ({ ...current, start_date: event.target.value }))}
+                  disabled={submitting}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="end_date">End date</label>
+                <input
+                  id="end_date"
+                  type="date"
+                  value={formState.end_date}
+                  onChange={(event) => setFormState((current) => ({ ...current, end_date: event.target.value }))}
+                  disabled={submitting}
+                />
+              </div>
+              <button type="submit" disabled={submitting}>
+                {submitting ? "Assigning..." : "Assign package"}
+              </button>
+            </form>
+            {submitSuccess ? <p className="status-text status-text--success">{submitSuccess}</p> : null}
+            {submitError ? <p className="status-text status-text--danger">{submitError}</p> : null}
+          </Section>
 
-      <Section title="Available Packages">
-        {!loading && !loadError && packages.length === 0 ? <p>No PT packages returned.</p> : null}
-
-        {packages.map((pkg, index) => {
-          const packageId = getEntityId(pkg);
-          const packageName = getTextField(pkg, ["name", "title", "package_name"]);
-
-          return (
-            <div
-              key={packageId ?? `package-${index}`}
-              style={{ borderTop: index > 0 ? "1px solid #334155" : undefined, paddingTop: index > 0 ? 12 : 0 }}
-            >
-              <p style={{ margin: 0 }}>
-                <strong>Name:</strong> {packageName ?? "Unavailable"}
-              </p>
-              <p style={{ margin: 0 }}>
-                <strong>Id:</strong> <code>{packageId ?? "Unavailable"}</code>
-              </p>
-              <JsonPreview value={pkg} />
-            </div>
-          );
-        })}
-
-        {!loading && !loadError ? <JsonPreview value={packagesData ?? []} /> : null}
-      </Section>
-
-      <Section title="Assign Package Form">
-        <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
-          <label style={{ display: "grid", gap: 6 }}>
-            <span>Training Package Id</span>
-            {hasPackageOptions ? (
-              <select
-                value={formState.training_package_id}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    training_package_id: event.target.value,
-                  }))
-                }
-                disabled={submitting || loading || Boolean(loadError)}
-              >
-                <option value="" disabled>
-                  Select a package
-                </option>
-                {packages.map((pkg, index) => {
-                  const packageId = getEntityId(pkg);
-
-                  if (!packageId) {
-                    return null;
-                  }
-
-                  return (
-                    <option key={packageId} value={packageId}>
-                      {getPackageLabel(pkg, index)}
-                    </option>
-                  );
-                })}
-              </select>
+          <Section title="Package options">
+            {view.packageOptions.length > 0 ? (
+              <div className="stacked-list">
+                {view.packageOptions.map((pkg, index) => (
+                  <RecordCard
+                    key={pkg.id ?? `${pkg.title}-${index}`}
+                    eyebrow="Package"
+                    title={pkg.title}
+                    description={pkg.description}
+                    metadata={pkg.id ? [{ label: "Package ID", value: pkg.id }] : []}
+                  />
+                ))}
+              </div>
             ) : (
-              <input
-                type="text"
-                value={formState.training_package_id}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    training_package_id: event.target.value,
-                  }))
-                }
-                placeholder="Enter training package id"
-                disabled={submitting || loading || Boolean(loadError)}
+              <EmptyState
+                title="No packages returned"
+                message="The PT package route did not return assignable packages for this workflow."
               />
             )}
-          </label>
+          </Section>
 
-          <label style={{ display: "grid", gap: 6 }}>
-            <span>Start Date</span>
-            <input
-              type="date"
-              value={formState.start_date}
-              onChange={(event) =>
-                setFormState((current) => ({
-                  ...current,
-                  start_date: event.target.value,
-                }))
-              }
-              disabled={submitting || loading || Boolean(loadError)}
-            />
-          </label>
-
-          <label style={{ display: "grid", gap: 6 }}>
-            <span>End Date</span>
-            <input
-              type="date"
-              value={formState.end_date}
-              onChange={(event) =>
-                setFormState((current) => ({
-                  ...current,
-                  end_date: event.target.value,
-                }))
-              }
-              disabled={submitting || loading || Boolean(loadError)}
-            />
-          </label>
-
-          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-            <button type="submit" disabled={submitting || loading || Boolean(loadError)}>
-              {submitting ? "Assigning..." : "Assign Package"}
-            </button>
-            {submitSuccess ? <span>{submitSuccess}</span> : null}
-          </div>
-        </form>
-
-        {submitError ? <ErrorBlock title="Unable to create assignment" message={submitError} /> : null}
-      </Section>
+          <Section title="Existing assignments">
+            {view.assignments.length > 0 ? (
+              <div className="stacked-list">
+                {view.assignments.map((assignment, index) => (
+                  <RecordCard
+                    key={assignment.id ?? `${assignment.title}-${index}`}
+                    eyebrow={assignment.eyebrow}
+                    title={assignment.title}
+                    description={assignment.description}
+                    metadata={assignment.metadata}
+                  />
+                ))}
+              </div>
+            ) : (
+              <>
+                <EmptyState
+                  title="No assignments returned"
+                  message="This client does not yet have active assignments from the PT endpoints."
+                />
+                {view.debugData ? (
+                  <DebugPreview value={view.debugData} label="Assignments payload fallback" />
+                ) : null}
+              </>
+            )}
+          </Section>
+        </>
+      ) : null}
     </PageShell>
   );
 }

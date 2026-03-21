@@ -70,3 +70,75 @@ export type PTDashboardResponse = {
   clients: JsonValue;
   packages: JsonValue;
 };
+
+export type MealPlanSummary = {
+  id: string;
+  vendor_id: string;
+  vendor_name: string;
+  vendor_zip_code: string | null;
+  slug: string;
+  name: string;
+  description: string | null;
+  status: string;
+  total_price_cents: number;
+  total_calories: number;
+  item_count: number;
+  availability_count: number;
+};
+
+export type MealPlanListPayload = {
+  items: MealPlanSummary[];
+  count: number;
+};
+
+export type BookmarkItem = {
+  id: string;
+  meal_plan_id: string;
+  note: string | null;
+  created_at: string;
+  meal_plan: MealPlanSummary;
+};
+
+export type BookmarkFolder = {
+  id: string;
+  client_user_id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  items: BookmarkItem[];
+};
+
+export type BookmarkFolderListPayload = {
+  items: BookmarkFolder[];
+  count: number;
+};
+
+export type VendorIdentity = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  zip_code: string | null;
+  status: string;
+  meal_plan_count: number;
+};
+
+export type VendorMePayload = {
+  user_id: string;
+  email: string;
+  vendor_ids: string[];
+  default_vendor: VendorIdentity | null;
+  vendors: VendorIdentity[];
+};
+
+export type VendorMetricsPayload = {
+  vendor_id: string;
+  vendor_name: string;
+  zip_code: string | null;
+  total_meal_plans: number;
+  published_meal_plans: number;
+  draft_meal_plans: number;
+  total_availability_entries: number;
+  open_pickup_windows: number;
+};

@@ -28,6 +28,7 @@ export default function LandingPage() {
       <ul>
         <li>Sign in as a client to access the first real client-home slice.</li>
         <li>Sign in as a PT to reach the guarded PT placeholder page.</li>
+        <li>Sign in as a vendor to reach the vendor-only route tree.</li>
         <li>Backend secrets and trusted-caller headers stay server-only.</li>
       </ul>
       <nav>

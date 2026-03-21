@@ -2,83 +2,29 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
-import { JsonPreview, getArrayItems } from "@/components/JsonPreview";
+import { RecordCard } from "@/components/cards/RecordCard";
+import { SummaryCard } from "@/components/cards/SummaryCard";
 import { PageShell } from "@/components/layout/PageShell";
+import { DebugPreview } from "@/components/ui/DebugPreview";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { Section } from "@/components/ui/Section";
+import {
+  getCheckoutSessionSummary,
+} from "@/lib/adapters/client-records";
+import { adaptMealPlanDetail } from "@/lib/adapters/meal-plans";
 import { useSessionBootstrap } from "@/lib/client/session";
-import type { ApiResponse, JsonObject, JsonValue } from "@/lib/types/api";
+import type { ApiResponse, JsonValue } from "@/lib/types/api";
 
 type MealPlanDetailResponse = ApiResponse<JsonValue>;
 type CheckoutSessionResponse = ApiResponse<JsonValue>;
 
-function isObject(value: JsonValue): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function getTextField(value: JsonValue, keys: string[]): string | null {
-  if (!isObject(value)) {
-    return null;
-  }
-
-  for (const key of keys) {
-    const candidate = value[key];
-    if (typeof candidate === "string" && candidate.trim().length > 0) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
-function getPriceField(value: JsonValue): string | null {
-  if (!isObject(value)) {
-    return null;
-  }
-
-  const cents = value.total_price_cents;
-  if (typeof cents === "number") {
-    return `$${(cents / 100).toFixed(2)}`;
-  }
-
-  const raw = value.price;
-  if (typeof raw === "string" && raw.trim().length > 0) {
-    return raw;
-  }
-
-  return null;
-}
-
-function getMealsPreview(value: JsonValue): JsonValue[] {
-  if (!isObject(value)) {
-    return [];
-  }
-
-  const candidates = [
-    value.meals,
-    value.items,
-    value.meal_items,
-    value.included_meals,
-  ];
-
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) {
-      return candidate;
-    }
-  }
-
-  return [];
-}
-
 export default function ClientMealPlanDetailPage() {
   const params = useParams<{ mealPlanId: string }>();
-  const mealPlanId = useMemo(() => {
-    const raw = params?.mealPlanId;
-    return typeof raw === "string" ? raw : "";
-  }, [params]);
+  const mealPlanId = typeof params?.mealPlanId === "string" ? params.mealPlanId : "";
 
   const { status, user } = useSessionBootstrap({
     requiredRole: "client",
@@ -92,8 +38,8 @@ export default function ClientMealPlanDetailPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [checkoutSuccess, setCheckoutSuccess] = useState<string | null>(null);
+  const [checkoutData, setCheckoutData] = useState<JsonValue | null>(null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
-  const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (status !== "authenticated" || !user || user.role !== "client" || !mealPlanId) {
@@ -146,8 +92,8 @@ export default function ClientMealPlanDetailPage() {
     setCheckoutLoading(true);
     setCheckoutError(null);
     setCheckoutSuccess(null);
+    setCheckoutData(null);
     setCheckoutUrl(null);
-    setCheckoutSessionId(null);
 
     try {
       const response = await fetch("/api/client/checkout/session", {
@@ -166,35 +112,20 @@ export default function ClientMealPlanDetailPage() {
         return;
       }
 
-      const data = payload.data;
-      const responseObject =
-        typeof data === "object" && data !== null && !Array.isArray(data)
-          ? (data as Record<string, unknown>)
+      const data =
+        typeof payload.data === "object" && payload.data !== null && !Array.isArray(payload.data)
+          ? payload.data
           : null;
 
-      const returnedCheckoutUrl =
-        responseObject && typeof responseObject.checkout_url === "string"
-          ? responseObject.checkout_url
-          : null;
-      const returnedSessionId =
-        responseObject && typeof responseObject.session_id === "string"
-          ? responseObject.session_id
-          : null;
+      const returnedCheckoutUrl = data && typeof data.checkout_url === "string" ? data.checkout_url : null;
 
+      setCheckoutData(payload.data);
       setCheckoutUrl(returnedCheckoutUrl);
-      setCheckoutSessionId(returnedSessionId);
-
-      if (returnedCheckoutUrl) {
-        setCheckoutSuccess("Checkout session created. Use the link below to proceed.");
-        return;
-      }
-
-      if (returnedSessionId) {
-        setCheckoutSuccess("Checkout session created successfully.");
-        return;
-      }
-
-      setCheckoutSuccess("Checkout session created through the BFF.");
+      setCheckoutSuccess(
+        returnedCheckoutUrl
+          ? "Checkout session created. Use the launch link below."
+          : "Checkout session created through the BFF.",
+      );
     } catch {
       setCheckoutError("Unable to create checkout session.");
     } finally {
@@ -207,104 +138,99 @@ export default function ClientMealPlanDetailPage() {
   }
 
   if (status !== "authenticated" || !user) {
-    return (
-      <LoadingBlock
-        title="Redirecting"
-        message="Meal plan detail requires an authenticated client session."
-      />
-    );
+    return <LoadingBlock title="Redirecting" message="Meal plan detail requires an authenticated client session." />;
   }
 
-  const title = mealPlan ? getTextField(mealPlan, ["name", "title"]) : null;
-  const vendor = mealPlan ? getTextField(mealPlan, ["vendor", "vendor_name"]) : null;
-  const description = mealPlan ? getTextField(mealPlan, ["description", "summary"]) : null;
-  const price = mealPlan ? getPriceField(mealPlan) : null;
-  const meals = mealPlan ? getMealsPreview(mealPlan) : [];
+  const view = adaptMealPlanDetail(mealPlan);
+  const checkoutSummary = getCheckoutSessionSummary(checkoutData);
 
   return (
     <PageShell
-      title={title ?? "Meal Plan Detail"}
+      title={view.summary.title}
       user={user}
-      navigation={<Link href="/client/meal-plans">Back to Meal Plans</Link>}
+      navigation={<Link className="link-button" href="/client/meal-plans">Back to meal plans</Link>}
     >
-      {vendor ? (
-        <Section>
-          <p style={{ margin: 0 }}>
-            <strong>Vendor:</strong> {vendor}
-          </p>
-        </Section>
-      ) : null}
+      {loading ? <LoadingBlock title="Loading detail" message={`Fetching /api/client/meal-plans/${mealPlanId}.`} /> : null}
+      {errorMessage ? <ErrorBlock title="Unable to load meal plan detail" message={errorMessage} /> : null}
 
-      {loading ? (
-        <LoadingBlock
-          title="Loading detail"
-          message={`Fetching /api/client/meal-plans/${mealPlanId || "..."}.`}
-        />
-      ) : null}
-
-      {errorMessage ? (
-        <ErrorBlock title="Unable to load meal plan detail" message={errorMessage} />
-      ) : null}
-
-      {mealPlan ? (
+      {!loading && !errorMessage ? (
         <>
-          <Section title="Overview">
-            {description ? <p>{description}</p> : <p>No description returned.</p>}
-            {price ? <p><strong>Pricing:</strong> {price}</p> : <p>No pricing returned.</p>}
+          <Section title="Plan summary">
+            <div className="grid grid--2">
+              <SummaryCard label="Vendor" value={view.summary.vendor ?? "Unavailable"} hint="Meal plan provider returned by the client route." />
+              <SummaryCard label="Meals" value={view.summary.mealCount} hint="Structured meal items included in this plan." />
+            </div>
+            <p className="section__copy">{view.summary.description}</p>
           </Section>
 
-          <Section title="Meals / Structure">
-            {meals.length > 0 ? (
-              <ul>
-                {getArrayItems(meals).slice(0, 6).map((item, index) => (
-                  <li key={index}>
-                    <JsonPreview value={item} />
-                  </li>
+          <Section title="Included meals">
+            {view.meals.length > 0 ? (
+              <div className="stacked-list">
+                {view.meals.map((meal) => (
+                  <RecordCard
+                    key={meal}
+                    eyebrow="Included meal"
+                    title={meal}
+                    description="Part of the selected plan."
+                    metadata={[
+                      { label: "Plan ID", value: mealPlanId || "Unavailable" },
+                      { label: "Price", value: view.summary.price },
+                    ]}
+                  />
                 ))}
-              </ul>
+              </div>
             ) : (
-              <p>No included meals were returned.</p>
+              <>
+                <EmptyState
+                  title="No meal structure returned"
+                  message="This payload did not include named meals or meal items."
+                />
+                {mealPlan ? <DebugPreview value={mealPlan} label="Meal-plan detail payload fallback" /> : null}
+              </>
             )}
           </Section>
 
-          <Section title="Selection">
-            <button type="button" onClick={() => setSelectedPlanId(mealPlanId)}>
-              Select Plan
-            </button>
-            {selectedPlanId === mealPlanId ? (
-              <p style={{ color: "#86efac" }}>This plan is selected locally in the current page session.</p>
-            ) : (
-              <p>No plan selected yet in this page session.</p>
-            )}
-          </Section>
-
-          <Section title="Checkout">
-            <button
-              type="button"
-              onClick={() => void handleStartCheckout()}
-              disabled={checkoutLoading}
-            >
-              {checkoutLoading ? "Creating Checkout Session..." : "Start Checkout"}
-            </button>
-            {checkoutSuccess ? <p style={{ color: "#86efac" }}>{checkoutSuccess}</p> : null}
-            {checkoutError ? <p style={{ color: "#fca5a5" }}>{checkoutError}</p> : null}
-            {checkoutUrl ? (
-              <p>
-                Proceed to Checkout:{" "}
-                <a href={checkoutUrl} target="_blank" rel="noreferrer">
-                  {checkoutUrl}
-                </a>
-              </p>
+          <Section title="Selection and checkout">
+            <RecordCard
+              eyebrow={selectedPlanId === mealPlanId ? "Selected" : "Ready"}
+              title={selectedPlanId === mealPlanId ? "Plan selected" : "Choose this plan"}
+              description={
+                selectedPlanId === mealPlanId
+                  ? "This meal plan is selected in the current page session."
+                  : "Selection remains local to this page until you start checkout."
+              }
+              metadata={[
+                { label: "Plan ID", value: mealPlanId || "Unavailable" },
+                { label: "Price", value: view.summary.price },
+              ]}
+              footer={
+                <>
+                  <button type="button" onClick={() => setSelectedPlanId(mealPlanId)}>
+                    Select plan
+                  </button>
+                  <button type="button" onClick={() => void handleStartCheckout()} disabled={checkoutLoading}>
+                    {checkoutLoading ? "Creating checkout..." : "Start checkout"}
+                  </button>
+                  {checkoutUrl ? (
+                    <a className="link-button link-button--accent" href={checkoutUrl} target="_blank" rel="noreferrer">
+                      Open checkout
+                    </a>
+                  ) : null}
+                </>
+              }
+            />
+            {checkoutSuccess ? <p className="status-text status-text--success">{checkoutSuccess}</p> : null}
+            {checkoutError ? <p className="status-text status-text--danger">{checkoutError}</p> : null}
+            {checkoutSummary.length > 0 ? (
+              <div className="stacked-list">
+                <RecordCard
+                  eyebrow="Checkout session"
+                  title="Checkout created"
+                  description="The session was created through /api/client/checkout/session."
+                  metadata={checkoutSummary}
+                />
+              </div>
             ) : null}
-            {checkoutSessionId ? (
-              <p>
-                Checkout Session ID: <code>{checkoutSessionId}</code>
-              </p>
-            ) : null}
-          </Section>
-
-          <Section title="Metadata">
-            <JsonPreview value={mealPlan} />
           </Section>
         </>
       ) : null}

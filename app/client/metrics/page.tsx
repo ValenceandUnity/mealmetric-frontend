@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { JsonPreview } from "@/components/JsonPreview";
+import { SummaryCard } from "@/components/cards/SummaryCard";
 import { PageShell } from "@/components/layout/PageShell";
+import { MetricsPanel } from "@/components/metrics/MetricsPanel";
+import { DebugPreview } from "@/components/ui/DebugPreview";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { Section } from "@/components/ui/Section";
+import { Tabs } from "@/components/ui/Tabs";
+import { adaptMetrics } from "@/lib/adapters/metrics";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, ClientMetricsResponse, JsonValue } from "@/lib/types/api";
 
@@ -106,72 +110,66 @@ export default function ClientMetricsPage() {
   }
 
   if (status !== "authenticated" || !user) {
-    return (
-      <LoadingBlock
-        title="Redirecting"
-        message="Client metrics require an authenticated client session."
-      />
-    );
+    return <LoadingBlock title="Redirecting" message="Client metrics require an authenticated client session." />;
   }
 
   const currentData = activeTab === "overview" ? overview : history;
+  const currentView = adaptMetrics(currentData);
+  const sectionTitle = activeTab === "overview" ? "Overview metrics" : "History metrics";
+  const sectionCopy =
+    activeTab === "overview"
+      ? "Use the overview tab for current status and headline metric rollups."
+      : "Use the history tab for trend-oriented records and prior checkpoints.";
 
   return (
     <PageShell
       title="Metrics"
       user={user}
-      navigation={<Link href="/client">Back to Client Home</Link>}
+      navigation={<Link className="link-button" href="/client">Back to client home</Link>}
     >
-      <Section>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <button
-            type="button"
-            onClick={() => setActiveTab("overview")}
-            disabled={activeTab === "overview"}
-          >
-            Overview
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("history")}
-            disabled={activeTab === "history"}
-          >
-            History
-          </button>
-          <button
-            type="button"
-            onClick={() => void refreshTab(activeTab)}
-            disabled={refreshing}
-          >
+      <Section title="Metric views">
+        <div className="row row--between">
+          <Tabs
+            active={activeTab}
+            onChange={setActiveTab}
+            options={[
+              { value: "overview", label: "Overview" },
+              { value: "history", label: "History" },
+            ]}
+          />
+          <button type="button" onClick={() => void refreshTab(activeTab)} disabled={refreshing}>
             {refreshing ? "Refreshing..." : `Refresh ${activeTab}`}
           </button>
         </div>
+        <p className="section__copy">{sectionCopy}</p>
       </Section>
 
-      {loading ? (
-        <LoadingBlock
-          title="Loading metrics data"
-          message="Fetching /api/client/metrics through the BFF."
-        />
-      ) : null}
-
+      {loading ? <LoadingBlock title="Loading metrics data" message="Fetching /api/client/metrics through the BFF." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load metrics" message={errorMessage} /> : null}
 
       {!loading && !errorMessage ? (
-        <Section title={activeTab === "overview" ? "Overview" : "History"}>
-          <div>
-            <p style={{ marginTop: 0 }}>
-              {activeTab === "overview" ? "Overview" : "History"}
-            </p>
-          </div>
-          <div>
-            {currentData === null ? (
-              <p>No {activeTab} data returned.</p>
-            ) : (
-              <JsonPreview value={currentData} emptyMessage={`No ${activeTab} data returned.`} />
-            )}
-          </div>
-        </Section>
+        <>
+          <Section title="Snapshot">
+            <div className="grid grid--2">
+              <SummaryCard label="Active view" value={activeTab === "overview" ? "Overview" : "History"} hint="Segmented without direct backend access." />
+              <SummaryCard
+                label="Highlights"
+                value={`${currentView.highlights.length}`}
+                hint="Readable metrics derived from the current response slice."
+              />
+            </div>
+          </Section>
+
+          <Section title={sectionTitle}>
+            <MetricsPanel metrics={currentView} />
+          </Section>
+
+          {currentData && currentView.highlights.length === 0 ? (
+            <Section title="Debug fallback">
+              <DebugPreview value={currentData} label={`${activeTab} payload fallback`} />
+            </Section>
+          ) : null}
+        </>
       ) : null}
     </PageShell>
   );

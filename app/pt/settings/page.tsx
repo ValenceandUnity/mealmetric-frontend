@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
-import { JsonPreview } from "@/components/JsonPreview";
 import { LogoutButton } from "@/components/LogoutButton";
+import { RecordCard } from "@/components/cards/RecordCard";
 import { PageShell } from "@/components/layout/PageShell";
+import { DebugPreview } from "@/components/ui/DebugPreview";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { Section } from "@/components/ui/Section";
@@ -127,7 +128,7 @@ export default function PTSettingsPage() {
   const currentTextValue = getTextField(profileData, [editableFieldKey], { allowEmpty: true }) ?? "";
   const hasChanges = normalizeText(draftName) !== normalizeText(currentTextValue);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!hasChanges) {
@@ -174,8 +175,8 @@ export default function PTSettingsPage() {
       user={user}
       navigation={
         <>
-          <Link href="/pt">Back to PT Dashboard</Link>{" "}
-          <Link href="/pt/clients">Clients</Link>
+          <Link className="link-button" href="/pt">Back to PT dashboard</Link>
+          <Link className="link-button" href="/pt/clients">Clients</Link>
         </>
       }
       actions={<LogoutButton />}
@@ -187,49 +188,39 @@ export default function PTSettingsPage() {
       {!loading ? (
         <>
           <Section title="Edit profile">
-            <form
-              onSubmit={handleSubmit}
-              style={{ display: "grid", gap: 12, maxWidth: 420 }}
-            >
-              <label style={{ display: "grid", gap: 6 }}>
+            <form onSubmit={handleSubmit} className="form-grid">
+              <label className="field">
                 <span>{fieldLabel}</span>
                 <input
                   type="text"
                   value={draftName}
                   onChange={(event) => setDraftName(event.target.value)}
                   placeholder={`Enter ${fieldLabel.toLowerCase()}`}
-                  style={{
-                    border: "1px solid #475569",
-                    borderRadius: 8,
-                    padding: "10px 12px",
-                    background: "#0f172a",
-                    color: "inherit",
-                  }}
                 />
               </label>
 
-              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                <button
-                  type="submit"
-                  disabled={saving || !hasChanges}
-                  style={{
-                    border: "1px solid #475569",
-                    borderRadius: 8,
-                    padding: "10px 14px",
-                    background: saving || !hasChanges ? "#1e293b" : "#2563eb",
-                    color: "white",
-                    cursor: saving || !hasChanges ? "not-allowed" : "pointer",
-                  }}
-                >
+              <div className="row">
+                <button type="submit" disabled={saving || !hasChanges}>
                   {saving ? "Saving..." : "Save changes"}
                 </button>
-                {saveMessage ? <p style={{ margin: 0, color: "#86efac" }}>{saveMessage}</p> : null}
+                {saveMessage ? <p className="status-text status-text--success">{saveMessage}</p> : null}
               </div>
             </form>
           </Section>
 
-          <Section title="Profile data">
-            <JsonPreview value={profileData ?? null} />
+          <Section title="Profile summary">
+            <RecordCard
+              eyebrow="PT profile"
+              title={user.email}
+              description="Profile data remains inside the authenticated BFF session workflow."
+              metadata={[
+                { label: "Role", value: user.role },
+                { label: fieldLabel, value: currentTextValue || "Unavailable" },
+              ]}
+            />
+            {!currentTextValue && profileData ? (
+              <DebugPreview value={profileData} label="Profile payload fallback" />
+            ) : null}
           </Section>
         </>
       ) : null}

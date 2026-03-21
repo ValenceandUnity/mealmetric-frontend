@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { JsonPreview, getArrayItems, getEntityId } from "@/components/JsonPreview";
+import { RecordCard } from "@/components/cards/RecordCard";
+import { SummaryCard } from "@/components/cards/SummaryCard";
 import { PageShell } from "@/components/layout/PageShell";
+import { DebugPreview } from "@/components/ui/DebugPreview";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { Section } from "@/components/ui/Section";
+import { adaptOrders } from "@/lib/adapters/client-records";
 import { useSessionBootstrap } from "@/lib/client/session";
-import { getTextField } from "@/lib/json/object";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
 
 type OrdersResponse = ApiResponse<JsonValue>;
@@ -69,8 +72,6 @@ export default function ClientOrdersPage() {
     };
   }, [status, user]);
 
-  const orders = ordersData ? getArrayItems(ordersData) : [];
-
   if (status === "loading") {
     return <LoadingBlock title="Loading orders" message="Validating your client session." />;
   }
@@ -79,50 +80,52 @@ export default function ClientOrdersPage() {
     return <LoadingBlock title="Redirecting" message="Orders require an authenticated client session." />;
   }
 
+  const view = adaptOrders(ordersData);
+
   return (
     <PageShell
       title="Orders"
       user={user}
-      navigation={<Link href="/client">Back to Client Home</Link>}
+      navigation={<Link className="link-button" href="/client">Back to client home</Link>}
     >
-      <Section>
-        <p style={{ margin: 0 }}>
-          Order history loaded through <code>/api/client/orders</code>.
-        </p>
-      </Section>
-
-      {loading ? <LoadingBlock title="Loading orders" message="Fetching order records." /> : null}
-
+      {loading ? <LoadingBlock title="Loading orders" message="Fetching order history through the BFF." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load orders" message={errorMessage} /> : null}
 
-      {!loading && !errorMessage && orders.length === 0 ? (
-        <Section title="No orders returned">
-          <JsonPreview value={ordersData ?? []} />
-        </Section>
-      ) : null}
-
-      {orders.map((order, index) => {
-        const orderId = getEntityId(order);
-        const mealPlanReference = getTextField(order, ["meal_plan_id", "meal_plan", "meal_plan_name"]);
-        const statusText = getTextField(order, ["status", "order_status"]);
-        const createdAt = getTextField(order, ["created_at", "ordered_at"]);
-        const updatedAt = getTextField(order, ["updated_at"]);
-
-        return (
-          <Section key={orderId ?? `order-${index}`} title={`Order ${orderId ?? `#${index + 1}`}`}>
-            {orderId ? (
-              <p>
-                <strong>Id:</strong> <code>{orderId}</code>
-              </p>
-            ) : null}
-            {mealPlanReference ? <p><strong>Meal Plan:</strong> {mealPlanReference}</p> : null}
-            {statusText ? <p><strong>Status:</strong> {statusText}</p> : null}
-            {createdAt ? <p><strong>Created:</strong> {createdAt}</p> : null}
-            {updatedAt ? <p><strong>Updated:</strong> {updatedAt}</p> : null}
-            <JsonPreview value={order} />
+      {!loading && !errorMessage ? (
+        <>
+          <Section title="Order summary">
+            <div className="grid grid--2">
+              {view.summary.map((item) => (
+                <SummaryCard key={item.label} label={item.label} value={item.value} hint={item.hint} />
+              ))}
+            </div>
           </Section>
-        );
-      })}
+
+          <Section title="Order history">
+            {view.records.length > 0 ? (
+              <div className="stacked-list">
+                {view.records.map((order, index) => (
+                  <RecordCard
+                    key={order.id ?? `${order.title}-${index}`}
+                    eyebrow={order.eyebrow}
+                    title={order.title}
+                    description={order.description}
+                    metadata={order.metadata}
+                  />
+                ))}
+              </div>
+            ) : (
+              <>
+                <EmptyState
+                  title="No orders returned"
+                  message="Order history will appear here when the client orders route returns structured records."
+                />
+                {view.debugData ? <DebugPreview value={view.debugData} label="Orders payload fallback" /> : null}
+              </>
+            )}
+          </Section>
+        </>
+      ) : null}
     </PageShell>
   );
 }

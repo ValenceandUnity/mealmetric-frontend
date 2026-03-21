@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { JsonPreview, getArrayItems } from "@/components/JsonPreview";
+import { RecordCard } from "@/components/cards/RecordCard";
+import { SummaryCard } from "@/components/cards/SummaryCard";
 import { PageShell } from "@/components/layout/PageShell";
+import { DebugPreview } from "@/components/ui/DebugPreview";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { Section } from "@/components/ui/Section";
+import { adaptPickups } from "@/lib/adapters/client-records";
 import { useSessionBootstrap } from "@/lib/client/session";
-import { getTextField } from "@/lib/json/object";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
 
 type PickupsResponse = ApiResponse<JsonValue>;
@@ -69,8 +72,6 @@ export default function ClientPickupsPage() {
     };
   }, [status, user]);
 
-  const pickups = pickupsData ? getArrayItems(pickupsData) : [];
-
   if (status === "loading") {
     return <LoadingBlock title="Loading pickups" message="Validating your client session." />;
   }
@@ -79,42 +80,52 @@ export default function ClientPickupsPage() {
     return <LoadingBlock title="Redirecting" message="Pickups require an authenticated client session." />;
   }
 
+  const view = adaptPickups(pickupsData);
+
   return (
     <PageShell
       title="Pickups"
       user={user}
-      navigation={<Link href="/client">Back to Client Home</Link>}
+      navigation={<Link className="link-button" href="/client">Back to client home</Link>}
     >
-      <Section>
-        <p style={{ margin: 0 }}>
-          Pickup records loaded through <code>/api/client/pickups</code>.
-        </p>
-      </Section>
-
-      {loading ? <LoadingBlock title="Loading pickups" message="Fetching pickup records." /> : null}
-
+      {loading ? <LoadingBlock title="Loading pickups" message="Fetching pickup records through the BFF." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load pickups" message={errorMessage} /> : null}
 
-      {!loading && !errorMessage && pickups.length === 0 ? (
-        <Section title="No pickups returned">
-          <JsonPreview value={pickupsData ?? []} />
-        </Section>
-      ) : null}
-
-      {pickups.map((pickup, index) => {
-        const pickupTime = getTextField(pickup, ["pickup_at", "pickup_time", "scheduled_for"]);
-        const mealPlanReference = getTextField(pickup, ["meal_plan_id", "meal_plan", "meal_plan_name"]);
-        const statusText = getTextField(pickup, ["status", "pickup_status"]);
-
-        return (
-          <Section key={`pickup-${index}`} title={`Pickup #${index + 1}`}>
-            {pickupTime ? <p><strong>Pickup Time:</strong> {pickupTime}</p> : null}
-            {mealPlanReference ? <p><strong>Meal Plan:</strong> {mealPlanReference}</p> : null}
-            {statusText ? <p><strong>Status:</strong> {statusText}</p> : null}
-            <JsonPreview value={pickup} />
+      {!loading && !errorMessage ? (
+        <>
+          <Section title="Pickup summary">
+            <div className="grid grid--2">
+              {view.summary.map((item) => (
+                <SummaryCard key={item.label} label={item.label} value={item.value} hint={item.hint} />
+              ))}
+            </div>
           </Section>
-        );
-      })}
+
+          <Section title="Scheduled pickups">
+            {view.records.length > 0 ? (
+              <div className="stacked-list">
+                {view.records.map((pickup, index) => (
+                  <RecordCard
+                    key={pickup.id ?? `${pickup.title}-${index}`}
+                    eyebrow={pickup.eyebrow}
+                    title={pickup.title}
+                    description={pickup.description}
+                    metadata={pickup.metadata}
+                  />
+                ))}
+              </div>
+            ) : (
+              <>
+                <EmptyState
+                  title="No pickups returned"
+                  message="Pickup scheduling details will appear here when the BFF returns structured records."
+                />
+                {view.debugData ? <DebugPreview value={view.debugData} label="Pickups payload fallback" /> : null}
+              </>
+            )}
+          </Section>
+        </>
+      ) : null}
     </PageShell>
   );
 }
