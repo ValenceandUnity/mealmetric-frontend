@@ -17,10 +17,19 @@ type AppShellProps = {
   subtitle?: string;
   actions?: ReactNode;
   className?: string;
+  hideTopHub?: boolean;
   children: ReactNode;
 };
 
-export function AppShell({ title, user, subtitle, actions, className, children }: AppShellProps) {
+export function AppShell({
+  title,
+  user,
+  subtitle,
+  actions,
+  className,
+  hideTopHub = false,
+  children,
+}: AppShellProps) {
   const pathname = usePathname();
   const roleMeta = getRoleShellMeta(user.role);
   const activeItem = getActiveNavItem(user.role, pathname);
@@ -28,15 +37,17 @@ export function AppShell({ title, user, subtitle, actions, className, children }
   return (
     <div className={["app-shell", className ?? ""].filter(Boolean).join(" ")}>
       <div className="app-shell__stack">
-        <TopHub
-          accent={roleMeta.accent}
-          roleLabel={roleMeta.label}
-          sectionLabel={activeItem?.label ?? "Workspace"}
-          title={title}
-          subtitle={subtitle}
-          email={user.email}
-          actions={actions}
-        />
+        {hideTopHub ? null : (
+          <TopHub
+            accent={roleMeta.accent}
+            roleLabel={roleMeta.label}
+            sectionLabel={activeItem?.label ?? "Workspace"}
+            title={title}
+            subtitle={subtitle}
+            email={user.email}
+            actions={actions}
+          />
+        )}
         <div className="app-shell__viewport">{children}</div>
       </div>
       <BottomNavigation role={user.role} />

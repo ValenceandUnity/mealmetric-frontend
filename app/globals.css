@@ -1036,6 +1036,7 @@ main {
 }
 
 .client-meal-plans-hero__layout,
+.client-meal-plans-budget-marker__header,
 .client-meal-plans-budget-marker__row,
 .client-meal-plans-hero__lead,
 .client-meal-plans-filter-panel,
@@ -1060,6 +1061,33 @@ main {
   align-items: start;
 }
 
+.client-meal-plans-budget-marker__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.client-meal-plans-budget-marker__heading {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.client-meal-plans-budget-marker__eyebrow {
+  margin: 0;
+  color: #6f2a53;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.client-meal-plans-budget-marker__title {
+  margin: 0;
+  color: #4f1737;
+  font-size: 1.4rem;
+  line-height: 1.15;
+}
+
 .client-meal-plans-budget-marker__value-group {
   display: grid;
   gap: 0.3rem;
@@ -1078,16 +1106,26 @@ main {
   margin: 0;
   color: rgba(103, 17, 63, 0.74);
   font-size: 0.88rem;
+  line-height: 1.45;
 }
 
 .client-meal-plans-filter-panel {
   margin-top: -0.15rem;
 }
 
-.client-meal-plans-budget-marker .page-header__eyebrow,
-.client-meal-plans-budget-marker .page-header__description,
-.client-meal-plans-budget-marker .chip,
-.client-meal-plans-budget-marker .page-header__title {
+.client-meal-plans-budget-marker__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.client-meal-plans-budget-marker__actions {
+  display: flex;
+  justify-content: center;
+}
+
+.client-meal-plans-budget-marker .chip {
   color: #4f1737;
 }
 

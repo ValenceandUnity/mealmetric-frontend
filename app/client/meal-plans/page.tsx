@@ -76,11 +76,6 @@ function getActiveFilterChips(filters: FilterDraft) {
   if (filters.budgetMax.trim()) {
     chips.push(`Max $${filters.budgetMax.trim()}`);
   }
-  if (filters.budgetDuration === "custom duration" && filters.customDuration.trim()) {
-    chips.push(filters.customDuration.trim());
-  } else if (filters.budgetDuration) {
-    chips.push(filters.budgetDuration);
-  }
 
   return chips;
 }
@@ -327,7 +322,12 @@ export default function ClientMealPlansPage() {
   }
 
   return (
-    <PageShell title="Meal plans" user={user} className="app-shell--client-meal-plans">
+    <PageShell
+      title="Meal plans"
+      user={user}
+      className="app-shell--client-meal-plans"
+      hideTopHub
+    >
       {loading ? (
         <LoadingBlock title="Loading plans" message="Fetching meal-plan discovery data." />
       ) : null}
@@ -345,31 +345,43 @@ export default function ClientMealPlansPage() {
       {!loading && !loadError ? (
         <>
           <Card className="client-meal-plans-budget-marker" variant="accent" as="section">
+            <div className="client-meal-plans-budget-marker__header">
+              <div className="client-meal-plans-budget-marker__heading">
+                <p className="client-meal-plans-budget-marker__eyebrow">Client meal plans</p>
+                <h2 className="client-meal-plans-budget-marker__title">Budget Marker</h2>
+              </div>
+              <Chip tone="muted">{resolvedDurationLabel}</Chip>
+            </div>
             <div className="client-meal-plans-budget-marker__row">
-              <PageHeader
-                eyebrow="Client meal plans"
-                title="Budget Marker"
-                description="Use the current supported ZIP and budget controls without leaving the top discovery marker open."
-                chips={activeFilterChips.length > 0 ? activeFilterChips : ["No active filters"]}
-              />
               <div className="client-meal-plans-budget-marker__value-group">
                 <p className="client-meal-plans-budget-marker__value">{`$${resolvedBudget}`}</p>
-                <p className="client-meal-plans-budget-marker__caption">{resolvedDurationLabel}</p>
+                <p className="client-meal-plans-budget-marker__caption">
+                  Use the current supported ZIP and budget controls without leaving the top discovery marker open.
+                </p>
               </div>
             </div>
-            <ActionRow>
-              <button
-                type="button"
-                aria-expanded={filtersOpen}
-                aria-controls="budget-marker-controls"
-                onClick={() => setFiltersOpen((current) => !current)}
-              >
-                {filtersOpen ? "Close edit" : "Edit Budget Marker"}
-              </button>
-              <Link className="link-button" href="/client/bookmarks">
-                Saved plans
-              </Link>
-            </ActionRow>
+            <div className="client-meal-plans-budget-marker__chips">
+              {(activeFilterChips.length > 0 ? activeFilterChips : ["No active filters"]).map((chip) => (
+                <Chip key={chip} tone={activeFilterChips.length > 0 ? "accent" : "muted"}>
+                  {chip}
+                </Chip>
+              ))}
+            </div>
+            <div className="client-meal-plans-budget-marker__actions">
+              <ActionRow>
+                <button
+                  type="button"
+                  aria-expanded={filtersOpen}
+                  aria-controls="budget-marker-controls"
+                  onClick={() => setFiltersOpen((current) => !current)}
+                >
+                  {filtersOpen ? "Close edit" : "Edit Budget Marker"}
+                </button>
+                <Link className="link-button" href="/client/bookmarks">
+                  Saved plans
+                </Link>
+              </ActionRow>
+            </div>
           </Card>
 
           {filtersOpen ? (
