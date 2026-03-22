@@ -4,15 +4,20 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { LogoutButton } from "@/components/LogoutButton";
-import { SummaryCard } from "@/components/cards/SummaryCard";
+import { AnalyticsCard } from "@/components/analytics/AnalyticsCard";
+import { Card } from "@/components/ui/Card";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SectionBlock } from "@/components/ui/SectionBlock";
+import { StatPill } from "@/components/ui/StatPill";
+import { ActionRow } from "@/components/ui/ActionRow";
+import { ListRow } from "@/components/ui/ListRow";
 import { MealPlanCard } from "@/components/meal-plans/MealPlanCard";
 import { PageShell } from "@/components/layout/PageShell";
-import { AssignmentCard } from "@/components/training/AssignmentCard";
+import { RoutineCard } from "@/components/training/RoutineCard";
 import { DebugPreview } from "@/components/ui/DebugPreview";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
-import { Section } from "@/components/ui/Section";
 import { adaptClientHome } from "@/lib/adapters/dashboard";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, ClientHomeResponse } from "@/lib/types/api";
@@ -83,6 +88,13 @@ export default function ClientDashboardPage() {
   }
 
   const view = homeData ? adaptClientHome(homeData) : null;
+  const summaryItems = view?.summary ?? [];
+  const assignments = view?.assignments ?? [];
+  const mealPlans = view?.mealPlans ?? [];
+  const summaryChips = [
+    `${assignments.length} training highlight${assignments.length === 1 ? "" : "s"}`,
+    `${mealPlans.length} meal-plan highlight${mealPlans.length === 1 ? "" : "s"}`,
+  ];
 
   return (
     <PageShell
@@ -92,7 +104,7 @@ export default function ClientDashboardPage() {
         <>
           <Link className="link-button" href="/client/training">Training</Link>
           <Link className="link-button" href="/client/metrics">Metrics</Link>
-          <Link className="link-button" href="/client/meal-plans">Meal Plans</Link>
+          <Link className="link-button" href="/client/meal-plans">Meal plans</Link>
           <Link className="link-button" href="/client/bookmarks">Bookmarks</Link>
         </>
       }
@@ -103,54 +115,203 @@ export default function ClientDashboardPage() {
 
       {view && homeData ? (
         <>
-          <Section title="Analytics summary">
-            <div className="grid grid--2">
-              {view.summary.length > 0 ? (
-                view.summary.map((item) => (
-                  <SummaryCard key={item.label} label={item.label} value={item.value} hint={item.hint} />
+          <Card className="client-home-hero" variant="accent" as="section">
+            <PageHeader
+              eyebrow="Client dashboard"
+              title="Your meal and training rhythm"
+              description="Track active momentum across analytics, training, and meal plans without leaving the protected client workspace."
+              chips={summaryChips}
+            />
+            <div className="client-home-hero__stats">
+              {summaryItems.length > 0 ? (
+                summaryItems.map((item, index) => (
+                  <StatPill
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    hint={item.hint}
+                    active={index === 0}
+                  />
                 ))
               ) : (
-                <SummaryCard label="Overview" value="Live" hint="Overview payload did not expose numeric headline fields." />
+                <>
+                  <StatPill label="Overview" value="Live" hint="Connected to the current client home BFF slice." active />
+                  <StatPill
+                    label="Analytics"
+                    value="Pending"
+                    hint="Overview payload did not expose headline summary fields."
+                  />
+                </>
               )}
             </div>
-          </Section>
+            <ActionRow>
+              <Link className="link-button link-button--accent" href="/client/training">
+                Open training
+              </Link>
+              <Link className="link-button" href="/client/metrics">
+                Review metrics
+              </Link>
+              <Link className="link-button" href="/client/meal-plans">
+                Browse meal plans
+              </Link>
+            </ActionRow>
+          </Card>
 
-          <Section title="Training">
-            {view.assignments.length > 0 ? (
+          <SectionBlock
+            eyebrow="Overview"
+            title="Analytics summary"
+            description="Headline metrics surfaced from the current home payload."
+          >
+            <AnalyticsCard
+              eyebrow="BFF overview"
+              title="Current summary"
+              description="These values come directly from the protected client home aggregation route."
+              stats={
+                summaryItems.length > 0
+                  ? summaryItems
+                  : [
+                      {
+                        label: "Overview",
+                        value: "Live",
+                        hint: "Overview payload is connected but did not expose summary-ready fields.",
+                      },
+                    ]
+              }
+              actions={
+                <ActionRow>
+                  <Link className="link-button" href="/client/metrics">
+                    Open metrics
+                  </Link>
+                </ActionRow>
+              }
+            />
+          </SectionBlock>
+
+          <SectionBlock
+            eyebrow="Training"
+            title="Training highlights"
+            description="Recent assignment summaries from the home slice."
+            actions={
+              <Link className="link-button" href="/client/training">
+                Full training hub
+              </Link>
+            }
+          >
+            {assignments.length > 0 ? (
               <div className="stacked-list">
-                {view.assignments.map((assignment) => (
-                  <AssignmentCard key={assignment.id ?? assignment.title} assignment={assignment} />
+                {assignments.map((assignment) => (
+                  <RoutineCard
+                    key={assignment.id ?? assignment.title}
+                    eyebrow="Assignment"
+                    title={assignment.title}
+                    description={assignment.description}
+                    status={assignment.status ? { label: assignment.status, tone: "accent" } : undefined}
+                    metadata={[
+                      { label: "Package", value: assignment.packageId ?? "Unavailable" },
+                      { label: "Window", value: assignment.schedule },
+                      { label: "Checklist", value: assignment.checklistCount },
+                    ]}
+                    footer={
+                      assignment.id ? (
+                        <Link className="link-button" href={`/client/training/${assignment.id}`}>
+                          Open assignment
+                        </Link>
+                      ) : (
+                        <Link className="link-button" href="/client/training">
+                          Open training
+                        </Link>
+                      )
+                    }
+                  />
                 ))}
               </div>
             ) : (
-              <EmptyState title="No assignments yet" message="Training assignments will appear here when the BFF returns them." />
+              <EmptyState
+                title="No assignments yet"
+                message="Training highlights will populate here when the home route returns active assignment data."
+              />
             )}
-          </Section>
+          </SectionBlock>
 
-          <Section title="Meal plans">
-            {view.mealPlans.length > 0 ? (
+          <SectionBlock
+            eyebrow="Nutrition"
+            title="Meal-plan highlights"
+            description="A lightweight preview of meal-plan options available from the same signed-in client context."
+            actions={
+              <Link className="link-button" href="/client/meal-plans">
+                Full meal-plan catalog
+              </Link>
+            }
+          >
+            {mealPlans.length > 0 ? (
               <div className="stacked-list">
-                {view.mealPlans.map((mealPlan) => (
+                {mealPlans.map((mealPlan) => (
                   <MealPlanCard key={mealPlan.id ?? mealPlan.title} mealPlan={mealPlan} />
                 ))}
               </div>
             ) : (
-              <EmptyState title="No meal plans returned" message="Available meal plans will surface here once the BFF provides them." />
+              <EmptyState
+                title="No meal plans returned"
+                message="Meal-plan highlights will appear here when the client home route returns available plans."
+              />
             )}
-          </Section>
+          </SectionBlock>
 
-          <Section title="Hub shortcuts">
-            <div className="row">
-              <Link className="link-button link-button--accent" href="/client/training">Open training hub</Link>
-              <Link className="link-button" href="/client/metrics">Review metrics</Link>
-              <Link className="link-button" href="/client/meal-plans">Browse meal plans</Link>
-              <Link className="link-button" href="/client/bookmarks">Manage bookmarks</Link>
-            </div>
-            {view.summary.length === 0 ? (
+          <SectionBlock
+            eyebrow="Shortcuts"
+            title="Next actions"
+            description="Fast routes into the main client surfaces."
+          >
+            <Card className="client-home-actions" variant="soft">
+              <ListRow
+                eyebrow="Client workspace"
+                title="Move into the next task"
+                description="Use direct links into the current client surfaces without leaving the authenticated shell."
+              />
+              <ActionRow>
+                <Link className="link-button link-button--accent" href="/client/training">
+                  Open training hub
+                </Link>
+                <Link className="link-button" href="/client/metrics">
+                  Review metrics
+                </Link>
+                <Link className="link-button" href="/client/meal-plans">
+                  Browse meal plans
+                </Link>
+                <Link className="link-button" href="/client/bookmarks">
+                  Manage bookmarks
+                </Link>
+              </ActionRow>
+            </Card>
+            {summaryItems.length === 0 ? (
               <DebugPreview value={homeData.overview} label="Overview debug fallback" />
             ) : null}
-          </Section>
+          </SectionBlock>
         </>
+      ) : null}
+
+      {!loading && !errorMessage && !view ? (
+        <SectionBlock
+          eyebrow="Client dashboard"
+          title="Home data is not ready"
+          description="The authenticated route loaded, but it did not return a dashboard-ready client home view."
+        >
+          <EmptyState
+            title="Dashboard unavailable"
+            message="Try opening training, metrics, or meal plans directly while the home payload shape is refined."
+          />
+          <ActionRow>
+            <Link className="link-button" href="/client/training">
+              Open training
+            </Link>
+            <Link className="link-button" href="/client/metrics">
+              Open metrics
+            </Link>
+            <Link className="link-button" href="/client/meal-plans">
+              Open meal plans
+            </Link>
+          </ActionRow>
+        </SectionBlock>
       ) : null}
     </PageShell>
   );

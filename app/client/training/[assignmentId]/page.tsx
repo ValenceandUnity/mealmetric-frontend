@@ -9,6 +9,7 @@ import { WorkoutLogForm, type WorkoutLogFormState } from "@/components/training/
 import { DebugPreview } from "@/components/ui/DebugPreview";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
+import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { Section } from "@/components/ui/Section";
 import { adaptAssignmentDetail } from "@/lib/adapters/training";
@@ -194,8 +195,20 @@ export default function AssignmentDetailPage() {
               onSubmit={handleSubmit}
               loading={submitLoading}
             />
-            {submitSuccess ? <p className="status-text status-text--success">{submitSuccess}</p> : null}
-            {submitError ? <p className="status-text status-text--danger">{submitError}</p> : null}
+            {submitSuccess ? (
+              <FeedbackBanner
+                tone="success"
+                title="Workout log submitted"
+                message={submitSuccess}
+              />
+            ) : null}
+            {submitError ? (
+              <FeedbackBanner
+                tone="error"
+                title="Workout log submission failed"
+                message={submitError}
+              />
+            ) : null}
           </Section>
 
           {detailData && view.checklist.length === 0 ? (

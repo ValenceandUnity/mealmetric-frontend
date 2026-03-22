@@ -1,5 +1,8 @@
 "use client";
 
+import { Card } from "@/components/ui/Card";
+import { PageHeader } from "@/components/ui/PageHeader";
+
 type LoadingBlockProps = {
   title: string;
   message?: string;
@@ -7,9 +10,20 @@ type LoadingBlockProps = {
 
 export function LoadingBlock({ title, message }: LoadingBlockProps) {
   return (
-    <section className="surface surface--soft">
-      <h2 className="section__title">{title}</h2>
-      {message ? <p className="section__copy">{message}</p> : null}
-    </section>
+    <div role="status" aria-live="polite">
+      <Card as="section" className="status-block status-block--loading" variant="soft">
+        <PageHeader
+          eyebrow="Loading"
+          title={title}
+          description={message}
+          status={{ label: "In progress", tone: "accent" }}
+        />
+        <div className="status-block__pulse" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+      </Card>
+    </div>
   );
 }

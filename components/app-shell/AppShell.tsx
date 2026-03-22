@@ -1,8 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 
+import { TopHub } from "@/components/app-shell/TopHub";
 import { BottomNavigation } from "@/components/navigation/BottomNavigation";
+import {
+  getActiveNavItem,
+  getRoleShellMeta,
+} from "@/lib/navigation/app-shell";
 import type { SessionUser } from "@/lib/types/api";
 
 type AppShellProps = {
@@ -13,39 +19,24 @@ type AppShellProps = {
   children: ReactNode;
 };
 
-function getRoleLabel(role: SessionUser["role"]): string {
-  switch (role) {
-    case "client":
-      return "Client hub";
-    case "pt":
-      return "PT command";
-    case "vendor":
-      return "Vendor portal";
-    default:
-      return "MealMetric";
-  }
-}
-
 export function AppShell({ title, user, subtitle, actions, children }: AppShellProps) {
+  const pathname = usePathname();
+  const roleMeta = getRoleShellMeta(user.role);
+  const activeItem = getActiveNavItem(user.role, pathname);
+
   return (
     <div className="app-shell">
       <div className="app-shell__stack">
-        <header className="app-shell__hero">
-          <div className="row row--between">
-            <span className="app-shell__eyebrow">{getRoleLabel(user.role)}</span>
-            {actions}
-          </div>
-          <h1 className="app-shell__headline">{title}</h1>
-          <p className="app-shell__copy">
-            {subtitle ??
-              "Product-grade mobile UI running entirely through the Next.js BFF boundary."}
-          </p>
-          <div className="app-shell__meta">
-            <span className="chip">{user.email}</span>
-            <span className="chip">Role: {user.role}</span>
-          </div>
-        </header>
-        {children}
+        <TopHub
+          accent={roleMeta.accent}
+          roleLabel={roleMeta.label}
+          sectionLabel={activeItem?.label ?? "Workspace"}
+          title={title}
+          subtitle={subtitle}
+          email={user.email}
+          actions={actions}
+        />
+        <div className="app-shell__viewport">{children}</div>
       </div>
       <BottomNavigation role={user.role} />
     </div>

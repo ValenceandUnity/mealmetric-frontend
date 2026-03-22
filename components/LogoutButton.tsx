@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { logoutViaBff } from "@/lib/client/session";
 
 export function LogoutButton() {
@@ -31,9 +32,11 @@ export function LogoutButton() {
         {loading ? "Signing out..." : "Sign out"}
       </button>
       {errorMessage ? (
-        <span className="status-text" style={{ color: "var(--danger)" }}>
-          {errorMessage}
-        </span>
+        <FeedbackBanner
+          tone="error"
+          title="Sign out failed"
+          message={errorMessage}
+        />
       ) : null}
     </div>
   );

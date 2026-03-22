@@ -2,28 +2,21 @@
 
 import Link from "next/link";
 
-import { DetailCard } from "@/components/cards/DetailCard";
+import { RoutineCard } from "@/components/training/RoutineCard";
 import type { TrainingAssignmentView } from "@/lib/adapters/training";
 
 export function AssignmentCard({ assignment }: { assignment: TrainingAssignmentView }) {
   return (
-    <DetailCard
-      eyebrow={assignment.status ?? "Assignment"}
+    <RoutineCard
+      eyebrow="Assignment"
       title={assignment.title}
       description={assignment.description}
-      metadata={
-        <>
-          <span>
-            <strong>Package:</strong> {assignment.packageId ?? "Unavailable"}
-          </span>
-          <span>
-            <strong>Window:</strong> {assignment.schedule}
-          </span>
-          <span>
-            <strong>Checklist:</strong> {assignment.checklistCount}
-          </span>
-        </>
-      }
+      status={assignment.status ? { label: assignment.status, tone: "accent" } : undefined}
+      metadata={[
+        { label: "Package", value: assignment.packageId ?? "Unavailable" },
+        { label: "Window", value: assignment.schedule },
+        { label: "Checklist", value: assignment.checklistCount },
+      ]}
       footer={
         assignment.id ? (
           <Link className="link-button" href={`/client/training/${assignment.id}`}>

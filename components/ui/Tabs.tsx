@@ -1,9 +1,6 @@
 "use client";
 
-type TabOption<T extends string> = {
-  value: T;
-  label: string;
-};
+import { TabSwitch } from "@/components/ui/TabSwitch";
 
 export function Tabs<T extends string>({
   active,
@@ -11,22 +8,8 @@ export function Tabs<T extends string>({
   onChange,
 }: {
   active: T;
-  options: TabOption<T>[];
+  options: Array<{ value: T; label: string; disabled?: boolean }>;
   onChange: (value: T) => void;
 }) {
-  return (
-    <div className="tab-bar" role="tablist" aria-label="Sections">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          className="tab-bar__button"
-          aria-pressed={active === option.value}
-          onClick={() => onChange(option.value)}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
+  return <TabSwitch active={active} options={options} onChange={onChange} />;
 }

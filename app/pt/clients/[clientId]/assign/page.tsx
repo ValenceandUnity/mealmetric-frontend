@@ -10,6 +10,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { DebugPreview } from "@/components/ui/DebugPreview";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
+import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { Section } from "@/components/ui/Section";
 import { adaptPTAssignmentWorkspace } from "@/lib/adapters/client-records";
@@ -216,9 +217,10 @@ export default function PTClientAssignPage() {
           <Section title="Create assignment">
             <form className="form-grid" onSubmit={handleSubmit}>
               <div className="field">
-                <span>Training package</span>
+                <label htmlFor="training_package_id">Training package</label>
                 {view.packageOptions.some((pkg) => Boolean(pkg.id)) ? (
                   <select
+                    id="training_package_id"
                     value={formState.training_package_id}
                     onChange={(event) =>
                       setFormState((current) => ({ ...current, training_package_id: event.target.value }))
@@ -235,6 +237,7 @@ export default function PTClientAssignPage() {
                   </select>
                 ) : (
                   <input
+                    id="training_package_id"
                     value={formState.training_package_id}
                     onChange={(event) =>
                       setFormState((current) => ({ ...current, training_package_id: event.target.value }))
@@ -264,11 +267,23 @@ export default function PTClientAssignPage() {
                 />
               </div>
               <button type="submit" disabled={submitting}>
-                {submitting ? "Assigning..." : "Assign package"}
+                {submitting ? "Creating assignment..." : "Create assignment"}
               </button>
             </form>
-            {submitSuccess ? <p className="status-text status-text--success">{submitSuccess}</p> : null}
-            {submitError ? <p className="status-text status-text--danger">{submitError}</p> : null}
+            {submitSuccess ? (
+              <FeedbackBanner
+                tone="success"
+                title="Assignment created"
+                message={submitSuccess}
+              />
+            ) : null}
+            {submitError ? (
+              <FeedbackBanner
+                tone="error"
+                title="Assignment creation failed"
+                message={submitError}
+              />
+            ) : null}
           </Section>
 
           <Section title="Package options">

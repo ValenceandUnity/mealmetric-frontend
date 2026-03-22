@@ -2,7 +2,8 @@
 
 import type { ReactNode } from "react";
 
-import { DetailCard } from "@/components/cards/DetailCard";
+import { Card } from "@/components/ui/Card";
+import { ListRow } from "@/components/ui/ListRow";
 
 type RecordCardProps = {
   eyebrow: string;
@@ -14,20 +15,9 @@ type RecordCardProps = {
 
 export function RecordCard({ eyebrow, title, description, metadata, footer }: RecordCardProps) {
   return (
-    <DetailCard
-      eyebrow={eyebrow}
-      title={title}
-      description={description}
-      metadata={
-        <>
-          {metadata.map((item) => (
-            <span key={`${item.label}-${item.value}`}>
-              <strong>{item.label}:</strong> {item.value}
-            </span>
-          ))}
-        </>
-      }
-      footer={footer}
-    />
+    <Card className="record-card">
+      <ListRow eyebrow={eyebrow} title={title} description={description} metadata={metadata} />
+      {footer ? <div className="action-row">{footer}</div> : null}
+    </Card>
   );
 }

@@ -32,6 +32,7 @@ export function WorkoutLogForm({
           id="assignmentId"
           value={formState.assignmentId}
           onChange={(event) => onChange("assignmentId", event.target.value)}
+          disabled={loading}
         />
       </div>
       <div className="field">
@@ -40,6 +41,7 @@ export function WorkoutLogForm({
           id="routineId"
           value={formState.routineId}
           onChange={(event) => onChange("routineId", event.target.value)}
+          disabled={loading}
         />
       </div>
       <div className="field">
@@ -48,6 +50,7 @@ export function WorkoutLogForm({
           id="performedAt"
           value={formState.performedAt}
           onChange={(event) => onChange("performedAt", event.target.value)}
+          disabled={loading}
         />
       </div>
       <div className="field">
@@ -58,6 +61,7 @@ export function WorkoutLogForm({
           min="0"
           value={formState.durationMinutes}
           onChange={(event) => onChange("durationMinutes", event.target.value)}
+          disabled={loading}
         />
       </div>
       <div className="field">
@@ -66,6 +70,7 @@ export function WorkoutLogForm({
           id="completionStatus"
           value={formState.completionStatus}
           onChange={(event) => onChange("completionStatus", event.target.value)}
+          disabled={loading}
         />
       </div>
       <div className="field">
@@ -75,10 +80,11 @@ export function WorkoutLogForm({
           rows={4}
           value={formState.clientNotes}
           onChange={(event) => onChange("clientNotes", event.target.value)}
+          disabled={loading}
         />
       </div>
       <button type="submit" disabled={loading}>
-        {loading ? "Submitting..." : "Submit Workout Log"}
+        {loading ? "Submitting..." : "Submit workout log"}
       </button>
     </form>
   );

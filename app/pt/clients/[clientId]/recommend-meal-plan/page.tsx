@@ -10,6 +10,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { DebugPreview } from "@/components/ui/DebugPreview";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
+import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { Section } from "@/components/ui/Section";
 import { adaptPTMealRecommendationWorkspace } from "@/lib/adapters/client-records";
@@ -235,9 +236,10 @@ export default function PTRecommendMealPlanPage() {
           <Section title="Create recommendation">
             <form className="form-grid" onSubmit={handleSubmit}>
               <div className="field">
-                <span>Meal plan</span>
+                <label htmlFor="meal_plan_id">Meal plan</label>
                 {view.mealPlans.some((mealPlan) => Boolean(mealPlan.id)) ? (
                   <select
+                    id="meal_plan_id"
                     value={formState.meal_plan_id}
                     onChange={(event) => setFormState((current) => ({ ...current, meal_plan_id: event.target.value }))}
                     disabled={submitting}
@@ -252,6 +254,7 @@ export default function PTRecommendMealPlanPage() {
                   </select>
                 ) : (
                   <input
+                    id="meal_plan_id"
                     value={formState.meal_plan_id}
                     onChange={(event) => setFormState((current) => ({ ...current, meal_plan_id: event.target.value }))}
                     disabled={submitting}
@@ -291,11 +294,23 @@ export default function PTRecommendMealPlanPage() {
                 />
               </div>
               <button type="submit" disabled={submitting}>
-                {submitting ? "Submitting..." : "Recommend meal plan"}
+                {submitting ? "Creating recommendation..." : "Create recommendation"}
               </button>
             </form>
-            {submitSuccess ? <p className="status-text status-text--success">{submitSuccess}</p> : null}
-            {submitError ? <p className="status-text status-text--danger">{submitError}</p> : null}
+            {submitSuccess ? (
+              <FeedbackBanner
+                tone="success"
+                title="Meal recommendation created"
+                message={submitSuccess}
+              />
+            ) : null}
+            {submitError ? (
+              <FeedbackBanner
+                tone="error"
+                title="Meal recommendation failed"
+                message={submitError}
+              />
+            ) : null}
           </Section>
 
           <Section title="Recommendable plans">

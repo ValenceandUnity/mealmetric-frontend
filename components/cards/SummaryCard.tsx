@@ -1,5 +1,7 @@
 "use client";
 
+import { MetricCard } from "@/components/metrics/MetricCard";
+
 type SummaryCardProps = {
   label: string;
   value: string;
@@ -7,11 +9,5 @@ type SummaryCardProps = {
 };
 
 export function SummaryCard({ label, value, hint }: SummaryCardProps) {
-  return (
-    <div className="stat-card">
-      <p className="stat-card__label">{label}</p>
-      <p className="stat-card__value">{value}</p>
-      {hint ? <p className="stat-card__hint">{hint}</p> : null}
-    </div>
-  );
+  return <MetricCard label={label} value={value} hint={hint} />;
 }

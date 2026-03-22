@@ -21,7 +21,7 @@ export function PageShell({ title, user, navigation, actions, children }: PageSh
       actions={actions}
       subtitle="Signed-in workspace backed by MealMetric's protected BFF flow."
     >
-      {navigation ? <div className="row">{navigation}</div> : null}
+      {navigation ? <div className="page-shell__nav row">{navigation}</div> : null}
       {children}
     </AppShell>
   );
