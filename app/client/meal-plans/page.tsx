@@ -215,6 +215,10 @@ export default function ClientMealPlansPage() {
     () => trackedLocations.filter((entry) => entry.kind === "zip" && entry.selected).length,
     [trackedLocations],
   );
+  const draftActiveZipCount = useMemo(
+    () => draftTrackedLocations.filter((entry) => entry.kind === "zip" && entry.selected).length,
+    [draftTrackedLocations],
+  );
 
   function openBudgetMarkerEditor() {
     setDraft(filters);
@@ -447,9 +451,6 @@ export default function ClientMealPlansPage() {
               </div>
               <div className="client-meal-plans-budget-marker__meta">
                 <Chip tone="muted">{resolvedDurationLabel}</Chip>
-                <Chip tone="muted">
-                  {activeZipCount === 1 ? "1 Active Zip Code" : `${activeZipCount} Active Zip Codes`}
-                </Chip>
               </div>
             </div>
             <div className="client-meal-plans-budget-marker__row">
@@ -479,6 +480,94 @@ export default function ClientMealPlansPage() {
               </ActionRow>
             </div>
           </Card>
+
+          <SectionBlock
+            eyebrow="Discover"
+            title="Recommended Meal Plans"
+            description="A quick visual pass across meal plans already available in your current browsing set."
+            actions={
+              <button
+                type="button"
+                className="link-button client-meal-plans-section-link"
+                onClick={() => {
+                  const catalogSection = document.getElementById("meal-plan-catalog");
+                  catalogSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+              >
+                See All
+              </button>
+            }
+          >
+            {mealPlans.length > 0 ? (
+              <div className="client-meal-plans-recommended">
+                {mealPlans.slice(0, 6).map((mealPlan, index) => (
+                  <article
+                    key={`recommended-${mealPlan.id}`}
+                    className={[
+                      "client-meal-plans-recommended-card",
+                      index === 0 ? "client-meal-plans-recommended-card--highlighted" : "",
+                    ].filter(Boolean).join(" ")}
+                  >
+                    <div className="client-meal-plans-recommended-card__top">
+                      {index === 0 ? <Badge label="Trainer's Choice" tone="accent" /> : null}
+                    </div>
+                    <div className="client-meal-plans-recommended-card__body">
+                      <h3 className="client-meal-plans-recommended-card__title">{mealPlan.name}</h3>
+                    </div>
+                    <div className="client-meal-plans-recommended-card__meta">
+                      <span>{`${mealPlan.total_calories} Calories`}</span>
+                      <span>{formatPrice(mealPlan.total_price_cents)}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No meal plans ready"
+                message="Recommended meal plans will appear here when the current browsing set has available plans."
+              />
+            )}
+          </SectionBlock>
+
+          <SectionBlock
+            eyebrow="Browse Next"
+            title="Upcoming Meals"
+            description="A quick-scan list built from the meal plans already visible on this page."
+            actions={
+              <button
+                type="button"
+                className="link-button client-meal-plans-section-link"
+                onClick={() => {
+                  const catalogSection = document.getElementById("meal-plan-catalog");
+                  catalogSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+              >
+                See All
+              </button>
+            }
+          >
+            {mealPlans.length > 0 ? (
+              <div className="client-meal-plans-upcoming">
+                {mealPlans.slice(0, 5).map((mealPlan) => (
+                  <article key={`upcoming-${mealPlan.id}`} className="client-meal-plans-upcoming-row">
+                    <div className="client-meal-plans-upcoming-row__main">
+                      <h3 className="client-meal-plans-upcoming-row__title">{mealPlan.name}</h3>
+                      <p className="client-meal-plans-upcoming-row__vendor">{mealPlan.vendor_name}</p>
+                    </div>
+                    <div className="client-meal-plans-upcoming-row__meta">
+                      <span>{formatPrice(mealPlan.total_price_cents)}</span>
+                      <span>{`${mealPlan.total_calories} Calories`}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No meals ready"
+                message="Upcoming Meals will appear here when the current meal plan set has available items."
+              />
+            )}
+          </SectionBlock>
 
           {filtersOpen ? (
             <section className="client-meal-plans-filter-panel" id="budget-marker-controls">
@@ -556,9 +645,9 @@ export default function ClientMealPlansPage() {
                       <h3>ZIP Code Tracker</h3>
                       <Badge
                         label={
-                          draftTrackedLocations.some((entry) => entry.kind === "zip" && entry.selected)
-                            ? "ZIP tracking on"
-                            : "ZIP tracking off"
+                          draftActiveZipCount === 1
+                            ? "1 Active Zip Code"
+                            : `${draftActiveZipCount} Active Zip Codes`
                         }
                         tone="accent"
                       />
@@ -829,49 +918,51 @@ export default function ClientMealPlansPage() {
             )}
           </SectionBlock>
 
-          <SectionBlock
-            eyebrow="Browse"
-            title="Meal-plan catalog"
-            description="Browse the current meal-plan results and open detail pages through the existing route structure."
-          >
-            {mealPlans.length > 0 ? (
-              <div className="client-meal-plans-catalog">
-                <Card className="client-meal-plans-catalog-note" variant="ghost">
-                  <ListRow
-                    eyebrow="Catalog scan"
-                    title="Start with the first visible plans"
-                    description="The catalog remains a live result stack. The first visible plans are surfaced as the easiest scan point, then the full stack continues below."
-                  />
-                </Card>
-                {mealPlans.map((mealPlan, index) => (
-                  <MealPlanCard
-                    key={mealPlan.id}
-                    mealPlan={mealPlan}
-                    bookmarked={bookmarkedIds.has(mealPlan.id)}
-                    bookmarkBusy={bookmarkBusyId === mealPlan.id}
-                    onToggleBookmark={handleToggleBookmark}
-                    footer={
-                      index < 3 ? (
-                        <Badge
-                          label={index === 0 ? "Top visible plan" : "Visible now"}
-                          tone="accent"
-                        />
-                      ) : undefined
-                    }
-                  />
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title="No meal plans returned"
-                message={
-                  activeFilterChips.length > 0
-                    ? "Try broadening the current ZIP or budget filters."
-                    : "The meal-plan catalog is currently empty for this client session."
-                }
-              />
-            )}
-          </SectionBlock>
+          <div id="meal-plan-catalog">
+            <SectionBlock
+              eyebrow="Browse"
+              title="Meal-plan catalog"
+              description="Browse the current meal-plan results and open detail pages through the existing route structure."
+            >
+              {mealPlans.length > 0 ? (
+                <div className="client-meal-plans-catalog">
+                  <Card className="client-meal-plans-catalog-note" variant="ghost">
+                    <ListRow
+                      eyebrow="Catalog scan"
+                      title="Start with the first visible plans"
+                      description="The catalog remains a live result stack. The first visible plans are surfaced as the easiest scan point, then the full stack continues below."
+                    />
+                  </Card>
+                  {mealPlans.map((mealPlan, index) => (
+                    <MealPlanCard
+                      key={mealPlan.id}
+                      mealPlan={mealPlan}
+                      bookmarked={bookmarkedIds.has(mealPlan.id)}
+                      bookmarkBusy={bookmarkBusyId === mealPlan.id}
+                      onToggleBookmark={handleToggleBookmark}
+                      footer={
+                        index < 3 ? (
+                          <Badge
+                            label={index === 0 ? "Top visible plan" : "Visible now"}
+                            tone="accent"
+                          />
+                        ) : undefined
+                      }
+                    />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No meal plans returned"
+                  message={
+                    activeFilterChips.length > 0
+                      ? "Try broadening the current ZIP or budget filters."
+                      : "The meal-plan catalog is currently empty for this client session."
+                  }
+                />
+              )}
+            </SectionBlock>
+          </div>
         </>
       ) : null}
     </PageShell>

@@ -1050,6 +1050,7 @@ main {
 }
 
 .client-meal-plans-budget-marker {
+  gap: 1.1rem;
   border-color: rgba(255, 221, 244, 0.72);
   background:
     linear-gradient(145deg, rgba(252, 233, 246, 0.96), rgba(236, 221, 255, 0.92)),
@@ -1072,7 +1073,7 @@ main {
 
 .client-meal-plans-budget-marker__heading {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.28rem;
 }
 
 .client-meal-plans-budget-marker__meta {
@@ -1100,7 +1101,7 @@ main {
 
 .client-meal-plans-budget-marker__value-group {
   display: grid;
-  gap: 0.3rem;
+  gap: 0.38rem;
   justify-items: start;
 }
 
@@ -1114,9 +1115,10 @@ main {
 
 .client-meal-plans-budget-marker__caption {
   margin: 0;
-  color: rgba(103, 17, 63, 0.74);
-  font-size: 0.88rem;
-  line-height: 1.45;
+  max-width: 25rem;
+  color: rgba(103, 17, 63, 0.6);
+  font-size: 0.82rem;
+  line-height: 1.38;
 }
 
 .client-meal-plans-filter-panel {
@@ -1271,12 +1273,150 @@ main {
   border-color: rgba(255, 212, 232, 0.18);
 }
 
+.app-shell--client-meal-plans .section-block {
+  gap: 1.15rem;
+}
+
+.app-shell--client-meal-plans .section-block + .section-block,
+.app-shell--client-meal-plans .client-meal-plans-budget-marker + .section-block,
+.app-shell--client-meal-plans .section-block + #meal-plan-catalog,
+.app-shell--client-meal-plans .section-block + .client-meal-plans-filter-panel,
+.app-shell--client-meal-plans .client-meal-plans-budget-marker + .client-meal-plans-filter-panel {
+  margin-top: 0.45rem;
+}
+
 .client-meal-plans-hero__stats,
 .client-meal-plans-analytics,
 .client-meal-plans-featured__stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+}
+
+.client-meal-plans-recommended {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(14.6rem, 17.8rem);
+  gap: 0.95rem;
+  overflow-x: auto;
+  padding: 0 0.2rem 0.35rem;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 0.2rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.client-meal-plans-recommended-card {
+  display: grid;
+  gap: 0.8rem;
+  min-height: 11rem;
+  padding: 1.15rem 1.05rem 1rem;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 212, 232, 0.16);
+  background:
+    linear-gradient(180deg, rgba(44, 17, 42, 0.88), rgba(23, 17, 32, 0.84)),
+    rgba(20, 17, 28, 0.76);
+  box-shadow: 0 16px 30px rgba(31, 11, 27, 0.22);
+  scroll-snap-align: start;
+}
+
+.client-meal-plans-recommended-card--highlighted {
+  border-color: rgba(255, 221, 244, 0.4);
+  background:
+    linear-gradient(160deg, rgba(104, 34, 84, 0.94), rgba(35, 18, 38, 0.88)),
+    rgba(20, 17, 28, 0.8);
+}
+
+.client-meal-plans-recommended-card__top,
+.client-meal-plans-recommended-card__body,
+.client-meal-plans-recommended-card__meta {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.client-meal-plans-recommended-card__top {
+  min-height: 1.7rem;
+  align-content: start;
+}
+
+.client-meal-plans-recommended-card__body {
+  align-content: center;
+  min-height: 3.4rem;
+}
+
+.client-meal-plans-recommended-card__title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.client-meal-plans-recommended-card__meta {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: auto;
+  color: rgba(210, 222, 235, 0.82);
+  font-size: 0.86rem;
+}
+
+.client-meal-plans-recommended-card .badge {
+  min-height: 1.7rem;
+  padding: 0.22rem 0.58rem;
+  font-size: 0.68rem;
+}
+
+.client-meal-plans-upcoming {
+  display: grid;
+  gap: 0.82rem;
+}
+
+.client-meal-plans-upcoming-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.05rem 1.05rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 212, 232, 0.14);
+  background:
+    linear-gradient(180deg, rgba(35, 17, 37, 0.82), rgba(23, 17, 32, 0.76)),
+    rgba(20, 17, 28, 0.72);
+}
+
+.client-meal-plans-upcoming-row__main,
+.client-meal-plans-upcoming-row__meta {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.client-meal-plans-upcoming-row__title,
+.client-meal-plans-upcoming-row__vendor {
+  margin: 0;
+}
+
+.client-meal-plans-upcoming-row__title {
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.28;
+}
+
+.client-meal-plans-upcoming-row__vendor {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.client-meal-plans-upcoming-row__meta {
+  justify-items: end;
+  color: var(--muted-strong);
+  font-size: 0.88rem;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.client-meal-plans-section-link {
+  min-height: 2.35rem;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .client-meal-plans-hero__chips,
@@ -1471,6 +1611,23 @@ main {
   .client-meal-plans-analytics,
   .client-meal-plans-featured__stats {
     grid-template-columns: 1fr;
+  }
+
+  .client-meal-plans-recommended {
+    grid-auto-columns: minmax(13.5rem, 84%);
+  }
+
+  .client-meal-plans-recommended-card__meta {
+    grid-template-columns: 1fr;
+  }
+
+  .client-meal-plans-upcoming-row {
+    grid-template-columns: 1fr;
+  }
+
+  .client-meal-plans-upcoming-row__meta {
+    justify-items: start;
+    text-align: left;
   }
 
   .client-meal-plans-zip-tracker__add {
