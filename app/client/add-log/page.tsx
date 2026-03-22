@@ -19,6 +19,7 @@ import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionBlock } from "@/components/ui/SectionBlock";
 import { useSessionBootstrap } from "@/lib/client/session";
+import type { CreateWorkoutLogInput, WorkoutLogExerciseEntryInput } from "@/lib/types/training";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
 
 type WorkoutLogResponse = ApiResponse<JsonValue>;
@@ -35,29 +36,81 @@ function createExerciseRow(): ExerciseInputRowState {
   };
 }
 
-function buildClientNotes(exercises: ExerciseInputRowState[], mode: ContextMode, routineName: string) {
-  const populatedRows = exercises.filter((exercise) =>
-    [exercise.name, exercise.sets, exercise.reps, exercise.weight, exercise.time].some((value) => value.trim().length > 0),
-  );
+function normalizeOptionalText(value: string): string | undefined {
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
 
-  const contextLine =
-    mode === "routine" && routineName.trim().length > 0
-      ? `Routine: ${routineName.trim()}`
-      : "General workout";
+function normalizeOptionalNumber(value: string): number | undefined {
+  const normalized = value.trim();
+  if (normalized.length === 0) {
+    return undefined;
+  }
 
-  const exerciseLines = populatedRows.map((exercise, index) => {
-    const parts = [
-      exercise.name.trim() || `Exercise ${index + 1}`,
-      exercise.sets.trim() ? `Sets ${exercise.sets.trim()}` : null,
-      exercise.reps.trim() ? `Reps ${exercise.reps.trim()}` : null,
-      exercise.weight.trim() ? `Weight ${exercise.weight.trim()}` : null,
-      exercise.time.trim() ? `Time ${exercise.time.trim()}` : null,
-    ].filter(Boolean);
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return undefined;
+  }
 
-    return parts.join(" | ");
+  return parsed;
+}
+
+function normalizeOptionalInteger(value: string): number | undefined {
+  const normalized = value.trim();
+  if (normalized.length === 0) {
+    return undefined;
+  }
+
+  if (!/^\d+$/.test(normalized)) {
+    return undefined;
+  }
+
+  const parsed = Number(normalized);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
+function isBlank(value: string): boolean {
+  return value.trim().length === 0;
+}
+
+function hasInvalidIntegerValue(value: string): boolean {
+  return !isBlank(value) && normalizeOptionalInteger(value) === undefined;
+}
+
+function normalizeExerciseEntries(exercises: ExerciseInputRowState[]): WorkoutLogExerciseEntryInput[] {
+  return exercises.flatMap((exercise, index) => {
+    const exerciseName = normalizeOptionalText(exercise.name);
+    const sets = normalizeOptionalInteger(exercise.sets);
+    const reps = normalizeOptionalInteger(exercise.reps);
+    const weight = normalizeOptionalNumber(exercise.weight);
+    const durationMinutes = normalizeOptionalNumber(exercise.time);
+    const durationSeconds =
+      durationMinutes === undefined ? undefined : Math.round(durationMinutes * 60);
+
+    const hasMeaningfulContent =
+      exerciseName !== undefined ||
+      sets !== undefined ||
+      reps !== undefined ||
+      weight !== undefined ||
+      durationSeconds !== undefined;
+
+    if (!hasMeaningfulContent) {
+      return [];
+    }
+
+    return [{
+      exercise_name: exerciseName,
+      sets,
+      reps,
+      weight,
+      duration_seconds: durationSeconds,
+      position: index,
+    }];
   });
-
-  return [contextLine, ...exerciseLines].join("\n");
 }
 
 export default function AddLogPage() {
@@ -82,6 +135,7 @@ export default function AddLogPage() {
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
 
   const hasPrefilledRoutine = initialRoutineName.length > 0;
+  const hasValidAnchor = initialAssignmentId.length > 0;
   const visibleRoutineLabel = useMemo(() => {
     if (contextMode !== "routine" || routineName.trim().length === 0) {
       return null;
@@ -89,6 +143,19 @@ export default function AddLogPage() {
 
     return initialRoutineLabel.length > 0 ? `${initialRoutineLabel} - ${routineName.trim()}` : routineName.trim();
   }, [contextMode, initialRoutineLabel, routineName]);
+  const hasInvalidDurationMinutes = hasInvalidIntegerValue(durationMinutes);
+  const hasInvalidExerciseIntegers = exercises.some(
+    (exercise) =>
+      hasInvalidIntegerValue(exercise.sets) ||
+      hasInvalidIntegerValue(exercise.reps),
+  );
+  const blockingMessage = !hasValidAnchor
+    ? "Workout logs require valid training context. Open this form from a training assignment to save the workout."
+    : hasInvalidDurationMinutes
+      ? "Workout time must be a non-negative whole number of minutes."
+      : hasInvalidExerciseIntegers
+        ? "Sets and reps must be non-negative whole numbers before saving."
+        : null;
 
   if (status === "loading") {
     return <LoadingBlock title="Loading log workout" message="Validating your client session." />;
@@ -100,31 +167,32 @@ export default function AddLogPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (blockingMessage) {
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError(null);
     setSubmitSuccess(null);
 
     try {
-      if (!initialAssignmentId) {
-        setSubmitSuccess("Workout captured locally. No assignment context was available, so nothing was persisted.");
-        setExercises([createExerciseRow()]);
-        setDurationMinutes("");
-        return;
-      }
+      const exerciseEntries = normalizeExerciseEntries(exercises);
+      const normalizedDurationMinutes = normalizeOptionalInteger(durationMinutes);
+      const requestBody: CreateWorkoutLogInput = {
+        assignment_id: initialAssignmentId,
+        routine_id: contextMode === "routine" && initialRoutineId ? initialRoutineId : undefined,
+        performed_at: new Date(performedAt).toISOString(),
+        duration_minutes: normalizedDurationMinutes,
+        completion_status: "completed",
+        exercise_entries: exerciseEntries.length > 0 ? exerciseEntries : undefined,
+      };
 
       const response = await fetch("/api/client/training/workout-logs", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          assignment_id: initialAssignmentId || undefined,
-          routine_id: contextMode === "routine" && initialRoutineId ? initialRoutineId : undefined,
-          performed_at: new Date(performedAt).toISOString(),
-          duration_minutes: Number(durationMinutes),
-          completion_status: "completed",
-          client_notes: buildClientNotes(exercises, contextMode, routineName),
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const payload = (await response.json()) as WorkoutLogResponse;
@@ -167,11 +235,14 @@ export default function AddLogPage() {
       user={user}
       className="app-shell--client-add-log"
       navigation={
-        <Link className="link-button" href={initialAssignmentId ? `/client/training/${initialAssignmentId}` : "/client/training"}>
+        <Link className="link-button" href={hasValidAnchor ? `/client/training/${initialAssignmentId}` : "/client/training"}>
           Back to training
         </Link>
       }
     >
+      {blockingMessage ? (
+        <ErrorBlock title="Workout log blocked" message={blockingMessage} />
+      ) : null}
       {submitError ? <ErrorBlock title="Unable to save workout" message={submitError} /> : null}
       {submitSuccess ? (
         <FeedbackBanner
@@ -227,6 +298,7 @@ export default function AddLogPage() {
                 id="duration-minutes"
                 type="number"
                 min="0"
+                step="1"
                 value={durationMinutes}
                 onChange={(event) => setDurationMinutes(event.target.value)}
                 placeholder="45"
@@ -252,7 +324,7 @@ export default function AddLogPage() {
             <button type="button" onClick={handleAddExercise} disabled={submitting}>
               Add Exercise
             </button>
-            <button type="submit" disabled={submitting || durationMinutes.trim().length === 0}>
+            <button type="submit" disabled={submitting || durationMinutes.trim().length === 0 || blockingMessage !== null}>
               {submitting ? "Saving..." : "Save Workout"}
             </button>
           </ActionRow>

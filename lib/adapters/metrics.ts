@@ -10,7 +10,7 @@ import {
 } from "@/lib/adapters/common";
 
 type MetricDefinition = {
-  key: string;
+  keys: string[];
   label: string;
 };
 
@@ -26,7 +26,8 @@ export type MetricsTrendRow = {
 };
 
 export type ClientMetricsDisplayView = {
-  primary: MetricsDisplayItem[];
+  nutrition: MetricsDisplayItem[];
+  training: MetricsDisplayItem[];
   supporting: MetricsDisplayItem[];
   today: MetricsDisplayItem[];
   thisWeek: MetricsDisplayItem[];
@@ -34,19 +35,31 @@ export type ClientMetricsDisplayView = {
   hasAnyData: boolean;
 };
 
-const PRIMARY_METRICS: MetricDefinition[] = [
-  { key: "calories_consumed", label: "Calories Consumed" },
-  { key: "calories_burned", label: "Calories Burned" },
-  { key: "net_calories", label: "Net Calories" },
-  { key: "deficit", label: "Deficit" },
-  { key: "surplus", label: "Surplus" },
+const NUTRITION_METRICS: MetricDefinition[] = [
+  { keys: ["calories_consumed"], label: "Calories Consumed" },
+  { keys: ["calories_burned"], label: "Calories Burned" },
+  { keys: ["net_calories"], label: "Net Calories" },
+  { keys: ["deficit"], label: "Deficit" },
+  { keys: ["surplus"], label: "Surplus" },
+];
+
+const TRAINING_METRICS: MetricDefinition[] = [
+  { keys: ["workout_count", "completed_workouts", "workouts_completed", "total_workouts"], label: "Workout Count" },
+  { keys: ["active_minutes", "minutes_active", "workout_minutes", "total_active_minutes"], label: "Active Minutes" },
+  {
+    keys: ["completion_rate", "completion_percent", "percent_complete", "completed_percent"],
+    label: "Completion Rate",
+  },
+  {
+    keys: ["completion_status", "workout_completion_status", "training_completion_status"],
+    label: "Completion Status",
+  },
 ];
 
 const SUPPORTING_METRICS: MetricDefinition[] = [
-  { key: "protein", label: "Protein" },
-  { key: "steps", label: "Steps" },
-  { key: "workout_count", label: "Workout Count" },
-  { key: "active_minutes", label: "Active Minutes" },
+  { keys: ["protein"], label: "Protein" },
+  { keys: ["steps"], label: "Steps" },
+  { keys: ["distance", "distance_miles", "distance_km"], label: "Distance" },
 ];
 
 const DATE_KEYS = ["date", "day", "recorded_at", "created_at", "timestamp"];
@@ -77,10 +90,11 @@ export function adaptClientMetricsDisplay(
   history: JsonValue | null,
 ): ClientMetricsDisplayView {
   const sources = [overview, history];
-  const allMetricDefs = [...PRIMARY_METRICS, ...SUPPORTING_METRICS];
+  const allMetricDefs = [...NUTRITION_METRICS, ...TRAINING_METRICS, ...SUPPORTING_METRICS];
 
   return {
-    primary: pickMetricsFromSources(sources, PRIMARY_METRICS),
+    nutrition: pickMetricsFromSources(sources, NUTRITION_METRICS),
+    training: pickMetricsFromSources(sources, TRAINING_METRICS),
     supporting: pickMetricsFromSources(sources, SUPPORTING_METRICS),
     today: pickMetricsFromSection(sources, ["today", "today_summary", "current_day"], allMetricDefs),
     thisWeek: pickMetricsFromSection(sources, ["this_week", "week", "weekly", "week_summary"], allMetricDefs),
@@ -136,11 +150,11 @@ function pickMetricsFromSources(
 ): MetricsDisplayItem[] {
   return definitions.flatMap((definition) => {
     for (const source of sources) {
-      const candidate = findScalarValue(source, definition.key);
+      const candidate = findScalarValue(source, definition.keys);
       if (candidate !== null) {
         return [
           {
-            key: definition.key,
+            key: definition.keys[0],
             label: definition.label,
             value: candidate,
           },
@@ -164,9 +178,9 @@ function pickMetricsFromSection(
     }
 
     const metrics = definitions.flatMap((definition) => {
-      const candidate = findScalarValue(section, definition.key);
+      const candidate = findScalarValue(section, definition.keys);
       return candidate !== null
-        ? [{ key: definition.key, label: definition.label, value: candidate }]
+        ? [{ key: definition.keys[0], label: definition.label, value: candidate }]
         : [];
     });
 
@@ -192,14 +206,16 @@ function findTrendRows(
   return [];
 }
 
-function findScalarValue(value: JsonValue | null, targetKey: string): string | null {
+function findScalarValue(value: JsonValue | null, targetKeys: string[]): string | null {
   if (!isObject(value)) {
     return null;
   }
 
-  const directValue = value[targetKey];
-  if (typeof directValue === "string" || typeof directValue === "number" || typeof directValue === "boolean") {
-    return formatValue(directValue);
+  for (const targetKey of targetKeys) {
+    const directValue = value[targetKey];
+    if (typeof directValue === "string" || typeof directValue === "number" || typeof directValue === "boolean") {
+      return formatValue(directValue);
+    }
   }
 
   for (const entry of Object.values(value)) {
@@ -207,7 +223,7 @@ function findScalarValue(value: JsonValue | null, targetKey: string): string | n
       continue;
     }
 
-    const nestedValue = findScalarValue(entry, targetKey);
+    const nestedValue = findScalarValue(entry, targetKeys);
     if (nestedValue !== null) {
       return nestedValue;
     }
@@ -283,10 +299,14 @@ function buildTrendRow(
     .map((key) => value[key])
     .find((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
   const metrics = definitions.flatMap((definition) => {
-    const candidate = value[definition.key];
-    return typeof candidate === "string" || typeof candidate === "number" || typeof candidate === "boolean"
-      ? [{ key: definition.key, label: definition.label, value: formatValue(candidate) }]
-      : [];
+    for (const key of definition.keys) {
+      const candidate = value[key];
+      if (typeof candidate === "string" || typeof candidate === "number" || typeof candidate === "boolean") {
+        return [{ key: definition.keys[0], label: definition.label, value: formatValue(candidate) }];
+      }
+    }
+
+    return [];
   });
 
   if (!label || metrics.length === 0) {

@@ -40,6 +40,7 @@ export function ExerciseInputRow({
             id={`exercise-sets-${exercise.id}`}
             type="number"
             min="0"
+            step="1"
             value={exercise.sets}
             onChange={(event) => onChange(exercise.id, "sets", event.target.value)}
             placeholder="3"
@@ -51,6 +52,7 @@ export function ExerciseInputRow({
             id={`exercise-reps-${exercise.id}`}
             type="number"
             min="0"
+            step="1"
             value={exercise.reps}
             onChange={(event) => onChange(exercise.id, "reps", event.target.value)}
             placeholder="10"
@@ -68,11 +70,12 @@ export function ExerciseInputRow({
           />
         </div>
         <div className="field">
-          <label htmlFor={`exercise-time-${exercise.id}`}>Time</label>
+          <label htmlFor={`exercise-time-${exercise.id}`}>Time (minutes)</label>
           <input
             id={`exercise-time-${exercise.id}`}
             type="number"
             min="0"
+            step="0.1"
             value={exercise.time}
             onChange={(event) => onChange(exercise.id, "time", event.target.value)}
             placeholder="15"

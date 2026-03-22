@@ -3,25 +3,89 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { LogoutButton } from "@/components/LogoutButton";
-import { AnalyticsCard } from "@/components/analytics/AnalyticsCard";
 import { PageShell } from "@/components/layout/PageShell";
-import { RoutineCard } from "@/components/training/RoutineCard";
-import { ActionRow } from "@/components/ui/ActionRow";
 import { Card } from "@/components/ui/Card";
-import { DebugPreview } from "@/components/ui/DebugPreview";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
-import { ListRow } from "@/components/ui/ListRow";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionBlock } from "@/components/ui/SectionBlock";
-import { StatPill } from "@/components/ui/StatPill";
-import { adaptPTDashboard } from "@/lib/adapters/dashboard";
 import { useSessionBootstrap } from "@/lib/client/session";
-import type { ApiResponse, PTDashboardResponse } from "@/lib/types/api";
+import type { ApiResponse, PTDashboardClientSummary, PTDashboardResponse } from "@/lib/types/api";
 
 type PTDashboardApiResponse = ApiResponse<PTDashboardResponse>;
+
+function formatDateTime(value: string | null): string {
+  if (!value) {
+    return "No workout logs yet";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(parsed);
+}
+
+function formatMetricValue(value: number | null): string {
+  return value === null ? "Not available" : `${value}`;
+}
+
+function PTDashboardClientCard({ client }: { client: PTDashboardClientSummary }) {
+  return (
+    <Card className="pt-dashboard-client-card" variant="soft">
+      <PageHeader
+        eyebrow="Client"
+        title={client.client.email}
+        description={
+          client.notes
+            ? `Link notes: ${client.notes}`
+            : "PT-linked client available through the protected dashboard route."
+        }
+        status={{ label: client.status, tone: "accent" }}
+      />
+
+      <dl className="pt-dashboard-client-card__facts">
+        <div>
+          <dt>Assignments</dt>
+          <dd>{client.assignment_count}</dd>
+        </div>
+        <div>
+          <dt>Workout logs</dt>
+          <dd>{client.workout_log_count}</dd>
+        </div>
+        <div>
+          <dt>Latest workout log</dt>
+          <dd>{formatDateTime(client.latest_workout_log_at)}</dd>
+        </div>
+        <div>
+          <dt>Intake ceiling</dt>
+          <dd>{formatMetricValue(client.metrics_snapshot?.current_intake_ceiling_calories ?? null)}</dd>
+        </div>
+        <div>
+          <dt>Expenditure floor</dt>
+          <dd>{formatMetricValue(client.metrics_snapshot?.current_expenditure_floor_calories ?? null)}</dd>
+        </div>
+      </dl>
+
+      <div className="action-row">
+        <Link className="link-button link-button--accent" href={`/pt/clients/${client.client_user_id}`}>
+          Open client
+        </Link>
+        <Link className="link-button" href={`/pt/clients/${client.client_user_id}/metrics`}>
+          Metrics
+        </Link>
+        <Link className="link-button" href={`/pt/clients/${client.client_user_id}/assign`}>
+          Training
+        </Link>
+      </div>
+    </Card>
+  );
+}
 
 export default function PTDashboardPage() {
   const { status, user } = useSessionBootstrap({
@@ -86,198 +150,48 @@ export default function PTDashboardPage() {
     return <LoadingBlock title="Redirecting" message="PT access requires an authenticated PT session." />;
   }
 
-  const view = dashboardData ? adaptPTDashboard(dashboardData) : null;
-
   return (
-    <PageShell
-      title="Coach dashboard"
-      user={user}
-      actions={<LogoutButton />}
-    >
-      {loading ? <LoadingBlock title="Loading dashboard data" message="Calling `/api/pt/dashboard` through the BFF." /> : null}
+    <PageShell title="PT Dashboard" user={user}>
+      {loading ? <LoadingBlock title="Loading dashboard" message="Fetching real PT-linked client summaries." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load PT dashboard" message={errorMessage} /> : null}
 
-      {view && dashboardData ? (
+      {!loading && !errorMessage ? (
         <>
-          <Card className="pt-dashboard-hero" variant="accent" as="section">
+          <Card className="pt-dashboard-header" variant="accent" as="section">
             <PageHeader
               eyebrow="PT workspace"
-              title="Coaching command center"
-              description="Manage clients, review package availability, and move into client-specific actions through the existing PT BFF routes."
-              chips={view.profile.chips}
+              title="PT Dashboard"
+              description="Manage your linked clients from one place using real assignment, workout log, and metrics snapshot data already available inside MealMetric."
               actions={
-                <ActionRow>
+                <>
                   <Link className="link-button link-button--accent" href="/pt/clients">
-                    Open clients
+                    Client workspace
                   </Link>
                   <Link className="link-button" href="/pt/settings">
-                    PT settings
+                    Settings
                   </Link>
-                </ActionRow>
+                </>
               }
             />
-            <div className="pt-dashboard-hero__stats">
-              {view.summary.length > 0 ? (
-                view.summary.map((item, index) => (
-                  <StatPill
-                    key={item.label}
-                    label={item.label}
-                    value={item.value}
-                    hint={item.hint}
-                    active={index === 0}
-                  />
-                ))
-              ) : (
-                <>
-                  <StatPill label="Clients" value={`${view.clients.length}`} hint="Loaded from the PT dashboard aggregate route." active />
-                  <StatPill label="Packages" value={`${view.packages.length}`} hint="Current package visibility returned by the dashboard route." />
-                </>
-              )}
-            </div>
           </Card>
 
           <SectionBlock
-            eyebrow="Workspace"
-            title="Operations overview"
-            description="High-level framing for the real PT slices currently assembled in the dashboard route."
+            eyebrow="Linked clients"
+            title="Client roster"
+            description="Each card shows only real PT-scoped summary data returned by the protected dashboard route."
           >
-            <div className="pt-dashboard-analytics">
-              <AnalyticsCard
-                eyebrow="Dashboard aggregate"
-                title={view.profile.title}
-                description={view.profile.description}
-                stats={
-                  view.summary.length > 0
-                    ? view.summary
-                    : [
-                        { label: "Clients", value: `${view.clients.length}` },
-                        { label: "Packages", value: `${view.packages.length}` },
-                      ]
-                }
-              />
-              <Card className="pt-dashboard-context" variant="soft">
-                <ListRow
-                  eyebrow="Workspace status"
-                  title="Client-first PT operations"
-                  description="Top-level PT tabs stay honest, but the real workflow remains client-centric: metrics, assignments, and meal-plan recommendations all live under the client workspace."
-                  metadata={[
-                    { label: "Dashboard route", value: "/api/pt/dashboard" },
-                    { label: "Clients route", value: "/pt/clients" },
-                    { label: "Packages visible", value: `${view.packages.length}` },
-                  ]}
-                />
-              </Card>
-            </div>
-          </SectionBlock>
-
-          <SectionBlock
-            eyebrow="Clients"
-            title="Client management"
-            description="Current clients surfaced from the PT dashboard for quick routing into metrics, training assignment, and meal-plan recommendation work."
-            actions={
-              <Link className="link-button" href="/pt/clients">
-                Full client workspace
-              </Link>
-            }
-          >
-            {view.clients.length > 0 ? (
-              <div className="stacked-list">
-                {view.clients.map((client, index) => (
-                  <Card key={client.id ?? `${client.title}-${index}`} className="pt-dashboard-client" variant="soft">
-                    <ListRow
-                      eyebrow="Client"
-                      title={client.title}
-                      description={client.subtitle}
-                      metadata={client.metadata}
-                      status={client.status ? { label: client.status, tone: "accent" } : undefined}
-                    />
-                    {client.id ? (
-                      <ActionRow>
-                        <Link className="link-button" href={`/pt/clients/${client.id}`}>
-                          Overview
-                        </Link>
-                        <Link className="link-button" href={`/pt/clients/${client.id}/metrics`}>
-                          Metrics
-                        </Link>
-                        <Link className="link-button" href={`/pt/clients/${client.id}/assign`}>
-                          Training
-                        </Link>
-                        <Link className="link-button" href={`/pt/clients/${client.id}/recommend-meal-plan`}>
-                          Meal plans
-                        </Link>
-                      </ActionRow>
-                    ) : null}
-                  </Card>
+            {dashboardData && dashboardData.items.length > 0 ? (
+              <div className="pt-dashboard-client-list">
+                {dashboardData.items.map((client) => (
+                  <PTDashboardClientCard key={client.id} client={client} />
                 ))}
               </div>
             ) : (
               <EmptyState
-                title="No clients returned"
-                message="Client accounts will appear here when the PT dashboard payload includes a roster."
+                title="No linked clients yet"
+                message="This PT account does not currently have any linked clients to manage."
               />
             )}
-          </SectionBlock>
-
-          <SectionBlock
-            eyebrow="Packages"
-            title="Training package visibility"
-            description="Package visibility is surfaced here as the closest current proxy for assignment readiness on the PT dashboard."
-          >
-            {view.packages.length > 0 ? (
-              <div className="stacked-list">
-                {view.packages.map((pkg, index) => (
-                  <RoutineCard
-                    key={pkg.id ?? `${pkg.title}-${index}`}
-                    eyebrow="Package"
-                    title={pkg.title}
-                    description={pkg.subtitle}
-                    metadata={pkg.metadata}
-                    status={pkg.status ? { label: pkg.status, tone: "accent" } : undefined}
-                    footer={
-                      <Link className="link-button" href="/pt/clients">
-                        Use in client workspace
-                      </Link>
-                    }
-                  />
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title="No packages returned"
-                message="Package inventory will appear here when the PT dashboard exposes assignable package data."
-              />
-            )}
-          </SectionBlock>
-
-          <SectionBlock
-            eyebrow="Actions"
-            title="Route-safe PT actions"
-            description="The PT shell remains consistent while unsupported top-level tabs continue to defer into the real client workspace."
-          >
-            <Card className="pt-dashboard-actions" variant="soft">
-              <ListRow
-                eyebrow="Current workflow"
-                title="Use client-centered operations"
-                description="Assignments, metrics, and meal-plan recommendations are all currently routed through the PT client workspace instead of top-level PT tabs."
-              />
-              <ActionRow>
-                <Link className="link-button link-button--accent" href="/pt/clients">
-                  Open client command center
-                </Link>
-                <Link className="link-button" href="/pt/training">
-                  Training tab
-                </Link>
-                <Link className="link-button" href="/pt/metrics">
-                  Metrics tab
-                </Link>
-                <Link className="link-button" href="/pt/meal-plans">
-                  Meal plans tab
-                </Link>
-              </ActionRow>
-            </Card>
-            {view.summary.length === 0 ? (
-              <DebugPreview value={dashboardData.profile} label="PT profile fallback" />
-            ) : null}
           </SectionBlock>
         </>
       ) : null}

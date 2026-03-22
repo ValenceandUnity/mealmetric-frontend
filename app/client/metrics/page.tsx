@@ -101,7 +101,8 @@ export default function ClientMetricsPage() {
                 title="Metrics"
                 description="Only metrics already present in the current backend slices are shown here."
                 chips={[
-                  `${view.primary.length} primary metric${view.primary.length === 1 ? "" : "s"}`,
+                  `${view.training.length} training metric${view.training.length === 1 ? "" : "s"}`,
+                  `${view.nutrition.length} nutrition metric${view.nutrition.length === 1 ? "" : "s"}`,
                   `${view.supporting.length} supporting metric${view.supporting.length === 1 ? "" : "s"}`,
                 ]}
                 actions={
@@ -117,13 +118,23 @@ export default function ClientMetricsPage() {
               />
             </Card>
 
-            {view.primary.length > 0 ? (
+            {view.training.length > 0 ? (
               <SectionBlock
-                eyebrow="Primary"
-                title="Primary Metrics"
-                description="Headline metrics returned directly from the current payload."
+                eyebrow="Training"
+                title="Training Metrics"
+                description="Workout and completion metrics are shown here only when they already exist in the current backend payload."
               >
-                <MetricsGrid metrics={view.primary} activeFirst />
+                <MetricsGrid metrics={view.training} activeFirst />
+              </SectionBlock>
+            ) : null}
+
+            {view.nutrition.length > 0 ? (
+              <SectionBlock
+                eyebrow="Nutrition"
+                title="Nutrition Metrics"
+                description="Nutrition values remain visible when they are already present in the current metrics response."
+              >
+                <MetricsGrid metrics={view.nutrition} activeFirst={view.training.length === 0} />
               </SectionBlock>
             ) : null}
 
@@ -131,7 +142,7 @@ export default function ClientMetricsPage() {
               <SectionBlock
                 eyebrow="Summary"
                 title="Summary"
-                description="Today and weekly summaries are shown only when those sections already exist in the current metrics payload."
+                description="Today and weekly groupings are shown only when those sections already exist in the current metrics payload."
               >
                 <div className="client-metrics-summary-sections">
                   {view.today.length > 0 ? (
@@ -139,7 +150,7 @@ export default function ClientMetricsPage() {
                       <PageHeader
                         eyebrow="Summary"
                         title="Today"
-                        description="Current daily metrics returned by the BFF."
+                        description="Current daily values returned by the BFF."
                       />
                       <MetricsGrid metrics={view.today} />
                     </Card>
@@ -150,7 +161,7 @@ export default function ClientMetricsPage() {
                       <PageHeader
                         eyebrow="Summary"
                         title="This Week"
-                        description="Current weekly metrics returned by the BFF."
+                        description="Current weekly values returned by the BFF."
                       />
                       <MetricsGrid metrics={view.thisWeek} />
                     </Card>
@@ -163,7 +174,7 @@ export default function ClientMetricsPage() {
               <SectionBlock
                 eyebrow="Trend"
                 title="Trend"
-                description="Rendered only because the metrics payload already exposes real time-series rows."
+                description="Rendered only because the metrics payload already exposes real dated rows."
               >
                 <TrendSection rows={view.trendRows} />
               </SectionBlock>
@@ -183,11 +194,11 @@ export default function ClientMetricsPage() {
           <SectionBlock
             eyebrow="Metrics"
             title="No metrics available yet"
-            description="Start logging workouts to see your progress."
+            description="This screen stays empty until the current backend metrics slices expose real values."
           >
             <EmptyState
               title="No metrics available yet"
-              message="Start logging workouts to see your progress."
+              message="No metrics are currently exposed by the active backend overview or history payloads."
             />
           </SectionBlock>
         )

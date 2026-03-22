@@ -558,6 +558,24 @@ main {
   border-color: transparent;
 }
 
+.notification-link {
+  position: relative;
+}
+
+.notification-link__count {
+  display: inline-flex;
+  min-width: 1.6rem;
+  min-height: 1.6rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(125, 211, 252, 0.16);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  justify-content: center;
+  align-items: center;
+}
+
 .debug-preview summary {
   cursor: pointer;
   color: var(--muted-strong);
@@ -946,6 +964,18 @@ main {
 .meal-plan-card,
 .record-card {
   gap: 0.95rem;
+}
+
+.notification-card {
+  gap: 0.9rem;
+}
+
+.notification-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  color: var(--muted);
+  font-size: 0.88rem;
 }
 
 .analytics-card__stats {
@@ -1365,6 +1395,205 @@ main {
 .client-add-log-row {
   display: grid;
   gap: 0.9rem;
+}
+
+.app-shell--client-workout-history {
+  position: relative;
+  isolation: isolate;
+}
+
+.app-shell--client-workout-history::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at top left, rgba(74, 222, 128, 0.1), transparent 26%),
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 28%),
+    linear-gradient(180deg, #09131d 0%, #07101a 48%, #040910 100%);
+}
+
+.app-shell--client-workout-history .app-shell__viewport {
+  gap: 1.1rem;
+}
+
+.client-workout-history-hero,
+.client-workout-history-list,
+.client-workout-history-card,
+.client-workout-history-card__body,
+.client-workout-history-exercise-list,
+.client-workout-history-exercise {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.client-workout-history-hero {
+  border-color: rgba(56, 189, 248, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.18), transparent 26%),
+    linear-gradient(155deg, rgba(8, 23, 35, 0.96), rgba(8, 15, 28, 0.92));
+}
+
+.client-workout-history-list {
+  gap: 0.8rem;
+}
+
+.client-workout-history-card {
+  gap: 0;
+  overflow: hidden;
+  border-color: rgba(136, 171, 204, 0.16);
+  background: rgba(8, 18, 30, 0.56);
+}
+
+.client-workout-history-card__details {
+  display: grid;
+  gap: 0;
+}
+
+.client-workout-history-card__summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 1rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.client-workout-history-card__summary::-webkit-details-marker {
+  display: none;
+}
+
+.client-workout-history-card__copy {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.client-workout-history-card__eyebrow,
+.client-workout-history-card__title,
+.client-workout-history-exercise__eyebrow,
+.client-workout-history-exercise__title,
+.client-workout-history-card__notes,
+.client-workout-history-exercise__notes {
+  margin: 0;
+}
+
+.client-workout-history-card__eyebrow,
+.client-workout-history-exercise__eyebrow {
+  color: rgba(210, 222, 235, 0.74);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.client-workout-history-card__title {
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.client-workout-history-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.client-workout-history-card__body {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid rgba(136, 171, 204, 0.14);
+}
+
+.client-workout-history-card__meta,
+.client-workout-history-exercise__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.85rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.client-workout-history-card__notes,
+.client-workout-history-exercise__notes {
+  color: var(--muted-strong);
+  line-height: 1.5;
+}
+
+.client-workout-history-card__note-section {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.client-workout-history-card__note-label {
+  margin: 0;
+  color: rgba(210, 222, 235, 0.74);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.client-workout-history-card__notes--preserve {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.client-workout-history-pt-note-editor,
+.client-workout-history-pt-note-form {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.client-workout-history-pt-note-label {
+  color: rgba(210, 222, 235, 0.74);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.client-workout-history-pt-note-input {
+  width: 100%;
+  min-height: 7rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(136, 171, 204, 0.18);
+  background: rgba(8, 18, 30, 0.58);
+  color: var(--text);
+  resize: vertical;
+}
+
+.client-workout-history-pt-note-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.client-workout-history-pt-note-feedback {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.client-workout-history-exercise-list {
+  gap: 0.7rem;
+}
+
+.client-workout-history-exercise {
+  border-color: rgba(136, 171, 204, 0.14);
+  background: rgba(6, 14, 24, 0.58);
+}
+
+.client-workout-history-exercise__header,
+.client-workout-history-exercise__copy {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.client-workout-history-exercise__title {
+  font-size: 0.98rem;
+  line-height: 1.2;
 }
 
 .client-add-log-hero {
@@ -2374,6 +2603,46 @@ main {
   gap: 0.75rem;
 }
 
+.pt-dashboard-header,
+.pt-dashboard-client-card {
+  gap: 1rem;
+}
+
+.pt-dashboard-client-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.pt-dashboard-client-card__facts {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.pt-dashboard-client-card__facts div {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 18px;
+  border: 1px solid rgba(125, 211, 252, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.pt-dashboard-client-card__facts dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.pt-dashboard-client-card__facts dd {
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
 .pt-clients-hero,
 .pt-clients-hero__lead,
 .pt-clients-hero__focus,
@@ -2533,6 +2802,10 @@ main {
   .client-add-log-form__meta,
   .client-add-log-row__grid {
     grid-template-columns: 1fr;
+  }
+
+  .client-workout-history-card__summary {
+    flex-direction: column;
   }
 
   .client-metrics-grid,

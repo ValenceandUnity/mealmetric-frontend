@@ -5,30 +5,19 @@ import { requireSession } from "@/lib/auth/session";
 import { backendFetch, toApiErrorResponse } from "@/lib/backend/client";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
 
-export async function GET() {
+type RouteContext = {
+  params: Promise<{
+    workoutLogId: string;
+  }>;
+};
+
+export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const session = await requireSession("client");
-
-    const data = await backendFetch<JsonValue>("/client/training/workout-logs", {
-      session,
-    });
-
-    return NextResponse.json<ApiResponse<JsonValue>>({
-      ok: true,
-      data,
-    });
-  } catch (error) {
-    return toApiErrorResponse(error, "Unable to load workout history.");
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const session = await requireSession("client");
+    const session = await requireSession("pt");
     const body = await readJsonObjectBody(request);
-
-    const data = await backendFetch<JsonValue>("/client/training/workout-logs", {
-      method: "POST",
+    const { workoutLogId } = await context.params;
+    const data = await backendFetch<JsonValue>(`/pt/workout-logs/${workoutLogId}/pt-notes`, {
+      method: "PATCH",
       session,
       body,
     });
@@ -43,6 +32,6 @@ export async function POST(request: Request) {
       return requestErrorResponse;
     }
 
-    return toApiErrorResponse(error, "Unable to submit workout log.");
+    return toApiErrorResponse(error, "Unable to update PT workout log note.");
   }
 }

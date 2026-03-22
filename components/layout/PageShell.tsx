@@ -8,6 +8,7 @@ import type { SessionUser } from "@/lib/types/api";
 type PageShellProps = {
   title: string;
   user: SessionUser;
+  subtitle?: string;
   navigation?: ReactNode;
   actions?: ReactNode;
   className?: string;
@@ -18,6 +19,7 @@ type PageShellProps = {
 export function PageShell({
   title,
   user,
+  subtitle,
   navigation,
   actions,
   className,
@@ -28,10 +30,10 @@ export function PageShell({
     <AppShell
       title={title}
       user={user}
+      subtitle={subtitle ?? "Signed-in workspace backed by MealMetric's protected BFF flow."}
       actions={actions}
       className={className}
       hideTopHub={hideTopHub}
-      subtitle="Signed-in workspace backed by MealMetric's protected BFF flow."
     >
       {navigation ? <div className="page-shell__nav row">{navigation}</div> : null}
       {children}

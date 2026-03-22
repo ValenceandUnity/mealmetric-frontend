@@ -2,23 +2,36 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { RecordCard } from "@/components/cards/RecordCard";
 import { PageShell } from "@/components/layout/PageShell";
-import { DebugPreview } from "@/components/ui/DebugPreview";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { Section } from "@/components/ui/Section";
-import {
-  adaptPTClientSnapshot,
-  findClientById,
-} from "@/lib/adapters/client-records";
+import { WorkoutHistoryList } from "@/components/training/WorkoutHistoryList";
+import { adaptWorkoutHistory } from "@/lib/adapters/workout-history";
+import { getArray, isObject, pickOptionalText } from "@/lib/adapters/common";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
 
-type PTClientsApiResponse = ApiResponse<JsonValue>;
+type JsonApiResponse = ApiResponse<JsonValue>;
+
+function replaceWorkoutLogInResponse(current: JsonValue | null, updatedLog: JsonValue): JsonValue | null {
+  if (isObject(current) && Array.isArray(current.items) && isObject(updatedLog)) {
+    return {
+      ...current,
+      items: current.items.map((item) => (isObject(item) && item.id === updatedLog.id ? updatedLog : item)),
+    };
+  }
+
+  if (Array.isArray(current) && isObject(updatedLog)) {
+    return current.map((item) => (isObject(item) && item.id === updatedLog.id ? updatedLog : item));
+  }
+
+  return current;
+}
 
 export default function PTClientDetailPage() {
   const params = useParams<{ clientId: string }>();
@@ -29,9 +42,27 @@ export default function PTClientDetailPage() {
     unauthenticatedRedirectTo: "/login",
   });
 
-  const [clientsData, setClientsData] = useState<JsonValue | null>(null);
+  const [clientDetailData, setClientDetailData] = useState<JsonValue | null>(null);
+  const [workoutLogsData, setWorkoutLogsData] = useState<JsonValue | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  async function handleSavePtNote(workoutLogId: string, ptNotes: string | null) {
+    const response = await fetch(`/api/pt/workout-logs/${workoutLogId}/pt-notes`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ pt_notes: ptNotes }),
+    });
+    const payload = (await response.json()) as JsonApiResponse;
+
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
+    }
+
+    setWorkoutLogsData((current) => replaceWorkoutLogInResponse(current, payload.data));
+  }
 
   useEffect(() => {
     if (status !== "authenticated" || !user || user.role !== "pt" || !clientId) {
@@ -45,24 +76,40 @@ export default function PTClientDetailPage() {
       setErrorMessage(null);
 
       try {
-        const response = await fetch("/api/pt/clients", { cache: "no-store" });
-        const payload = (await response.json()) as PTClientsApiResponse;
+        const [detailResponse, workoutLogsResponse] = await Promise.all([
+          fetch(`/api/pt/clients/${clientId}`, { cache: "no-store" }),
+          fetch(`/api/pt/clients/${clientId}/workout-logs`, { cache: "no-store" }),
+        ]);
+        const [detailPayload, workoutLogsPayload] = (await Promise.all([
+          detailResponse.json(),
+          workoutLogsResponse.json(),
+        ])) as [JsonApiResponse, JsonApiResponse];
 
         if (!active) {
           return;
         }
 
-        if (!payload.ok) {
-          setErrorMessage(payload.error.message);
-          setClientsData(null);
+        if (!detailPayload.ok) {
+          setErrorMessage(detailPayload.error.message);
+          setClientDetailData(null);
+          setWorkoutLogsData(null);
           return;
         }
 
-        setClientsData(payload.data);
+        if (!workoutLogsPayload.ok) {
+          setErrorMessage(workoutLogsPayload.error.message);
+          setClientDetailData(null);
+          setWorkoutLogsData(null);
+          return;
+        }
+
+        setClientDetailData(detailPayload.data);
+        setWorkoutLogsData(workoutLogsPayload.data);
       } catch {
         if (active) {
           setErrorMessage("Unable to load client detail.");
-          setClientsData(null);
+          setClientDetailData(null);
+          setWorkoutLogsData(null);
         }
       } finally {
         if (active) {
@@ -78,6 +125,26 @@ export default function PTClientDetailPage() {
     };
   }, [clientId, status, user]);
 
+  const detail = isObject(clientDetailData) ? clientDetailData : null;
+  const client = detail && isObject(detail.client) ? detail.client : null;
+  const currentAssignments = detail ? getArray(detail.current_assignments) : [];
+  const workoutLogs = useMemo(() => adaptWorkoutHistory(workoutLogsData), [workoutLogsData]);
+  const clientName = pickOptionalText(client, ["email"]) ?? `Client ${clientId}`;
+  const clientSummary = `${currentAssignments.length} current assignment${currentAssignments.length === 1 ? "" : "s"}`;
+  const metadata = [
+    { label: "Client ID", value: clientId },
+    ...(client ? [{ label: "Email", value: pickOptionalText(client, ["email"]) ?? "Unavailable" }] : []),
+    ...(client ? [{ label: "Role", value: pickOptionalText(client, ["role"]) ?? "Unavailable" }] : []),
+    {
+      label: "Assignments",
+      value: `${currentAssignments.length}`,
+    },
+    {
+      label: "Workout logs",
+      value: `${workoutLogs.length}`,
+    },
+  ];
+
   if (status === "loading") {
     return <LoadingBlock title="Loading client detail" message="Validating your BFF-managed session." />;
   }
@@ -86,12 +153,9 @@ export default function PTClientDetailPage() {
     return <LoadingBlock title="Redirecting" message="PT access requires an authenticated PT session." />;
   }
 
-  const clientRecord = findClientById(clientsData, clientId);
-  const snapshot = adaptPTClientSnapshot(clientRecord, clientId);
-
   return (
     <PageShell
-      title={snapshot.name}
+      title={clientName}
       user={user}
       navigation={
         <>
@@ -110,7 +174,7 @@ export default function PTClientDetailPage() {
         </>
       }
     >
-      {loading ? <LoadingBlock title="Loading client profile" message="Resolving this client from the PT clients route." /> : null}
+      {loading ? <LoadingBlock title="Loading client profile" message="Fetching PT-safe client detail and workout logs." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load client detail" message={errorMessage} /> : null}
 
       {!loading && !errorMessage ? (
@@ -118,9 +182,9 @@ export default function PTClientDetailPage() {
           <Section title="Client snapshot">
             <RecordCard
               eyebrow="Client overview"
-              title={snapshot.name}
-              description={snapshot.summary}
-              metadata={snapshot.metadata}
+              title={clientName}
+              description={clientSummary}
+              metadata={metadata}
               footer={
                 <>
                   <Link className="link-button" href={`/pt/clients/${clientId}/metrics`}>
@@ -153,7 +217,7 @@ export default function PTClientDetailPage() {
               <RecordCard
                 eyebrow="Training"
                 title="Manage assignments"
-                description="Create new assignments and review the client’s current training workload."
+                description="Create new assignments and review the client's current training workload."
                 metadata={[{ label: "Route", value: `/pt/clients/${clientId}/assign` }]}
                 footer={
                   <Link className="link-button" href={`/pt/clients/${clientId}/assign`}>
@@ -175,13 +239,29 @@ export default function PTClientDetailPage() {
             </div>
           </Section>
 
-          {!clientRecord ? (
+          <Section title="Workout logs">
+            {workoutLogs.length === 0 ? (
+              <EmptyState
+                title="No workout logs yet"
+                message="Saved workout logs will appear here once this linked client records workouts through the current logging flow."
+              />
+            ) : (
+              <WorkoutHistoryList
+                logs={workoutLogs}
+                ptNoteEditor={{
+                  enabled: true,
+                  onSave: handleSavePtNote,
+                }}
+              />
+            )}
+          </Section>
+
+          {!detail ? (
             <Section title="Fallback detail">
               <EmptyState
-                title="Dedicated client detail endpoint unavailable"
-                message="This view is assembled from the PT clients collection because the backend does not expose a direct client-detail route."
+                title="Client detail unavailable"
+                message="The PT detail route did not return a display-ready payload for this client."
               />
-              {clientsData ? <DebugPreview value={clientsData} label="PT clients collection fallback" /> : null}
             </Section>
           ) : null}
         </>

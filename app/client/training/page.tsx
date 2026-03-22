@@ -214,6 +214,9 @@ export default function ClientTrainingHubPage() {
                   </ActionRow>
                 ) : selectedPackage ? (
                   <ActionRow>
+                    <Link className="link-button" href="/client/training/history">
+                      Workout history
+                    </Link>
                     <button type="button" onClick={() => setSelectedPackage(null)}>
                       Back to Packages
                     </button>
@@ -223,6 +226,9 @@ export default function ClientTrainingHubPage() {
                   </ActionRow>
                 ) : (
                   <ActionRow>
+                    <Link className="link-button" href="/client/training/history">
+                      Workout history
+                    </Link>
                     <Link className="link-button" href="/client">
                       Client home
                     </Link>
@@ -278,7 +284,7 @@ export default function ClientTrainingHubPage() {
               ) : (
                 <PackageList
                   packages={packages}
-                  selectedPackageId={selectedPackage?.id ?? null}
+                  selectedPackageId={null}
                   onOpenPackage={(trainingPackage) => {
                     setSelectedRoutine(null);
                     setSelectedPackage(trainingPackage);
@@ -292,6 +298,11 @@ export default function ClientTrainingHubPage() {
               title="Routine Detail"
               description="Exercises are shown only when the selected routine exposes them in the current package detail payload."
             >
+              <ActionRow>
+                <Link className="link-button" href="/client/training/history">
+                  Workout history
+                </Link>
+              </ActionRow>
               <RoutineDetailView
                 routine={selectedRoutine}
                 addLogHref={

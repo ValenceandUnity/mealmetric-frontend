@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
+import { NotificationLink } from "@/components/app-shell/NotificationLink";
 import { TopHub } from "@/components/app-shell/TopHub";
 import { BottomNavigation } from "@/components/navigation/BottomNavigation";
 import {
@@ -45,7 +46,12 @@ export function AppShell({
             title={title}
             subtitle={subtitle}
             email={user.email}
-            actions={actions}
+            actions={
+              <>
+                <NotificationLink role={user.role} />
+                {actions}
+              </>
+            }
           />
         )}
         <div className="app-shell__viewport">{children}</div>

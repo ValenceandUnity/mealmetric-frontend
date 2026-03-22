@@ -66,9 +66,75 @@ export type ClientMetricsResponse = {
 };
 
 export type PTDashboardResponse = {
-  profile: JsonValue;
-  clients: JsonValue;
-  packages: JsonValue;
+  items: PTDashboardClientSummary[];
+  count: number;
+};
+
+export type OverviewMetricsPayload = {
+  client_user_id: string;
+  as_of_date: string;
+  week_start_date: string;
+  week_end_date: string;
+  business_timezone: string;
+  week_start_day: number;
+  total_intake_calories: number;
+  total_expenditure_calories: number;
+  net_calorie_balance: number;
+  weekly_target_deficit_calories: number | null;
+  deficit_progress_percent: string | number | null;
+  current_intake_ceiling_calories: number | null;
+  current_expenditure_floor_calories: number | null;
+  has_data: boolean;
+  freshness: JsonValue;
+};
+
+export type PTDashboardClientSummary = {
+  id: string;
+  pt_user_id: string;
+  client_user_id: string;
+  status: string;
+  started_at: string | null;
+  ended_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  client: {
+    id: string;
+    email: string;
+    role: string;
+    created_at: string;
+  };
+  assignment_count: number;
+  workout_log_count: number;
+  latest_workout_log_at: string | null;
+  metrics_snapshot: OverviewMetricsPayload | null;
+};
+
+export type NotificationType =
+  | "client_workout_logged"
+  | "pt_workout_note_added"
+  | "pt_assignment_created";
+
+export type NotificationItem = {
+  id: string;
+  recipient_user_id: string;
+  actor_user_id: string | null;
+  type: NotificationType;
+  title: string;
+  message: string;
+  related_entity_type: string | null;
+  related_entity_id: string | null;
+  is_read: boolean;
+  created_at: string;
+};
+
+export type NotificationListPayload = {
+  items: NotificationItem[];
+  count: number;
+};
+
+export type NotificationUnreadCountPayload = {
+  count: number;
 };
 
 export type MealPlanSummary = {

@@ -29,6 +29,42 @@ export class BackendClientError extends Error {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getSafeBackendErrorDetails(payload: unknown): {
+  code?: string;
+  message?: string;
+} {
+  if (typeof payload === "string") {
+    const message = payload.trim();
+    return message.length > 0 ? { message } : {};
+  }
+
+  if (!isRecord(payload)) {
+    return {};
+  }
+
+  const code = typeof payload.code === "string" ? payload.code : undefined;
+  if (typeof payload.message === "string" && payload.message.trim().length > 0) {
+    return { code, message: payload.message.trim() };
+  }
+
+  if (typeof payload.detail === "string" && payload.detail.trim().length > 0) {
+    return { code, message: payload.detail.trim() };
+  }
+
+  if (isRecord(payload.error)) {
+    const nestedCode = typeof payload.error.code === "string" ? payload.error.code : code;
+    if (typeof payload.error.message === "string" && payload.error.message.trim().length > 0) {
+      return { code: nestedCode, message: payload.error.message.trim() };
+    }
+  }
+
+  return { code };
+}
+
 function getBackendBaseUrl(): string {
   const value = process.env.BACKEND_BASE_URL;
 
@@ -110,10 +146,11 @@ export async function backendFetch<T>(
   const payload = await parseResponse(response);
 
   if (!response.ok) {
+    const safeError = getSafeBackendErrorDetails(payload);
     throw new BackendClientError(
       response.status,
-      "backend_request_failed",
-      "Backend request failed.",
+      safeError.code ?? "backend_request_failed",
+      safeError.message ?? "Backend request failed.",
       payload,
     );
   }
@@ -140,12 +177,17 @@ export function toApiErrorResponse(
   }
 
   if (error instanceof BackendClientError) {
+    const message =
+      error.status >= 400 && error.status < 500 && error.message.trim().length > 0
+        ? error.message
+        : fallbackMessage;
+
     return NextResponse.json(
       {
         ok: false,
         error: {
           code: error.code,
-          message: fallbackMessage,
+          message,
         },
       },
       { status: error.status },
