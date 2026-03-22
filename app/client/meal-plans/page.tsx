@@ -211,6 +211,10 @@ export default function ClientMealPlansPage() {
 
     return filters.budgetDuration;
   }, [filters.budgetDuration, filters.customDuration]);
+  const activeZipCount = useMemo(
+    () => trackedLocations.filter((entry) => entry.kind === "zip" && entry.selected).length,
+    [trackedLocations],
+  );
 
   function openBudgetMarkerEditor() {
     setDraft(filters);
@@ -441,7 +445,12 @@ export default function ClientMealPlansPage() {
                 <p className="client-meal-plans-budget-marker__eyebrow">Client meal plans</p>
                 <h2 className="client-meal-plans-budget-marker__title">Budget Marker</h2>
               </div>
-              <Chip tone="muted">{resolvedDurationLabel}</Chip>
+              <div className="client-meal-plans-budget-marker__meta">
+                <Chip tone="muted">{resolvedDurationLabel}</Chip>
+                <Chip tone="muted">
+                  {activeZipCount === 1 ? "1 Active Zip Code" : `${activeZipCount} Active Zip Codes`}
+                </Chip>
+              </div>
             </div>
             <div className="client-meal-plans-budget-marker__row">
               <div className="client-meal-plans-budget-marker__value-group">
@@ -450,13 +459,6 @@ export default function ClientMealPlansPage() {
                   Use the current supported ZIP and budget controls without leaving the top discovery marker open.
                 </p>
               </div>
-            </div>
-            <div className="client-meal-plans-budget-marker__chips">
-              {(activeFilterChips.length > 0 ? activeFilterChips : ["Budget open"]).map((chip) => (
-                <Chip key={chip} tone={activeFilterChips.length > 0 ? "accent" : "muted"}>
-                  {chip}
-                </Chip>
-              ))}
             </div>
             <div className="client-meal-plans-budget-marker__actions">
               <ActionRow>

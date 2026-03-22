@@ -1075,6 +1075,14 @@ main {
   gap: 0.35rem;
 }
 
+.client-meal-plans-budget-marker__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  align-items: center;
+}
+
 .client-meal-plans-budget-marker__eyebrow {
   margin: 0;
   color: #6f2a53;
@@ -1113,13 +1121,6 @@ main {
 
 .client-meal-plans-filter-panel {
   margin-top: -0.15rem;
-}
-
-.client-meal-plans-budget-marker__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-  align-items: center;
 }
 
 .client-meal-plans-budget-marker__actions {
