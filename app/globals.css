@@ -1130,6 +1130,46 @@ main {
   justify-content: center;
 }
 
+.meal-plans-top-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.2rem;
+}
+
+.meal-plans-top-nav__item {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 2.8rem;
+  padding: 0.7rem 0.6rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 212, 232, 0.16);
+  background: rgba(30, 18, 33, 0.48);
+  color: var(--muted-strong);
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-align: center;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.meal-plans-top-nav__item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 221, 244, 0.28);
+}
+
+.meal-plans-top-nav__item--active {
+  border-color: rgba(255, 221, 244, 0.4);
+  background:
+    linear-gradient(135deg, rgba(255, 241, 249, 0.9), rgba(239, 221, 255, 0.88)),
+    rgba(255, 248, 252, 0.92);
+  color: #5a173f;
+  box-shadow: 0 12px 24px rgba(72, 20, 56, 0.12);
+}
+
 .client-meal-plans-edit-form {
   gap: 1.1rem;
 }
@@ -1411,6 +1451,330 @@ main {
   text-align: right;
 }
 
+.client-meal-plans-search-input {
+  position: relative;
+}
+
+.client-meal-plans-search-input input {
+  padding-left: 3rem;
+}
+
+.client-meal-plans-search-input__icon {
+  position: absolute;
+  top: 50%;
+  left: 1rem;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.client-meal-plans-search-input__icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.client-meal-plans-search-results {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.client-meal-plans-search-card {
+  gap: 0.8rem;
+  padding: 1rem;
+  border-radius: 20px;
+  border-color: rgba(255, 212, 232, 0.16);
+}
+
+.client-meal-plans-search-card__header,
+.client-meal-plans-search-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.client-meal-plans-search-card__title {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.client-meal-plans-search-card__meta {
+  color: var(--muted-strong);
+  font-size: 0.9rem;
+}
+
+.client-meal-plan-detail-hero,
+.client-meal-plan-detail-summary,
+.client-meal-plan-detail-vendor,
+.client-meal-plan-detail-actions {
+  gap: 1rem;
+}
+
+.client-meal-plan-detail-hero {
+  overflow: hidden;
+}
+
+.client-meal-plan-detail-hero__media {
+  margin: -1.5rem -1.5rem 0;
+}
+
+.client-meal-plan-detail-hero__image-wrap {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(20, 17, 28, 0.22)),
+    rgba(255, 255, 255, 0.04);
+}
+
+.client-meal-plan-detail-hero__image {
+  object-fit: cover;
+}
+
+.client-meal-plan-detail-summary__body {
+  display: grid;
+  gap: 1rem;
+}
+
+.client-meal-plan-detail-summary__stats,
+.client-meal-plan-detail-vendor__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.client-meal-plan-detail-macros {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.client-meal-plan-detail-macros__item {
+  gap: 0.3rem;
+  padding: 0.9rem 1rem;
+  border-color: rgba(255, 212, 232, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.client-meal-plan-detail-macros__label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.client-meal-plan-detail-macros__value {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.client-meal-plan-detail-includes {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.client-meal-plan-detail-includes__item {
+  gap: 0.75rem;
+  padding: 1rem 1.05rem;
+  border-color: rgba(255, 212, 232, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.client-meal-plan-detail-includes__header {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.client-meal-plan-detail-includes__eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.client-meal-plan-detail-includes__title {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.client-meal-plan-detail-includes__meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 0.75rem;
+  margin: 0;
+}
+
+.client-meal-plan-detail-includes__meta-item {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.client-meal-plan-detail-includes__meta-item dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.client-meal-plan-detail-includes__meta-item dd {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.client-meal-plan-detail-vendor {
+  gap: 1rem;
+}
+
+.client-meal-plan-detail-vendor__list {
+  display: grid;
+  gap: 0.8rem;
+  margin: 0;
+}
+
+.client-meal-plan-detail-vendor__row {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(255, 212, 232, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.client-meal-plan-detail-vendor__row dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.client-meal-plan-detail-vendor__row dd {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
+.client-meal-plan-detail-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.client-meal-plan-detail-actions {
+  border-color: rgba(255, 212, 232, 0.18);
+}
+
+.client-meal-plan-detail-actions--selected {
+  border-color: rgba(255, 221, 244, 0.28);
+  background:
+    linear-gradient(180deg, rgba(78, 24, 65, 0.24), rgba(20, 17, 28, 0.04)),
+    var(--surface-soft);
+}
+
+.client-meal-plan-detail-actions--ready {
+  border-color: rgba(125, 211, 252, 0.28);
+  background:
+    linear-gradient(180deg, rgba(125, 211, 252, 0.12), rgba(20, 17, 28, 0.02)),
+    var(--surface-soft);
+}
+
+.client-meal-plan-detail-actions__cta {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.client-meal-plan-detail-ordering {
+  gap: 0.75rem;
+  padding: 1rem 1.05rem;
+  border-color: rgba(255, 212, 232, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.client-meal-plan-detail-ordering__eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.client-meal-plan-detail-ordering__title {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.client-meal-plan-detail-ordering__body {
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 0.93rem;
+  line-height: 1.45;
+}
+
+.client-meal-plan-detail-ordering__meta {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.client-meal-plan-detail-ordering__meta-row {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.client-meal-plan-detail-ordering__meta-row dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.client-meal-plan-detail-ordering__meta-row dd {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.client-meal-plan-detail-actions__primary {
+  justify-self: start;
+}
+
+.client-meal-plan-detail-actions__primary--selected {
+  background: linear-gradient(135deg, #f8c6dc 0%, #f3a0c8 100%);
+  color: #3d1226;
+  box-shadow: 0 12px 24px rgba(205, 114, 162, 0.24);
+}
+
+.client-meal-plan-detail-actions__helper {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
 .client-meal-plans-section-link {
   min-height: 2.35rem;
   padding: 0.55rem 0.85rem;
@@ -1621,6 +1985,10 @@ main {
     grid-template-columns: 1fr;
   }
 
+  .meal-plans-top-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .client-meal-plans-upcoming-row {
     grid-template-columns: 1fr;
   }
@@ -1628,6 +1996,21 @@ main {
   .client-meal-plans-upcoming-row__meta {
     justify-items: start;
     text-align: left;
+  }
+
+  .client-meal-plan-detail-summary__stats,
+  .client-meal-plan-detail-vendor__stats {
+    grid-template-columns: 1fr;
+  }
+
+  .client-meal-plan-detail-macros,
+  .client-meal-plan-detail-includes__meta {
+    grid-template-columns: 1fr;
+  }
+
+  .client-meal-plans-search-card__header,
+  .client-meal-plans-search-card__meta {
+    justify-content: flex-start;
   }
 
   .client-meal-plans-zip-tracker__add {

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AnalyticsCard } from "@/components/analytics/AnalyticsCard";
 import { PageShell } from "@/components/layout/PageShell";
 import { MealPlanCard } from "@/components/meal-plans/MealPlanCard";
+import { MealPlansTopNav } from "@/components/meal-plans/MealPlansTopNav";
 import { ActionRow } from "@/components/ui/ActionRow";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
@@ -18,6 +19,10 @@ import { ListRow } from "@/components/ui/ListRow";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionBlock } from "@/components/ui/SectionBlock";
 import { StatPill } from "@/components/ui/StatPill";
+import {
+  readActiveMealPlanZipCodes,
+  writeActiveMealPlanZipCodes,
+} from "@/lib/client/meal-plan-zip-tracker";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type {
   ApiResponse,
@@ -83,6 +88,21 @@ function getActiveFilterChips(filters: FilterDraft) {
   return chips;
 }
 
+function getSelectedZipCodes(entries: ZipTrackerEntry[]): string[] {
+  const selectedZipCodes: string[] = [];
+  const seen = new Set<string>();
+
+  for (const entry of entries) {
+    if (entry.kind !== "zip" || !entry.selected || seen.has(entry.label)) {
+      continue;
+    }
+    seen.add(entry.label);
+    selectedZipCodes.push(entry.label);
+  }
+
+  return selectedZipCodes;
+}
+
 export default function ClientMealPlansPage() {
   const { status, user } = useSessionBootstrap({
     requiredRole: "client",
@@ -105,8 +125,47 @@ export default function ClientMealPlansPage() {
   const [trackedLocations, setTrackedLocations] = useState<ZipTrackerEntry[]>([]);
   const [draftTrackedLocations, setDraftTrackedLocations] = useState<ZipTrackerEntry[]>([]);
   const [trackerInput, setTrackerInput] = useState("");
+  const [trackerStorageReady, setTrackerStorageReady] = useState(false);
+  const activeTrackedZipCodes = useMemo(() => getSelectedZipCodes(trackedLocations), [trackedLocations]);
 
   useEffect(() => {
+    const activeZipCodes = readActiveMealPlanZipCodes();
+    if (activeZipCodes.length === 0) {
+      setTrackerStorageReady(true);
+      return;
+    }
+
+    const persistedTrackedLocations: ZipTrackerEntry[] = activeZipCodes.map((zipCode) => ({
+      id: `zip-${zipCode}-persisted`,
+      label: zipCode,
+      kind: "zip",
+      selected: true,
+    }));
+
+    setTrackedLocations(persistedTrackedLocations);
+    setDraftTrackedLocations(persistedTrackedLocations);
+    setFilters((current) => ({
+      ...current,
+      zipCode: current.zipCode || activeZipCodes[0] || "",
+    }));
+    setDraft((current) => ({
+      ...current,
+      zipCode: current.zipCode || activeZipCodes[0] || "",
+    }));
+    setTrackerStorageReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!trackerStorageReady) {
+      return;
+    }
+    writeActiveMealPlanZipCodes(activeTrackedZipCodes);
+  }, [activeTrackedZipCodes, trackerStorageReady]);
+
+  useEffect(() => {
+    if (!trackerStorageReady) {
+      return;
+    }
     if (status !== "authenticated" || !user || user.role !== "client") {
       return;
     }
@@ -118,7 +177,9 @@ export default function ClientMealPlansPage() {
       setLoadError(null);
 
       const searchParams = new URLSearchParams();
-      if (filters.zipCode.trim()) {
+      if (activeTrackedZipCodes.length > 0) {
+        searchParams.set("zip_codes", activeTrackedZipCodes.join(","));
+      } else if (filters.zipCode.trim()) {
         searchParams.set("zip_code", filters.zipCode.trim());
       }
       if (filters.budgetMax.trim()) {
@@ -174,7 +235,7 @@ export default function ClientMealPlansPage() {
     return () => {
       active = false;
     };
-  }, [filters, status, user]);
+  }, [activeTrackedZipCodes, filters, status, trackerStorageReady, user]);
 
   const bookmarkedIds = useMemo(() => getBookmarkedMealPlanIds(bookmarks), [bookmarks]);
   const activeFilterChips = useMemo(() => getActiveFilterChips(filters), [filters]);
@@ -480,6 +541,8 @@ export default function ClientMealPlansPage() {
               </ActionRow>
             </div>
           </Card>
+
+          <MealPlansTopNav />
 
           <SectionBlock
             eyebrow="Discover"
