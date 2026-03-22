@@ -100,14 +100,6 @@ export default function ClientDashboardPage() {
     <PageShell
       title={`Welcome back`}
       user={user}
-      navigation={
-        <>
-          <Link className="link-button" href="/client/training">Training</Link>
-          <Link className="link-button" href="/client/metrics">Metrics</Link>
-          <Link className="link-button" href="/client/meal-plans">Meal plans</Link>
-          <Link className="link-button" href="/client/bookmarks">Bookmarks</Link>
-        </>
-      }
       actions={<LogoutButton />}
     >
       {loading ? <LoadingBlock title="Loading home data" message="Calling /api/client/home through the BFF." /> : null}

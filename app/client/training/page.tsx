@@ -98,11 +98,7 @@ export default function ClientTrainingHubPage() {
   ).length;
 
   return (
-    <PageShell
-      title="Training hub"
-      user={user}
-      navigation={<Link className="link-button" href="/client">Back to client home</Link>}
-    >
+    <PageShell title="Training hub" user={user}>
       {loading ? <LoadingBlock title="Loading assignments" message="Fetching your current training assignments." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load assignments" message={errorMessage} /> : null}
 

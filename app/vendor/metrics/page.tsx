@@ -1,6 +1,4 @@
 "use client";
-
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { SummaryCard } from "@/components/cards/SummaryCard";
@@ -69,11 +67,7 @@ export default function VendorMetricsPage() {
   }
 
   return (
-    <PageShell
-      title="Vendor metrics"
-      user={user}
-      navigation={<Link className="link-button" href="/vendor">Back to vendor dashboard</Link>}
-    >
+    <PageShell title="Vendor metrics" user={user}>
       {loading ? <LoadingBlock title="Loading metrics" message="Fetching vendor metrics through the BFF." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load metrics" message={errorMessage} /> : null}
 

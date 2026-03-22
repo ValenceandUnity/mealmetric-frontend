@@ -84,20 +84,7 @@ export default function VendorMealPlansPage() {
   }
 
   return (
-    <PageShell
-      title="Vendor meal plans"
-      user={user}
-      navigation={
-        <>
-          <Link className="link-button" href="/vendor">
-            Back to vendor dashboard
-          </Link>
-          <Link className="link-button" href="/vendor/metrics">
-            View metrics
-          </Link>
-        </>
-      }
-    >
+    <PageShell title="Vendor meal plans" user={user}>
       {loading ? <LoadingBlock title="Loading meal plans" message="Fetching vendor meal-plan inventory." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load meal plans" message={errorMessage} /> : null}
 

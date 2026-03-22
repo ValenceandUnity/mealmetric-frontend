@@ -1,6 +1,4 @@
 "use client";
-
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { RecordCard } from "@/components/cards/RecordCard";
@@ -83,11 +81,7 @@ export default function ClientPickupsPage() {
   const view = adaptPickups(pickupsData);
 
   return (
-    <PageShell
-      title="Pickups"
-      user={user}
-      navigation={<Link className="link-button" href="/client">Back to client home</Link>}
-    >
+    <PageShell title="Pickups" user={user}>
       {loading ? <LoadingBlock title="Loading pickups" message="Fetching pickup records through the BFF." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load pickups" message={errorMessage} /> : null}
 

@@ -243,20 +243,7 @@ export default function ClientBookmarksPage() {
   }
 
   return (
-    <PageShell
-      title="Bookmarks"
-      user={user}
-      navigation={
-        <>
-          <Link className="link-button" href="/client">
-            Back to client home
-          </Link>
-          <Link className="link-button" href="/client/meal-plans">
-            Browse meal plans
-          </Link>
-        </>
-      }
-    >
+    <PageShell title="Bookmarks" user={user}>
       {loading ? <LoadingBlock title="Loading bookmarks" message="Fetching bookmark folders." /> : null}
       {loadError ? <ErrorBlock title="Unable to manage bookmarks" message={loadError} /> : null}
       {actionFeedback ? (

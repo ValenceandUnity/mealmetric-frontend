@@ -1,6 +1,4 @@
 "use client";
-
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { RecordCard } from "@/components/cards/RecordCard";
@@ -88,11 +86,7 @@ export default function ClientSubscriptionsPage() {
   const view = adaptSubscriptions(subscriptionsData);
 
   return (
-    <PageShell
-      title="Subscriptions"
-      user={user}
-      navigation={<Link className="link-button" href="/client">Back to client home</Link>}
-    >
+    <PageShell title="Subscriptions" user={user}>
       {loading ? (
         <LoadingBlock title="Loading subscriptions" message="Fetching subscription records through the BFF." />
       ) : null}

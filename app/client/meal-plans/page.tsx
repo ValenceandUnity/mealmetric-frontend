@@ -317,20 +317,7 @@ export default function ClientMealPlansPage() {
   }
 
   return (
-    <PageShell
-      title="Meal plans"
-      user={user}
-      navigation={
-        <>
-          <Link className="link-button" href="/client">
-            Back to client home
-          </Link>
-          <Link className="link-button" href="/client/bookmarks">
-            Open bookmarks
-          </Link>
-        </>
-      }
-    >
+    <PageShell title="Meal plans" user={user}>
       {loading ? (
         <LoadingBlock title="Loading plans" message="Fetching meal-plan discovery data." />
       ) : null}

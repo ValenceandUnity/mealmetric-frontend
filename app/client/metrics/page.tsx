@@ -131,11 +131,7 @@ export default function ClientMetricsPage() {
   const leadSection = availableSections[0] ?? null;
 
   return (
-    <PageShell
-      title="Metrics"
-      user={user}
-      navigation={<Link className="link-button" href="/client">Back to client home</Link>}
-    >
+    <PageShell title="Metrics" user={user}>
       {loading ? <LoadingBlock title="Loading metrics data" message="Fetching `/api/client/metrics` through the BFF." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load metrics" message={errorMessage} /> : null}
 

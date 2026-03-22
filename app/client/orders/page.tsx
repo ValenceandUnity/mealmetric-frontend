@@ -1,6 +1,4 @@
 "use client";
-
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { RecordCard } from "@/components/cards/RecordCard";
@@ -83,11 +81,7 @@ export default function ClientOrdersPage() {
   const view = adaptOrders(ordersData);
 
   return (
-    <PageShell
-      title="Orders"
-      user={user}
-      navigation={<Link className="link-button" href="/client">Back to client home</Link>}
-    >
+    <PageShell title="Orders" user={user}>
       {loading ? <LoadingBlock title="Loading orders" message="Fetching order history through the BFF." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load orders" message={errorMessage} /> : null}
 

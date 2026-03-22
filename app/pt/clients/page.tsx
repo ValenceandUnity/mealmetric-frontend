@@ -92,20 +92,7 @@ export default function PTClientsPage() {
   const clientCount = view.clients.length;
 
   return (
-    <PageShell
-      title="Client command center"
-      user={user}
-      navigation={
-        <>
-          <Link className="link-button" href="/pt">
-            Back to PT dashboard
-          </Link>
-          <Link className="link-button" href="/pt/settings">
-            PT settings
-          </Link>
-        </>
-      }
-    >
+    <PageShell title="Client command center" user={user}>
       {loading ? <LoadingBlock title="Loading clients" message="Calling /api/pt/clients through the BFF." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load PT clients" message={errorMessage} /> : null}
 

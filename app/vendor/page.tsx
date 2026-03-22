@@ -109,20 +109,7 @@ export default function VendorDashboardPage() {
   }
 
   return (
-    <PageShell
-      title="Vendor dashboard"
-      user={user}
-      navigation={
-        <>
-          <Link className="link-button" href="/vendor/meal-plans">
-            Open meal plans
-          </Link>
-          <Link className="link-button" href="/vendor/metrics">
-            Open metrics
-          </Link>
-        </>
-      }
-    >
+    <PageShell title="Vendor dashboard" user={user}>
       {loading ? <LoadingBlock title="Loading dashboard" message="Fetching vendor profile, metrics, and catalog slices." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load vendor dashboard" message={errorMessage} /> : null}
 

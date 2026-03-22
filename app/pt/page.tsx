@@ -92,12 +92,6 @@ export default function PTDashboardPage() {
     <PageShell
       title="Coach dashboard"
       user={user}
-      navigation={
-        <>
-          <Link className="link-button" href="/pt/clients">Clients</Link>
-          <Link className="link-button" href="/pt/settings">Settings</Link>
-        </>
-      }
       actions={<LogoutButton />}
     >
       {loading ? <LoadingBlock title="Loading dashboard data" message="Calling `/api/pt/dashboard` through the BFF." /> : null}

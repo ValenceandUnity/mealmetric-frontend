@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 
 import { LogoutButton } from "@/components/LogoutButton";
@@ -170,17 +169,7 @@ export default function PTSettingsPage() {
   }
 
   return (
-    <PageShell
-      title="Settings"
-      user={user}
-      navigation={
-        <>
-          <Link className="link-button" href="/pt">Back to PT dashboard</Link>
-          <Link className="link-button" href="/pt/clients">Clients</Link>
-        </>
-      }
-      actions={<LogoutButton />}
-    >
+    <PageShell title="Settings" user={user} actions={<LogoutButton />}>
       {loading ? <LoadingBlock title="Loading profile" message="Calling /api/me through the BFF." /> : null}
 
       {errorMessage ? <ErrorBlock title="Unable to load settings" message={errorMessage} /> : null}
