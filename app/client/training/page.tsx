@@ -1,26 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { PackageList } from "@/components/training/PackageList";
+import { RoutineDetailView } from "@/components/training/RoutineDetailView";
+import { RoutineList } from "@/components/training/RoutineList";
 import { PageShell } from "@/components/layout/PageShell";
-import { AssignmentCard } from "@/components/training/AssignmentCard";
-import { RoutineCard } from "@/components/training/RoutineCard";
 import { ActionRow } from "@/components/ui/ActionRow";
 import { Card } from "@/components/ui/Card";
-import { DebugPreview } from "@/components/ui/DebugPreview";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
-import { ListRow } from "@/components/ui/ListRow";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionBlock } from "@/components/ui/SectionBlock";
 import { StatPill } from "@/components/ui/StatPill";
-import { adaptTrainingAssignments } from "@/lib/adapters/training";
+import {
+  adaptAssignmentDetail,
+  adaptTrainingAssignments,
+  type TrainingAssignmentView,
+  type TrainingRoutineView,
+} from "@/lib/adapters/training";
+import { getArray } from "@/lib/adapters/common";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
 
 type TrainingHubResponse = ApiResponse<JsonValue>;
+type AssignmentDetailResponse = ApiResponse<JsonValue>;
+type DetailState = {
+  loading: boolean;
+  data: JsonValue | null;
+  error: string | null;
+};
 
 export default function ClientTrainingHubPage() {
   const { status, user } = useSessionBootstrap({
@@ -31,6 +42,9 @@ export default function ClientTrainingHubPage() {
   const [trainingData, setTrainingData] = useState<JsonValue | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedPackage, setSelectedPackage] = useState<TrainingAssignmentView | null>(null);
+  const [selectedRoutine, setSelectedRoutine] = useState<TrainingRoutineView | null>(null);
+  const [detailByPackageId, setDetailByPackageId] = useState<Record<string, DetailState>>({});
 
   useEffect(() => {
     if (status !== "authenticated" || !user || user.role !== "client") {
@@ -60,7 +74,7 @@ export default function ClientTrainingHubPage() {
         setTrainingData(payload.data);
       } catch {
         if (active) {
-          setErrorMessage("Unable to load the training hub.");
+          setErrorMessage("Unable to load the training workspace.");
           setTrainingData(null);
         }
       } finally {
@@ -77,186 +91,276 @@ export default function ClientTrainingHubPage() {
     };
   }, [status, user]);
 
+  const packages = useMemo(() => adaptTrainingAssignments(trainingData), [trainingData]);
+  const packageCount = packages.length;
+  const rawTrainingCount = getArray(trainingData).length;
+  const displayReadyPackages = packages.filter((item) => item.id || item.title || item.packageId).length;
+  const packagesWithRoutineCount = packages.filter((item) => item.routineCount).length;
+
+  useEffect(() => {
+    setSelectedRoutine(null);
+  }, [selectedPackage?.id]);
+
+  useEffect(() => {
+    if (!selectedPackage?.id || detailByPackageId[selectedPackage.id]) {
+      return;
+    }
+
+    let active = true;
+    const packageId = selectedPackage.id;
+
+    setDetailByPackageId((current) => ({
+      ...current,
+      [packageId]: { loading: true, data: null, error: null },
+    }));
+
+    async function loadPackageDetail() {
+      try {
+        const response = await fetch(`/api/client/training/assignments/${packageId}`, {
+          cache: "no-store",
+        });
+        const payload = (await response.json()) as AssignmentDetailResponse;
+
+        if (!active) {
+          return;
+        }
+
+        if (!payload.ok) {
+          setDetailByPackageId((current) => ({
+            ...current,
+            [packageId]: {
+              loading: false,
+              data: null,
+              error: payload.error.message,
+            },
+          }));
+          return;
+        }
+
+        setDetailByPackageId((current) => ({
+          ...current,
+          [packageId]: {
+            loading: false,
+            data: payload.data,
+            error: null,
+          },
+        }));
+      } catch {
+        if (!active) {
+          return;
+        }
+
+        setDetailByPackageId((current) => ({
+          ...current,
+          [packageId]: {
+            loading: false,
+            data: null,
+            error: "Unable to load package detail.",
+          },
+        }));
+      }
+    }
+
+    void loadPackageDetail();
+
+    return () => {
+      active = false;
+    };
+  }, [detailByPackageId, selectedPackage]);
+
   if (status === "loading") {
-    return <LoadingBlock title="Loading training hub" message="Validating your client session." />;
+    return <LoadingBlock title="Loading training workspace" message="Validating your client session." />;
   }
 
   if (status !== "authenticated" || !user) {
     return <LoadingBlock title="Redirecting" message="Client training routes require an authenticated client session." />;
   }
 
-  const assignments = adaptTrainingAssignments(trainingData);
-  const focusAssignment = assignments[0] ?? null;
-  const scheduledAssignments = assignments.filter(
-    (assignment) => assignment.schedule !== "Dates not provided",
-  ).length;
-  const packagedAssignments = assignments.filter(
-    (assignment) => assignment.packageId && assignment.packageId !== "Unavailable",
-  ).length;
-  const checklistReadyAssignments = assignments.filter(
-    (assignment) => !assignment.checklistCount.toLowerCase().includes("pending"),
-  ).length;
+  const selectedPackageDetail =
+    selectedPackage?.id ? detailByPackageId[selectedPackage.id] ?? null : null;
+  const selectedPackageView = selectedPackageDetail?.data
+    ? adaptAssignmentDetail(selectedPackageDetail.data)
+    : null;
 
   return (
-    <PageShell title="Training hub" user={user}>
-      {loading ? <LoadingBlock title="Loading assignments" message="Fetching your current training assignments." /> : null}
-      {errorMessage ? <ErrorBlock title="Unable to load assignments" message={errorMessage} /> : null}
+    <PageShell title="Training" user={user} className="app-shell--client-training-workspace">
+      {loading ? <LoadingBlock title="Loading training packages" message="Fetching your current training assignments." /> : null}
+      {errorMessage ? <ErrorBlock title="Unable to load training" message={errorMessage} /> : null}
 
       {!loading && !errorMessage ? (
         <>
-          <Card className="client-training-hero" variant="accent" as="section">
+          <Card className="client-training-workspace-hero" variant="accent" as="section">
             <PageHeader
               eyebrow="Client training"
-              title="Focused training workspace"
-              description="Stay on top of assigned work, review what is active now, and move directly into the next training step."
+              title={selectedPackage ? selectedPackage.title : "Training Packages"}
+              description={
+                selectedPackage
+                  ? "This package view stays in place and swaps into routine structure without routing away."
+                  : "Packages come first here. Open one to move directly into its routine list."
+              }
               chips={[
-                `${assignments.length} assignment${assignments.length === 1 ? "" : "s"}`,
-                `${checklistReadyAssignments} checklist-ready`,
+                `${packageCount} package${packageCount === 1 ? "" : "s"}`,
+                `${packagesWithRoutineCount} with routine counts`,
               ]}
+              actions={
+                selectedRoutine ? (
+                  <ActionRow>
+                    <button type="button" onClick={() => setSelectedRoutine(null)}>
+                      Back to Routines
+                    </button>
+                    <button type="button" onClick={() => setSelectedPackage(null)}>
+                      Back to Packages
+                    </button>
+                  </ActionRow>
+                ) : selectedPackage ? (
+                  <ActionRow>
+                    <button type="button" onClick={() => setSelectedPackage(null)}>
+                      Back to Packages
+                    </button>
+                    <Link className="link-button" href="/client">
+                      Client home
+                    </Link>
+                  </ActionRow>
+                ) : (
+                  <ActionRow>
+                    <Link className="link-button" href="/client">
+                      Client home
+                    </Link>
+                  </ActionRow>
+                )
+              }
             />
-            <div className="client-training-hero__stats">
-              <StatPill
-                label="Assignments"
-                value={`${assignments.length}`}
-                hint="Current training items returned by the protected training route."
-                active
-              />
-              <StatPill
-                label="Scheduled"
-                value={`${scheduledAssignments}`}
-                hint="Assignments that include at least one scheduling date."
-              />
-              <StatPill
-                label="Packaged"
-                value={`${packagedAssignments}`}
-                hint="Assignments tied to a returned training package identifier."
-              />
-              <StatPill
-                label="Checklist ready"
-                value={`${checklistReadyAssignments}`}
-                hint="Assignments that expose checklist-style structure."
-              />
-            </div>
-            <ActionRow>
-              {focusAssignment?.id ? (
-                <Link className="link-button link-button--accent" href={`/client/training/${focusAssignment.id}`}>
-                  Continue training
-                </Link>
-              ) : (
-                <Link className="link-button link-button--accent" href="/client">
-                  Back to dashboard
-                </Link>
-              )}
-              <Link className="link-button" href="/client/metrics">
-                Review metrics
-              </Link>
-              <Link className="link-button" href="/client">
-                Client home
-              </Link>
-            </ActionRow>
+            {!selectedPackage ? (
+              <div className="client-training-workspace-hero__stats">
+                <StatPill
+                  label="Packages"
+                  value={`${packageCount}`}
+                  hint="Display-ready package cards derived from the client training BFF route."
+                  active
+                />
+                <StatPill
+                  label="Routines exposed"
+                  value={`${packagesWithRoutineCount}`}
+                  hint="Packages that already expose routine counts in current route data."
+                />
+                <StatPill
+                  label="Source items"
+                  value={`${rawTrainingCount}`}
+                  hint="Raw records returned by the protected client training route."
+                />
+                <StatPill
+                  label="Display-ready"
+                  value={`${displayReadyPackages}`}
+                  hint="Records that adapt cleanly into package cards."
+                />
+              </div>
+            ) : null}
           </Card>
 
-          <SectionBlock
-            eyebrow="Focus"
-            title="Current assignment"
-            description="The lead training item is surfaced here for quick continuation."
-          >
-            {focusAssignment ? (
-              <RoutineCard
-                eyebrow="In focus"
-                title={focusAssignment.title}
-                description={focusAssignment.description}
-                status={
-                  focusAssignment.status
-                    ? { label: focusAssignment.status, tone: "accent" }
-                    : undefined
-                }
-                metadata={[
-                  { label: "Package", value: focusAssignment.packageId ?? "Unavailable" },
-                  { label: "Window", value: focusAssignment.schedule },
-                  { label: "Checklist", value: focusAssignment.checklistCount },
-                ]}
-                active
-                footer={
-                  focusAssignment.id ? (
-                    <>
-                      <Link className="link-button link-button--accent" href={`/client/training/${focusAssignment.id}`}>
-                        Open assignment
-                      </Link>
-                      <Link className="link-button" href="/client/training">
-                        Training overview
-                      </Link>
-                    </>
-                  ) : null
+          {!selectedPackage ? (
+            <SectionBlock
+              eyebrow="Level 1"
+              title="Training Packages"
+              description="Select a package to switch this workspace into its routine list."
+            >
+              {packageCount === 0 ? (
+                rawTrainingCount === 0 ? (
+                  <EmptyState
+                    title="No training assigned yet"
+                    message="Once your PT assigns training, packages will appear here."
+                  />
+                ) : (
+                  <EmptyState
+                    title="Training data is not display-ready"
+                    message="Training data was returned, but it does not expose a package-ready structure for this view."
+                  />
+                )
+              ) : (
+                <PackageList
+                  packages={packages}
+                  selectedPackageId={selectedPackage?.id ?? null}
+                  onOpenPackage={(trainingPackage) => {
+                    setSelectedRoutine(null);
+                    setSelectedPackage(trainingPackage);
+                  }}
+                />
+              )}
+            </SectionBlock>
+          ) : selectedRoutine ? (
+            <SectionBlock
+              eyebrow="Level 3"
+              title="Routine Detail"
+              description="Exercises are shown only when the selected routine exposes them in the current package detail payload."
+            >
+              <RoutineDetailView
+                routine={selectedRoutine}
+                addLogHref={
+                  selectedPackage.id
+                    ? `/client/add-log?assignmentId=${encodeURIComponent(selectedPackage.id)}&routineId=${encodeURIComponent(selectedRoutine.id ?? "")}&routineName=${encodeURIComponent(selectedRoutine.title)}&routineLabel=${encodeURIComponent(selectedRoutine.label ?? "")}`
+                    : "/client/add-log"
                 }
               />
-            ) : (
-              <EmptyState
-                title="No active assignment"
-                message="As soon as the training route returns work, the current assignment will be featured here."
-              />
-            )}
-          </SectionBlock>
-
-          <SectionBlock
-            eyebrow="Structure"
-            title="Training overview"
-            description="Quick scan of the training workload currently visible in the client workspace."
-          >
-            {assignments.length > 0 ? (
-              <Card className="client-training-overview" variant="soft">
-                <ListRow
-                  eyebrow="Assignment queue"
-                  title={`${assignments.length} assignment${assignments.length === 1 ? "" : "s"} in this workspace`}
-                  description="Use this summary to understand how much structured work is currently exposed by the BFF training slice."
-                  metadata={[
-                    { label: "Scheduled", value: `${scheduledAssignments}` },
-                    { label: "Packaged", value: `${packagedAssignments}` },
-                    { label: "Checklist ready", value: `${checklistReadyAssignments}` },
+            </SectionBlock>
+          ) : (
+            <SectionBlock
+              eyebrow="Level 2"
+              title="Routines"
+              description="Each item below comes from the selected package detail only when the current data exposes routine-ready fields."
+            >
+              <Card className="client-training-package-summary" variant="soft">
+                <PageHeader
+                  eyebrow={selectedPackage.coachName ? `With ${selectedPackage.coachName}` : "Selected package"}
+                  title={selectedPackage.title}
+                  description={selectedPackage.description}
+                  chips={[
+                    selectedPackage.routineCount ?? "Routine count unavailable",
+                    selectedPackage.progressLabel ?? "No progress label returned",
                   ]}
                 />
               </Card>
-            ) : (
-              <EmptyState
-                title="Training structure unavailable"
-                message="No assignment metadata is available yet for the current training workspace."
-              />
-            )}
-          </SectionBlock>
 
-          <SectionBlock
-            eyebrow="Assignments"
-            title="Assignment stack"
-            description="All currently visible assignments returned through `/api/client/training`."
-            actions={
-              <Link className="link-button" href="/client">
-                Back to home
-              </Link>
-            }
-          >
-            {assignments.length > 0 ? (
-              <div className="stacked-list">
-                {assignments.map((assignment, index) => (
-                  <AssignmentCard key={assignment.id ?? `${assignment.title}-${index}`} assignment={assignment} />
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title="No assignments found"
-                message="Assignments will appear here when the BFF returns active training work."
-              />
-            )}
-          </SectionBlock>
-
-          {trainingData && assignments.length === 0 ? (
-            <SectionBlock
-              eyebrow="Fallback"
-              title="Training payload fallback"
-              description="The raw payload is available for inspection because the current route did not adapt into assignment cards."
-            >
-              <DebugPreview value={trainingData} label="Training payload fallback" />
+              {!selectedPackage.id ? (
+                <EmptyState
+                  title="Package detail is unavailable"
+                  message="This package does not expose an assignment identifier, so the workspace cannot safely load its routine list."
+                />
+              ) : !selectedPackageDetail ? (
+                <LoadingBlock
+                  title="Loading routines"
+                  message={`Fetching the routine structure for ${selectedPackage.title}.`}
+                />
+              ) : selectedPackageDetail?.loading ? (
+                <LoadingBlock
+                  title="Loading routines"
+                  message={`Fetching the routine structure for ${selectedPackage.title}.`}
+                />
+              ) : selectedPackageDetail?.error ? (
+                <ErrorBlock title="Unable to load routines" message={selectedPackageDetail.error} />
+              ) : selectedPackageView ? (
+                selectedPackageView.routines.length > 0 ? (
+                  <RoutineList
+                    routines={selectedPackageView.routines}
+                    onOpenRoutine={setSelectedRoutine}
+                  />
+                ) : selectedPackageView.summary.title ? (
+                  <EmptyState
+                    title="Routine data is not display-ready"
+                    message="This package detail loaded, but it did not expose routine-ready entries for the workspace."
+                  />
+                ) : (
+                  <EmptyState
+                    title="Routines are not ready"
+                    message="The package is selected, but its detail payload has not produced a routine-ready view."
+                  />
+                )
+              ) : (
+                <EmptyState
+                  title="Routines are not ready"
+                  message="The package is selected, but its detail payload has not produced a routine-ready view."
+                />
+              )}
             </SectionBlock>
-          ) : null}
+          )}
         </>
       ) : null}
     </PageShell>

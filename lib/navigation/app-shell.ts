@@ -3,6 +3,7 @@ import type { UserRole } from "@/lib/types/api";
 export type NavIcon =
   | "home"
   | "training"
+  | "log"
   | "metrics"
   | "meal-plans"
   | "bookmarks"
@@ -34,22 +35,22 @@ const CLIENT_NAV: AppShellNavItem[] = [
     matchers: ["/client/training"],
   },
   {
+    href: "/client/add-log",
+    label: "Log",
+    icon: "log",
+    matchers: ["/client/add-log"],
+  },
+  {
     href: "/client/metrics",
     label: "Metrics",
     icon: "metrics",
     matchers: ["/client/metrics"],
   },
   {
-    href: "/client/meal-plans",
-    label: "Meal Plans",
-    icon: "meal-plans",
-    matchers: ["/client/meal-plans"],
-  },
-  {
-    href: "/client/bookmarks",
-    label: "Bookmarks",
-    icon: "bookmarks",
-    matchers: ["/client/bookmarks"],
+    href: "/client/settings",
+    label: "Settings",
+    icon: "account",
+    matchers: ["/client/settings"],
   },
 ];
 

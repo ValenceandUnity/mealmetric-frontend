@@ -4,9 +4,52 @@ import {
   extractDetails,
   extractSummary,
   formatValue,
+  getArray,
   isObject,
   startCase,
 } from "@/lib/adapters/common";
+
+type MetricDefinition = {
+  key: string;
+  label: string;
+};
+
+export type MetricsDisplayItem = {
+  key: string;
+  label: string;
+  value: string;
+};
+
+export type MetricsTrendRow = {
+  label: string;
+  metrics: MetricsDisplayItem[];
+};
+
+export type ClientMetricsDisplayView = {
+  primary: MetricsDisplayItem[];
+  supporting: MetricsDisplayItem[];
+  today: MetricsDisplayItem[];
+  thisWeek: MetricsDisplayItem[];
+  trendRows: MetricsTrendRow[];
+  hasAnyData: boolean;
+};
+
+const PRIMARY_METRICS: MetricDefinition[] = [
+  { key: "calories_consumed", label: "Calories Consumed" },
+  { key: "calories_burned", label: "Calories Burned" },
+  { key: "net_calories", label: "Net Calories" },
+  { key: "deficit", label: "Deficit" },
+  { key: "surplus", label: "Surplus" },
+];
+
+const SUPPORTING_METRICS: MetricDefinition[] = [
+  { key: "protein", label: "Protein" },
+  { key: "steps", label: "Steps" },
+  { key: "workout_count", label: "Workout Count" },
+  { key: "active_minutes", label: "Active Minutes" },
+];
+
+const DATE_KEYS = ["date", "day", "recorded_at", "created_at", "timestamp"];
 
 export type MetricCollectionView = {
   hasData: boolean;
@@ -28,6 +71,23 @@ export type MetricCollectionView = {
     emptyMessage?: string;
   }>;
 };
+
+export function adaptClientMetricsDisplay(
+  overview: JsonValue | null,
+  history: JsonValue | null,
+): ClientMetricsDisplayView {
+  const sources = [overview, history];
+  const allMetricDefs = [...PRIMARY_METRICS, ...SUPPORTING_METRICS];
+
+  return {
+    primary: pickMetricsFromSources(sources, PRIMARY_METRICS),
+    supporting: pickMetricsFromSources(sources, SUPPORTING_METRICS),
+    today: pickMetricsFromSection(sources, ["today", "today_summary", "current_day"], allMetricDefs),
+    thisWeek: pickMetricsFromSection(sources, ["this_week", "week", "weekly", "week_summary"], allMetricDefs),
+    trendRows: findTrendRows(sources, allMetricDefs),
+    hasAnyData: sources.some(hasAnyMetricData),
+  };
+}
 
 export function adaptMetrics(value: JsonValue | null): MetricCollectionView {
   const summary = extractSummary(value, 4);
@@ -55,6 +115,187 @@ export function adaptMetrics(value: JsonValue | null): MetricCollectionView {
           ],
     highlights: extractDetails(value, 6),
     sections,
+  };
+}
+
+function hasAnyMetricData(value: JsonValue | null): boolean {
+  if (value === null) {
+    return false;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+
+  return isObject(value) && Object.keys(value).length > 0;
+}
+
+function pickMetricsFromSources(
+  sources: Array<JsonValue | null>,
+  definitions: MetricDefinition[],
+): MetricsDisplayItem[] {
+  return definitions.flatMap((definition) => {
+    for (const source of sources) {
+      const candidate = findScalarValue(source, definition.key);
+      if (candidate !== null) {
+        return [
+          {
+            key: definition.key,
+            label: definition.label,
+            value: candidate,
+          },
+        ];
+      }
+    }
+
+    return [];
+  });
+}
+
+function pickMetricsFromSection(
+  sources: Array<JsonValue | null>,
+  sectionKeys: string[],
+  definitions: MetricDefinition[],
+): MetricsDisplayItem[] {
+  for (const source of sources) {
+    const section = findObjectSection(source, sectionKeys);
+    if (!section) {
+      continue;
+    }
+
+    const metrics = definitions.flatMap((definition) => {
+      const candidate = findScalarValue(section, definition.key);
+      return candidate !== null
+        ? [{ key: definition.key, label: definition.label, value: candidate }]
+        : [];
+    });
+
+    if (metrics.length > 0) {
+      return metrics;
+    }
+  }
+
+  return [];
+}
+
+function findTrendRows(
+  sources: Array<JsonValue | null>,
+  definitions: MetricDefinition[],
+): MetricsTrendRow[] {
+  for (const source of sources) {
+    const candidate = findTrendArray(source, definitions);
+    if (candidate.length > 0) {
+      return candidate;
+    }
+  }
+
+  return [];
+}
+
+function findScalarValue(value: JsonValue | null, targetKey: string): string | null {
+  if (!isObject(value)) {
+    return null;
+  }
+
+  const directValue = value[targetKey];
+  if (typeof directValue === "string" || typeof directValue === "number" || typeof directValue === "boolean") {
+    return formatValue(directValue);
+  }
+
+  for (const entry of Object.values(value)) {
+    if (!isObject(entry)) {
+      continue;
+    }
+
+    const nestedValue = findScalarValue(entry, targetKey);
+    if (nestedValue !== null) {
+      return nestedValue;
+    }
+  }
+
+  return null;
+}
+
+function findObjectSection(value: JsonValue | null, keys: string[]): Record<string, JsonValue> | null {
+  if (!isObject(value)) {
+    return null;
+  }
+
+  for (const key of keys) {
+    const direct = value[key];
+    if (isObject(direct)) {
+      return direct;
+    }
+  }
+
+  for (const entry of Object.values(value)) {
+    if (!isObject(entry)) {
+      continue;
+    }
+
+    const nested = findObjectSection(entry, keys);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return null;
+}
+
+function findTrendArray(
+  value: JsonValue | null,
+  definitions: MetricDefinition[],
+): MetricsTrendRow[] {
+  const directArray = getArray(value);
+  if (directArray.length > 0 && directArray.every((entry) => isObject(entry))) {
+    const trendRows = directArray
+      .map((entry, index) => buildTrendRow(entry, index, definitions))
+      .filter((entry): entry is MetricsTrendRow => entry !== null);
+    if (trendRows.length > 0) {
+      return trendRows;
+    }
+  }
+
+  if (!isObject(value)) {
+    return [];
+  }
+
+  for (const entry of Object.values(value)) {
+    const nested = findTrendArray(entry, definitions);
+    if (nested.length > 0) {
+      return nested;
+    }
+  }
+
+  return [];
+}
+
+function buildTrendRow(
+  value: JsonValue,
+  index: number,
+  definitions: MetricDefinition[],
+): MetricsTrendRow | null {
+  if (!isObject(value)) {
+    return null;
+  }
+
+  const label = DATE_KEYS
+    .map((key) => value[key])
+    .find((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+  const metrics = definitions.flatMap((definition) => {
+    const candidate = value[definition.key];
+    return typeof candidate === "string" || typeof candidate === "number" || typeof candidate === "boolean"
+      ? [{ key: definition.key, label: definition.label, value: formatValue(candidate) }]
+      : [];
+  });
+
+  if (!label || metrics.length === 0) {
+    return null;
+  }
+
+  return {
+    label: label || `Record ${index + 1}`,
+    metrics,
   };
 }
 

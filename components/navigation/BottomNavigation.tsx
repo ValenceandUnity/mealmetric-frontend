@@ -17,6 +17,12 @@ function renderIcon(icon: string) {
           <path d="M6 7.5h12M12 7.5v9m-3-3h6" />
         </svg>
       );
+    case "log":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 5.5h7l3 3V18a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-12.5Zm2 5h6m-6 3h6" />
+        </svg>
+      );
     case "metrics":
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true">

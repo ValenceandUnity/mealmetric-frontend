@@ -1,28 +1,41 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { LogoutButton } from "@/components/LogoutButton";
-import { AnalyticsCard } from "@/components/analytics/AnalyticsCard";
-import { Card } from "@/components/ui/Card";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { SectionBlock } from "@/components/ui/SectionBlock";
-import { StatPill } from "@/components/ui/StatPill";
-import { ActionRow } from "@/components/ui/ActionRow";
-import { ListRow } from "@/components/ui/ListRow";
-import { MealPlanCard } from "@/components/meal-plans/MealPlanCard";
 import { PageShell } from "@/components/layout/PageShell";
-import { RoutineCard } from "@/components/training/RoutineCard";
-import { DebugPreview } from "@/components/ui/DebugPreview";
+import { ActionRow } from "@/components/ui/ActionRow";
+import { Badge } from "@/components/ui/Badge";
+import { Card } from "@/components/ui/Card";
+import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
-import { adaptClientHome } from "@/lib/adapters/dashboard";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SectionBlock } from "@/components/ui/SectionBlock";
+import { StatPill } from "@/components/ui/StatPill";
+import { extractDetails, extractSummary, getArray } from "@/lib/adapters/common";
+import { adaptMealPlanList } from "@/lib/adapters/meal-plans";
+import { adaptTrainingAssignments } from "@/lib/adapters/training";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, ClientHomeResponse } from "@/lib/types/api";
 
 type ClientHomeApiResponse = ApiResponse<ClientHomeResponse>;
+
+function getGreetingLabel(email: string): string {
+  const localPart = email.split("@")[0]?.trim() ?? "";
+  if (!localPart) {
+    return "Welcome back";
+  }
+
+  const normalized = localPart
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`);
+
+  return normalized.length > 0 ? `Hi, ${normalized[0]}` : "Welcome back";
+}
 
 export default function ClientDashboardPage() {
   const { status, user } = useSessionBootstrap({
@@ -62,7 +75,7 @@ export default function ClientDashboardPage() {
         setHomeData(payload.data);
       } catch {
         if (active) {
-          setErrorMessage("Unable to load the client home slice.");
+          setErrorMessage("Unable to load the client home dashboard.");
           setHomeData(null);
         }
       } finally {
@@ -79,6 +92,17 @@ export default function ClientDashboardPage() {
     };
   }, [status, user]);
 
+  const activityStats = useMemo(() => extractSummary(homeData?.overview, 4), [homeData]);
+  const activityHighlights = useMemo(() => extractDetails(homeData?.overview, 3), [homeData]);
+  const trainingPackages = useMemo(
+    () => adaptTrainingAssignments(homeData?.assignments ?? null).slice(0, 6),
+    [homeData],
+  );
+  const mealPlanPreview = useMemo(
+    () => adaptMealPlanList(homeData?.mealPlans ?? null).slice(0, 3),
+    [homeData],
+  );
+
   if (status === "loading") {
     return <LoadingBlock title="Loading client session" message="Validating your BFF-managed session." />;
   }
@@ -87,223 +111,225 @@ export default function ClientDashboardPage() {
     return <LoadingBlock title="Redirecting" message="Client access requires an authenticated client session." />;
   }
 
-  const view = homeData ? adaptClientHome(homeData) : null;
-  const summaryItems = view?.summary ?? [];
-  const assignments = view?.assignments ?? [];
-  const mealPlans = view?.mealPlans ?? [];
-  const summaryChips = [
-    `${assignments.length} training highlight${assignments.length === 1 ? "" : "s"}`,
-    `${mealPlans.length} meal-plan highlight${mealPlans.length === 1 ? "" : "s"}`,
-  ];
+  const greetingLabel = getGreetingLabel(user.email);
+  const assignmentCount = homeData ? getArray(homeData.assignments).length : 0;
+  const mealPlanCount = homeData ? getArray(homeData.mealPlans).length : 0;
+  const hasOverviewPayload = homeData?.overview !== null && typeof homeData?.overview !== "undefined";
+  const leadHighlight = activityHighlights[0] ?? null;
 
   return (
     <PageShell
-      title={`Welcome back`}
+      title={greetingLabel}
       user={user}
+      className="app-shell--client-home"
+      subtitle="Training stays in focus here, with your current activity snapshot and meal-plan preview kept close."
       actions={<LogoutButton />}
     >
-      {loading ? <LoadingBlock title="Loading home data" message="Calling /api/client/home through the BFF." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load home" message={errorMessage} /> : null}
 
-      {view && homeData ? (
+      {!errorMessage ? (
         <>
-          <Card className="client-home-hero" variant="accent" as="section">
+          <Card className="client-dashboard-scorecard" variant="accent" as="section">
             <PageHeader
-              eyebrow="Client dashboard"
-              title="Your meal and training rhythm"
-              description="Track active momentum across analytics, training, and meal plans without leaving the protected client workspace."
-              chips={summaryChips}
-            />
-            <div className="client-home-hero__stats">
-              {summaryItems.length > 0 ? (
-                summaryItems.map((item, index) => (
-                  <StatPill
-                    key={item.label}
-                    label={item.label}
-                    value={item.value}
-                    hint={item.hint}
-                    active={index === 0}
-                  />
-                ))
-              ) : (
-                <>
-                  <StatPill label="Overview" value="Live" hint="Connected to the current client home BFF slice." active />
-                  <StatPill
-                    label="Analytics"
-                    value="Pending"
-                    hint="Overview payload did not expose headline summary fields."
-                  />
-                </>
-              )}
-            </div>
-            <ActionRow>
-              <Link className="link-button link-button--accent" href="/client/training">
-                Open training
-              </Link>
-              <Link className="link-button" href="/client/metrics">
-                Review metrics
-              </Link>
-              <Link className="link-button" href="/client/meal-plans">
-                Browse meal plans
-              </Link>
-            </ActionRow>
-          </Card>
-
-          <SectionBlock
-            eyebrow="Overview"
-            title="Analytics summary"
-            description="Headline metrics surfaced from the current home payload."
-          >
-            <AnalyticsCard
-              eyebrow="BFF overview"
-              title="Current summary"
-              description="These values come directly from the protected client home aggregation route."
-              stats={
-                summaryItems.length > 0
-                  ? summaryItems
-                  : [
-                      {
-                        label: "Overview",
-                        value: "Live",
-                        hint: "Overview payload is connected but did not expose summary-ready fields.",
-                      },
-                    ]
-              }
+              eyebrow="Daily activity"
+              title="Today at a glance"
+              description="A compact scorecard built only from the live overview fields already returned by your client home BFF."
+              chips={[
+                `${trainingPackages.length} training item${trainingPackages.length === 1 ? "" : "s"} in focus`,
+                `${mealPlanCount} meal plan${mealPlanCount === 1 ? "" : "s"} available`,
+              ]}
               actions={
                 <ActionRow>
-                  <Link className="link-button" href="/client/metrics">
+                  <Link className="link-button link-button--accent" href="/client/metrics">
                     Open metrics
+                  </Link>
+                  <Link className="link-button" href="/client/meal-plans/search">
+                    Search plans
                   </Link>
                 </ActionRow>
               }
             />
-          </SectionBlock>
+
+            {loading ? (
+              <div className="client-dashboard-scorecard__loading" aria-hidden="true">
+                <div className="client-dashboard-skeleton client-dashboard-skeleton--hero" />
+                <div className="client-dashboard-scorecard__grid">
+                  {[0, 1, 2].map((index) => (
+                    <div key={index} className="client-dashboard-skeleton client-dashboard-skeleton--pill" />
+                  ))}
+                </div>
+              </div>
+            ) : activityStats.length > 0 ? (
+              <>
+                <div className="client-dashboard-scorecard__grid">
+                  {activityStats.map((item, index) => (
+                    <StatPill
+                      key={item.label}
+                      label={item.label}
+                      value={item.value}
+                      hint={item.hint ?? (index === 0 ? "Lead value from the current overview payload." : undefined)}
+                      active={index === 0}
+                    />
+                  ))}
+                </div>
+                {leadHighlight ? (
+                  <Card className="client-dashboard-scorecard__note" variant="soft">
+                    <p className="client-dashboard-scorecard__note-label">{leadHighlight.label}</p>
+                    <p className="client-dashboard-scorecard__note-value">{leadHighlight.value}</p>
+                  </Card>
+                ) : null}
+              </>
+            ) : hasOverviewPayload ? (
+              <EmptyState
+                title="No daily activity metrics yet"
+                message="Your home route is connected, but it did not return summary-ready activity fields for today."
+              />
+            ) : (
+              <EmptyState
+                title="Activity is not available"
+                message="The overview payload is not ready yet, so this scorecard stays empty instead of inventing values."
+              />
+            )}
+          </Card>
 
           <SectionBlock
             eyebrow="Training"
-            title="Training highlights"
-            description="Recent assignment summaries from the home slice."
+            title="Training Preview"
+            description="Assigned training is surfaced here as a quick workout-ready preview so you can continue from the next routine."
             actions={
-              <Link className="link-button" href="/client/training">
-                Full training hub
-              </Link>
-            }
-          >
-            {assignments.length > 0 ? (
-              <div className="stacked-list">
-                {assignments.map((assignment) => (
-                  <RoutineCard
-                    key={assignment.id ?? assignment.title}
-                    eyebrow="Assignment"
-                    title={assignment.title}
-                    description={assignment.description}
-                    status={assignment.status ? { label: assignment.status, tone: "accent" } : undefined}
-                    metadata={[
-                      { label: "Package", value: assignment.packageId ?? "Unavailable" },
-                      { label: "Window", value: assignment.schedule },
-                      { label: "Checklist", value: assignment.checklistCount },
-                    ]}
-                    footer={
-                      assignment.id ? (
-                        <Link className="link-button" href={`/client/training/${assignment.id}`}>
-                          Open assignment
-                        </Link>
-                      ) : (
-                        <Link className="link-button" href="/client/training">
-                          Open training
-                        </Link>
-                      )
-                    }
-                  />
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title="No assignments yet"
-                message="Training highlights will populate here when the home route returns active assignment data."
-              />
-            )}
-          </SectionBlock>
-
-          <SectionBlock
-            eyebrow="Nutrition"
-            title="Meal-plan highlights"
-            description="A lightweight preview of meal-plan options available from the same signed-in client context."
-            actions={
-              <Link className="link-button" href="/client/meal-plans">
-                Full meal-plan catalog
-              </Link>
-            }
-          >
-            {mealPlans.length > 0 ? (
-              <div className="stacked-list">
-                {mealPlans.map((mealPlan) => (
-                  <MealPlanCard key={mealPlan.id ?? mealPlan.title} mealPlan={mealPlan} />
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title="No meal plans returned"
-                message="Meal-plan highlights will appear here when the client home route returns available plans."
-              />
-            )}
-          </SectionBlock>
-
-          <SectionBlock
-            eyebrow="Shortcuts"
-            title="Next actions"
-            description="Fast routes into the main client surfaces."
-          >
-            <Card className="client-home-actions" variant="soft">
-              <ListRow
-                eyebrow="Client workspace"
-                title="Move into the next task"
-                description="Use direct links into the current client surfaces without leaving the authenticated shell."
-              />
               <ActionRow>
                 <Link className="link-button link-button--accent" href="/client/training">
-                  Open training hub
+                  Open training
                 </Link>
-                <Link className="link-button" href="/client/metrics">
-                  Review metrics
-                </Link>
+              </ActionRow>
+            }
+          >
+            {loading ? (
+              <div className="client-dashboard-carousel" aria-hidden="true">
+                {[0, 1, 2].map((index) => (
+                  <Card key={index} className="client-dashboard-package client-dashboard-package--loading" variant="soft">
+                    <div className="client-dashboard-skeleton client-dashboard-skeleton--badge" />
+                    <div className="client-dashboard-skeleton client-dashboard-skeleton--title" />
+                    <div className="client-dashboard-skeleton client-dashboard-skeleton--copy" />
+                    <div className="client-dashboard-skeleton client-dashboard-skeleton--copy short" />
+                  </Card>
+                ))}
+              </div>
+            ) : trainingPackages.length > 0 ? (
+              <div className="client-dashboard-carousel">
+                {trainingPackages.map((assignment, index) => (
+                  <Card
+                    key={assignment.id ?? `${assignment.title}-${index}`}
+                    className="client-dashboard-package"
+                    variant={index === 0 ? "accent" : "soft"}
+                  >
+                    <div className="client-dashboard-package__top">
+                      <div className="client-dashboard-package__eyebrow-row">
+                        <p className="client-dashboard-package__eyebrow">
+                          {assignment.coachName ? `With ${assignment.coachName}` : "Training item"}
+                        </p>
+                        {assignment.status ? <Badge label={assignment.status} tone="accent" /> : null}
+                      </div>
+                      <h3 className="client-dashboard-package__title">{assignment.title}</h3>
+                      <p className="client-dashboard-package__description">{assignment.description}</p>
+                    </div>
+
+                    <div className="client-dashboard-package__chips">
+                      {assignment.routineCount ? <Chip tone="accent">{assignment.routineCount}</Chip> : null}
+                      {assignment.progressLabel ? <Chip tone="muted">{assignment.progressLabel}</Chip> : null}
+                      {assignment.packageId ? <Chip tone="muted">{assignment.packageId}</Chip> : null}
+                    </div>
+
+                    <div className="client-dashboard-package__meta">
+                      <span>{assignment.schedule}</span>
+                      <span>{assignment.checklistCount}</span>
+                    </div>
+
+                    <ActionRow>
+                      <Link
+                        className="link-button link-button--accent"
+                        href={assignment.id ? `/client/training/${assignment.id}` : "/client/training"}
+                      >
+                        {index === 0 ? "Continue workout" : "Open training"}
+                      </Link>
+                    </ActionRow>
+                  </Card>
+                ))}
+              </div>
+            ) : assignmentCount === 0 ? (
+              <EmptyState
+                title="No training assigned yet"
+                message="Assigned training will appear here when the current home payload returns active workout structure."
+              />
+            ) : (
+              <EmptyState
+                title="Training preview is not ready"
+                message="The home route returned training data, but it did not expose preview-ready fields for this screen."
+              />
+            )}
+          </SectionBlock>
+
+          <SectionBlock
+            eyebrow="Meal plans"
+            title="Upcoming Meal Plan Preview"
+            description="Meal plans stay visible here as a lighter secondary preview beneath training."
+            actions={
+              <ActionRow>
                 <Link className="link-button" href="/client/meal-plans">
                   Browse meal plans
                 </Link>
-                <Link className="link-button" href="/client/bookmarks">
-                  Manage bookmarks
-                </Link>
               </ActionRow>
-            </Card>
-            {summaryItems.length === 0 ? (
-              <DebugPreview value={homeData.overview} label="Overview debug fallback" />
-            ) : null}
+            }
+          >
+            {loading ? (
+              <div className="client-dashboard-meal-preview" aria-hidden="true">
+                {[0, 1].map((index) => (
+                  <Card key={index} className="client-dashboard-meal-card client-dashboard-meal-card--loading" variant="ghost">
+                    <div className="client-dashboard-skeleton client-dashboard-skeleton--badge" />
+                    <div className="client-dashboard-skeleton client-dashboard-skeleton--title" />
+                    <div className="client-dashboard-skeleton client-dashboard-skeleton--copy" />
+                  </Card>
+                ))}
+              </div>
+            ) : mealPlanPreview.length > 0 ? (
+              <div className="client-dashboard-meal-preview">
+                {mealPlanPreview.map((mealPlan, index) => (
+                  <Card key={mealPlan.id ?? `${mealPlan.title}-${index}`} className="client-dashboard-meal-card" variant="ghost">
+                    <div className="client-dashboard-meal-card__top">
+                      <p className="client-dashboard-package__eyebrow">
+                        {mealPlan.vendor ?? "Meal plan preview"}
+                      </p>
+                      <h3 className="client-dashboard-package__title">{mealPlan.title}</h3>
+                    </div>
+                    <p className="client-dashboard-package__description">{mealPlan.description}</p>
+                    <div className="client-dashboard-package__chips">
+                      <Chip tone="accent">{mealPlan.price}</Chip>
+                      <Chip tone="muted">{mealPlan.mealCount}</Chip>
+                    </div>
+                    <ActionRow>
+                      <Link
+                        className="link-button"
+                        href={mealPlan.id ? `/client/meal-plans/${mealPlan.id}` : "/client/meal-plans"}
+                      >
+                        View meal plan
+                      </Link>
+                    </ActionRow>
+                  </Card>
+                ))}
+              </div>
+            ) : mealPlanCount === 0 ? (
+              <EmptyState
+                title="No meal plans available"
+                message="When meal-plan browse data is available through the current client BFF, a preview will appear here."
+              />
+            ) : (
+              <EmptyState
+                title="Meal plan preview is not ready"
+                message="Meal-plan data was returned, but it did not expose preview-ready fields for this dashboard card."
+              />
+            )}
           </SectionBlock>
         </>
-      ) : null}
-
-      {!loading && !errorMessage && !view ? (
-        <SectionBlock
-          eyebrow="Client dashboard"
-          title="Home data is not ready"
-          description="The authenticated route loaded, but it did not return a dashboard-ready client home view."
-        >
-          <EmptyState
-            title="Dashboard unavailable"
-            message="Try opening training, metrics, or meal plans directly while the home payload shape is refined."
-          />
-          <ActionRow>
-            <Link className="link-button" href="/client/training">
-              Open training
-            </Link>
-            <Link className="link-button" href="/client/metrics">
-              Open metrics
-            </Link>
-            <Link className="link-button" href="/client/meal-plans">
-              Open meal plans
-            </Link>
-          </ActionRow>
-        </SectionBlock>
       ) : null}
     </PageShell>
   );
