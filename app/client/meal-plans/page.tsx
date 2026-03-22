@@ -32,14 +32,16 @@ type CreateFolderResponse = ApiResponse<BookmarkFolder>;
 
 type FilterDraft = {
   zipCode: string;
-  budgetMin: string;
   budgetMax: string;
+  budgetDuration: string;
+  customDuration: string;
 };
 
 const DEFAULT_FILTERS: FilterDraft = {
   zipCode: "",
-  budgetMin: "",
   budgetMax: "",
+  budgetDuration: "one day",
+  customDuration: "",
 };
 
 function getBookmarkedMealPlanIds(folders: BookmarkFolder[]): Set<string> {
@@ -71,11 +73,13 @@ function getActiveFilterChips(filters: FilterDraft) {
   if (filters.zipCode.trim()) {
     chips.push(`ZIP ${filters.zipCode.trim()}`);
   }
-  if (filters.budgetMin.trim()) {
-    chips.push(`Min $${filters.budgetMin.trim()}`);
-  }
   if (filters.budgetMax.trim()) {
     chips.push(`Max $${filters.budgetMax.trim()}`);
+  }
+  if (filters.budgetDuration === "custom duration" && filters.customDuration.trim()) {
+    chips.push(filters.customDuration.trim());
+  } else if (filters.budgetDuration) {
+    chips.push(filters.budgetDuration);
   }
 
   return chips;
@@ -115,9 +119,6 @@ export default function ClientMealPlansPage() {
       const searchParams = new URLSearchParams();
       if (filters.zipCode.trim()) {
         searchParams.set("zip_code", filters.zipCode.trim());
-      }
-      if (filters.budgetMin.trim()) {
-        searchParams.set("budget_min_cents", String(Number(filters.budgetMin) * 100));
       }
       if (filters.budgetMax.trim()) {
         searchParams.set("budget_max_cents", String(Number(filters.budgetMax) * 100));
@@ -201,17 +202,14 @@ export default function ClientMealPlansPage() {
     const bookmarkedPlan = mealPlans.find((mealPlan) => bookmarkedIds.has(mealPlan.id));
     return bookmarkedPlan ?? mealPlans[0] ?? null;
   }, [bookmarkedIds, mealPlans]);
-  const resolvedBudget = useMemo(() => {
-    if (filters.budgetMax.trim()) {
-      return Number(filters.budgetMax) || 0;
+  const resolvedBudget = useMemo(() => Number(filters.budgetMax) || 0, [filters.budgetMax]);
+  const resolvedDurationLabel = useMemo(() => {
+    if (filters.budgetDuration === "custom duration") {
+      return filters.customDuration.trim() || "Custom duration";
     }
 
-    if (filters.budgetMin.trim()) {
-      return Number(filters.budgetMin) || 0;
-    }
-
-    return 0;
-  }, [filters.budgetMax, filters.budgetMin]);
+    return filters.budgetDuration;
+  }, [filters.budgetDuration, filters.customDuration]);
 
   async function ensureDefaultFolder(): Promise<BookmarkFolder | null> {
     if (bookmarks.length > 0) {
@@ -351,18 +349,12 @@ export default function ClientMealPlansPage() {
               <PageHeader
                 eyebrow="Client meal plans"
                 title="Budget Marker"
-                description="Use the current supported ZIP and budget filters without keeping the full discovery form open."
+                description="Use the current supported ZIP and budget controls without leaving the top discovery marker open."
                 chips={activeFilterChips.length > 0 ? activeFilterChips : ["No active filters"]}
               />
               <div className="client-meal-plans-budget-marker__value-group">
                 <p className="client-meal-plans-budget-marker__value">{`$${resolvedBudget}`}</p>
-                <p className="client-meal-plans-budget-marker__caption">
-                  {filters.budgetMax.trim()
-                    ? "Resolved from budget max"
-                    : filters.budgetMin.trim()
-                      ? "Resolved from budget min"
-                      : "No budget resolved"}
-                </p>
+                <p className="client-meal-plans-budget-marker__caption">{resolvedDurationLabel}</p>
               </div>
             </div>
             <ActionRow>
@@ -387,7 +379,7 @@ export default function ClientMealPlansPage() {
                   <PageHeader
                     eyebrow="Budget Marker edit"
                     title="ZIP and budget window"
-                    description="These controls keep the existing supported query-param discovery behavior intact."
+                    description="Budget max and ZIP keep the existing supported query-param discovery behavior intact. Budget Duration stays UI-local for now."
                   />
                   <form
                     className="form-grid grid--3"
@@ -409,20 +401,6 @@ export default function ClientMealPlansPage() {
                       />
                     </div>
                     <div className="field">
-                      <label htmlFor="budget-min">Budget min ($)</label>
-                      <input
-                        id="budget-min"
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={draft.budgetMin}
-                        onChange={(event) =>
-                          setDraft((current) => ({ ...current, budgetMin: event.target.value }))
-                        }
-                        placeholder="12"
-                      />
-                    </div>
-                    <div className="field">
                       <label htmlFor="budget-max">Budget max ($)</label>
                       <input
                         id="budget-max"
@@ -436,6 +414,35 @@ export default function ClientMealPlansPage() {
                         placeholder="25"
                       />
                     </div>
+                    <div className="field">
+                      <label htmlFor="budget-duration">Budget Duration</label>
+                      <select
+                        id="budget-duration"
+                        value={draft.budgetDuration}
+                        onChange={(event) =>
+                          setDraft((current) => ({ ...current, budgetDuration: event.target.value }))
+                        }
+                      >
+                        <option value="one day">one day</option>
+                        <option value="one week">one week</option>
+                        <option value="bi weekly">bi weekly</option>
+                        <option value="month">month</option>
+                        <option value="custom duration">custom duration</option>
+                      </select>
+                    </div>
+                    {draft.budgetDuration === "custom duration" ? (
+                      <div className="field">
+                        <label htmlFor="custom-duration">Custom duration</label>
+                        <input
+                          id="custom-duration"
+                          value={draft.customDuration}
+                          onChange={(event) =>
+                            setDraft((current) => ({ ...current, customDuration: event.target.value }))
+                          }
+                          placeholder="Enter duration"
+                        />
+                      </div>
+                    ) : null}
                     <ActionRow>
                       <button type="submit">Apply filters</button>
                       <button
@@ -463,7 +470,7 @@ export default function ClientMealPlansPage() {
                   <ListRow
                     eyebrow="Current boundary"
                     title="Discovery remains query-param based"
-                    description="ZIP and budget filtering still use only the currently supported parameters and existing apply or clear behavior."
+                    description="Only ZIP code and budget max affect real discovery requests. Budget Duration is displayed locally and does not add unsupported backend params."
                     footer={
                       <Badge
                         label={activeFilterChips.length > 0 ? "Filtered catalog" : "Open catalog"}
@@ -486,7 +493,7 @@ export default function ClientMealPlansPage() {
                   chips={
                     activeFilterChips.length > 0
                       ? activeFilterChips
-                      : ["All ZIPs", "All budgets", "Live catalog"]
+                      : ["All ZIPs", "Budget max open", "Live catalog"]
                   }
                   actions={
                     <ActionRow>

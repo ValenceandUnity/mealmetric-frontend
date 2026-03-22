@@ -145,6 +145,7 @@ main {
 
 .app-shell--client-meal-plans {
   position: relative;
+  isolation: isolate;
 }
 
 .app-shell--client-meal-plans::before {
@@ -154,7 +155,12 @@ main {
   z-index: -1;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(103, 7, 58, 0.96) 0%, rgba(248, 191, 214, 0.84) 52%, rgba(255, 255, 255, 0.98) 100%);
+    radial-gradient(circle at top, rgba(255, 180, 220, 0.16), transparent 28%),
+    linear-gradient(180deg, #5d073a 0%, #bf4b87 28%, #f5bfd5 62%, #fff7fb 100%);
+}
+
+.app-shell--client-meal-plans .app-shell__viewport {
+  padding: 0.25rem 0 0.75rem;
 }
 
 .app-shell__stack,
@@ -1041,10 +1047,13 @@ main {
 }
 
 .client-meal-plans-budget-marker {
-  border-color: rgba(255, 208, 227, 0.4);
+  border-color: rgba(255, 221, 244, 0.72);
   background:
-    linear-gradient(180deg, rgba(122, 10, 67, 0.92), rgba(222, 94, 150, 0.72)),
-    var(--surface);
+    linear-gradient(145deg, rgba(252, 233, 246, 0.96), rgba(236, 221, 255, 0.92)),
+    rgba(255, 248, 252, 0.96);
+  box-shadow:
+    0 20px 38px rgba(125, 16, 79, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.58);
 }
 
 .client-meal-plans-budget-marker__row {
@@ -1062,17 +1071,43 @@ main {
   font-family: var(--font-display);
   font-size: 2.35rem;
   line-height: 0.95;
-  color: #fff7fb;
+  color: #67113f;
 }
 
 .client-meal-plans-budget-marker__caption {
   margin: 0;
-  color: rgba(255, 240, 247, 0.86);
+  color: rgba(103, 17, 63, 0.74);
   font-size: 0.88rem;
 }
 
 .client-meal-plans-filter-panel {
   margin-top: -0.15rem;
+}
+
+.client-meal-plans-budget-marker .page-header__eyebrow,
+.client-meal-plans-budget-marker .page-header__description,
+.client-meal-plans-budget-marker .chip,
+.client-meal-plans-budget-marker .page-header__title {
+  color: #4f1737;
+}
+
+.client-meal-plans-budget-marker .chip {
+  border-color: rgba(139, 76, 126, 0.24);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.app-shell--client-meal-plans .client-meal-plans-hero,
+.app-shell--client-meal-plans .client-meal-plans-context,
+.app-shell--client-meal-plans .client-meal-plans-featured,
+.app-shell--client-meal-plans .client-meal-plans-hero__focus,
+.app-shell--client-meal-plans .client-meal-plans-filter-note,
+.app-shell--client-meal-plans .client-meal-plans-spotlight,
+.app-shell--client-meal-plans .client-meal-plans-catalog-note,
+.app-shell--client-meal-plans .client-meal-plans-filters {
+  background:
+    linear-gradient(180deg, rgba(54, 14, 45, 0.82), rgba(22, 16, 32, 0.78)),
+    rgba(20, 17, 28, 0.76);
+  border-color: rgba(255, 212, 232, 0.18);
 }
 
 .client-meal-plans-hero__stats,
