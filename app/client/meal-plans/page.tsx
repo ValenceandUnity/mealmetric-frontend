@@ -542,96 +542,6 @@ export default function ClientMealPlansPage() {
             </div>
           </Card>
 
-          <MealPlansTopNav />
-
-          <SectionBlock
-            eyebrow="Discover"
-            title="Recommended Meal Plans"
-            description="A quick visual pass across meal plans already available in your current browsing set."
-            actions={
-              <button
-                type="button"
-                className="link-button client-meal-plans-section-link"
-                onClick={() => {
-                  const catalogSection = document.getElementById("meal-plan-catalog");
-                  catalogSection?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
-              >
-                See All
-              </button>
-            }
-          >
-            {mealPlans.length > 0 ? (
-              <div className="client-meal-plans-recommended">
-                {mealPlans.slice(0, 6).map((mealPlan, index) => (
-                  <article
-                    key={`recommended-${mealPlan.id}`}
-                    className={[
-                      "client-meal-plans-recommended-card",
-                      index === 0 ? "client-meal-plans-recommended-card--highlighted" : "",
-                    ].filter(Boolean).join(" ")}
-                  >
-                    <div className="client-meal-plans-recommended-card__top">
-                      {index === 0 ? <Badge label="Trainer's Choice" tone="accent" /> : null}
-                    </div>
-                    <div className="client-meal-plans-recommended-card__body">
-                      <h3 className="client-meal-plans-recommended-card__title">{mealPlan.name}</h3>
-                    </div>
-                    <div className="client-meal-plans-recommended-card__meta">
-                      <span>{`${mealPlan.total_calories} Calories`}</span>
-                      <span>{formatPrice(mealPlan.total_price_cents)}</span>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title="No meal plans ready"
-                message="Recommended meal plans will appear here when the current browsing set has available plans."
-              />
-            )}
-          </SectionBlock>
-
-          <SectionBlock
-            eyebrow="Browse Next"
-            title="Upcoming Meals"
-            description="A quick-scan list built from the meal plans already visible on this page."
-            actions={
-              <button
-                type="button"
-                className="link-button client-meal-plans-section-link"
-                onClick={() => {
-                  const catalogSection = document.getElementById("meal-plan-catalog");
-                  catalogSection?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
-              >
-                See All
-              </button>
-            }
-          >
-            {mealPlans.length > 0 ? (
-              <div className="client-meal-plans-upcoming">
-                {mealPlans.slice(0, 5).map((mealPlan) => (
-                  <article key={`upcoming-${mealPlan.id}`} className="client-meal-plans-upcoming-row">
-                    <div className="client-meal-plans-upcoming-row__main">
-                      <h3 className="client-meal-plans-upcoming-row__title">{mealPlan.name}</h3>
-                      <p className="client-meal-plans-upcoming-row__vendor">{mealPlan.vendor_name}</p>
-                    </div>
-                    <div className="client-meal-plans-upcoming-row__meta">
-                      <span>{formatPrice(mealPlan.total_price_cents)}</span>
-                      <span>{`${mealPlan.total_calories} Calories`}</span>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title="No meals ready"
-                message="Upcoming Meals will appear here when the current meal plan set has available items."
-              />
-            )}
-          </SectionBlock>
-
           {filtersOpen ? (
             <section className="client-meal-plans-filter-panel" id="budget-marker-controls">
               <Card className="client-meal-plans-filters" variant="soft">
@@ -790,6 +700,96 @@ export default function ClientMealPlansPage() {
               </Card>
             </section>
           ) : null}
+
+          <MealPlansTopNav />
+
+          <SectionBlock
+            eyebrow="Discover"
+            title="Recommended Meal Plans"
+            description="A quick visual pass across meal plans already available in your current browsing set."
+            actions={
+              <button
+                type="button"
+                className="link-button client-meal-plans-section-link"
+                onClick={() => {
+                  const catalogSection = document.getElementById("meal-plan-catalog");
+                  catalogSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+              >
+                See All
+              </button>
+            }
+          >
+            {mealPlans.length > 0 ? (
+              <div className="client-meal-plans-recommended">
+                {mealPlans.slice(0, 6).map((mealPlan, index) => (
+                  <article
+                    key={`recommended-${mealPlan.id}`}
+                    className={[
+                      "client-meal-plans-recommended-card",
+                      index === 0 ? "client-meal-plans-recommended-card--highlighted" : "",
+                    ].filter(Boolean).join(" ")}
+                  >
+                    <div className="client-meal-plans-recommended-card__top">
+                      {index === 0 ? <Badge label="Trainer's Choice" tone="accent" /> : null}
+                    </div>
+                    <div className="client-meal-plans-recommended-card__body">
+                      <h3 className="client-meal-plans-recommended-card__title">{mealPlan.name}</h3>
+                    </div>
+                    <div className="client-meal-plans-recommended-card__meta">
+                      <span>{`${mealPlan.total_calories} Calories`}</span>
+                      <span>{formatPrice(mealPlan.total_price_cents)}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No meal plans ready"
+                message="Recommended meal plans will appear here when the current browsing set has available plans."
+              />
+            )}
+          </SectionBlock>
+
+          <SectionBlock
+            eyebrow="Browse Next"
+            title="Upcoming Meals"
+            description="A quick-scan list built from the meal plans already visible on this page."
+            actions={
+              <button
+                type="button"
+                className="link-button client-meal-plans-section-link"
+                onClick={() => {
+                  const catalogSection = document.getElementById("meal-plan-catalog");
+                  catalogSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+              >
+                See All
+              </button>
+            }
+          >
+            {mealPlans.length > 0 ? (
+              <div className="client-meal-plans-upcoming">
+                {mealPlans.slice(0, 5).map((mealPlan) => (
+                  <article key={`upcoming-${mealPlan.id}`} className="client-meal-plans-upcoming-row">
+                    <div className="client-meal-plans-upcoming-row__main">
+                      <h3 className="client-meal-plans-upcoming-row__title">{mealPlan.name}</h3>
+                      <p className="client-meal-plans-upcoming-row__vendor">{mealPlan.vendor_name}</p>
+                    </div>
+                    <div className="client-meal-plans-upcoming-row__meta">
+                      <span>{formatPrice(mealPlan.total_price_cents)}</span>
+                      <span>{`${mealPlan.total_calories} Calories`}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No meals ready"
+                message="Upcoming Meals will appear here when the current meal plan set has available items."
+              />
+            )}
+          </SectionBlock>
 
           <Card className="client-meal-plans-hero" variant="accent" as="section">
             <div className="client-meal-plans-hero__layout">
