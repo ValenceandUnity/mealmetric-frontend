@@ -99,6 +99,7 @@ export default function ClientMealPlansPage() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [bookmarkBusyId, setBookmarkBusyId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     if (status !== "authenticated" || !user || user.role !== "client") {
@@ -200,6 +201,17 @@ export default function ClientMealPlansPage() {
     const bookmarkedPlan = mealPlans.find((mealPlan) => bookmarkedIds.has(mealPlan.id));
     return bookmarkedPlan ?? mealPlans[0] ?? null;
   }, [bookmarkedIds, mealPlans]);
+  const resolvedBudget = useMemo(() => {
+    if (filters.budgetMax.trim()) {
+      return Number(filters.budgetMax) || 0;
+    }
+
+    if (filters.budgetMin.trim()) {
+      return Number(filters.budgetMin) || 0;
+    }
+
+    return 0;
+  }, [filters.budgetMax, filters.budgetMin]);
 
   async function ensureDefaultFolder(): Promise<BookmarkFolder | null> {
     if (bookmarks.length > 0) {
@@ -317,7 +329,7 @@ export default function ClientMealPlansPage() {
   }
 
   return (
-    <PageShell title="Meal plans" user={user}>
+    <PageShell title="Meal plans" user={user} className="app-shell--client-meal-plans">
       {loading ? (
         <LoadingBlock title="Loading plans" message="Fetching meal-plan discovery data." />
       ) : null}
@@ -334,6 +346,136 @@ export default function ClientMealPlansPage() {
 
       {!loading && !loadError ? (
         <>
+          <Card className="client-meal-plans-budget-marker" variant="accent" as="section">
+            <div className="client-meal-plans-budget-marker__row">
+              <PageHeader
+                eyebrow="Client meal plans"
+                title="Budget Marker"
+                description="Use the current supported ZIP and budget filters without keeping the full discovery form open."
+                chips={activeFilterChips.length > 0 ? activeFilterChips : ["No active filters"]}
+              />
+              <div className="client-meal-plans-budget-marker__value-group">
+                <p className="client-meal-plans-budget-marker__value">{`$${resolvedBudget}`}</p>
+                <p className="client-meal-plans-budget-marker__caption">
+                  {filters.budgetMax.trim()
+                    ? "Resolved from budget max"
+                    : filters.budgetMin.trim()
+                      ? "Resolved from budget min"
+                      : "No budget resolved"}
+                </p>
+              </div>
+            </div>
+            <ActionRow>
+              <button
+                type="button"
+                aria-expanded={filtersOpen}
+                aria-controls="budget-marker-controls"
+                onClick={() => setFiltersOpen((current) => !current)}
+              >
+                {filtersOpen ? "Close edit" : "Edit Budget Marker"}
+              </button>
+              <Link className="link-button" href="/client/bookmarks">
+                Saved plans
+              </Link>
+            </ActionRow>
+          </Card>
+
+          {filtersOpen ? (
+            <section className="client-meal-plans-filter-panel" id="budget-marker-controls">
+              <div className="client-meal-plans-controls">
+                <Card className="client-meal-plans-filters" variant="soft">
+                  <PageHeader
+                    eyebrow="Budget Marker edit"
+                    title="ZIP and budget window"
+                    description="These controls keep the existing supported query-param discovery behavior intact."
+                  />
+                  <form
+                    className="form-grid grid--3"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      setFilters(draft);
+                      setFiltersOpen(false);
+                    }}
+                  >
+                    <div className="field">
+                      <label htmlFor="zip-code">ZIP code</label>
+                      <input
+                        id="zip-code"
+                        value={draft.zipCode}
+                        onChange={(event) =>
+                          setDraft((current) => ({ ...current, zipCode: event.target.value }))
+                        }
+                        placeholder="10001"
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="budget-min">Budget min ($)</label>
+                      <input
+                        id="budget-min"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={draft.budgetMin}
+                        onChange={(event) =>
+                          setDraft((current) => ({ ...current, budgetMin: event.target.value }))
+                        }
+                        placeholder="12"
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="budget-max">Budget max ($)</label>
+                      <input
+                        id="budget-max"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={draft.budgetMax}
+                        onChange={(event) =>
+                          setDraft((current) => ({ ...current, budgetMax: event.target.value }))
+                        }
+                        placeholder="25"
+                      />
+                    </div>
+                    <ActionRow>
+                      <button type="submit">Apply filters</button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraft(DEFAULT_FILTERS);
+                          setFilters(DEFAULT_FILTERS);
+                          setFiltersOpen(false);
+                        }}
+                      >
+                        Clear
+                      </button>
+                    </ActionRow>
+                  </form>
+                  <div className="client-meal-plans-filter-chips">
+                    {(activeFilterChips.length > 0 ? activeFilterChips : ["No active filters"]).map((chip) => (
+                      <Chip key={chip} tone={activeFilterChips.length > 0 ? "accent" : "muted"}>
+                        {chip}
+                      </Chip>
+                    ))}
+                  </div>
+                </Card>
+
+                <Card className="client-meal-plans-filter-note" variant="ghost">
+                  <ListRow
+                    eyebrow="Current boundary"
+                    title="Discovery remains query-param based"
+                    description="ZIP and budget filtering still use only the currently supported parameters and existing apply or clear behavior."
+                    footer={
+                      <Badge
+                        label={activeFilterChips.length > 0 ? "Filtered catalog" : "Open catalog"}
+                        tone="accent"
+                      />
+                    }
+                  />
+                </Card>
+              </div>
+            </section>
+          ) : null}
+
           <Card className="client-meal-plans-hero" variant="accent" as="section">
             <div className="client-meal-plans-hero__layout">
               <div className="client-meal-plans-hero__lead">
@@ -348,12 +490,12 @@ export default function ClientMealPlansPage() {
                   }
                   actions={
                     <ActionRow>
-                      <Link className="link-button link-button--accent" href="/client/bookmarks">
-                        Saved plans
-                      </Link>
                       <Link className="link-button" href="/client/metrics">
                         Review metrics
                       </Link>
+                      <button type="button" onClick={() => setFiltersOpen(true)}>
+                        Edit Budget Marker
+                      </button>
                     </ActionRow>
                   }
                 />
@@ -416,102 +558,6 @@ export default function ClientMealPlansPage() {
               </Card>
             </div>
           </Card>
-
-          <SectionBlock
-            eyebrow="Controls"
-            title="Discovery controls"
-            description="ZIP and budget controls use the current supported query params only. No client-side-only search behavior has been added."
-          >
-            <div className="client-meal-plans-controls">
-              <Card className="client-meal-plans-filters" variant="soft">
-                <PageHeader
-                  eyebrow="Filter context"
-                  title="ZIP and budget window"
-                  description="These are the only supported discovery controls right now. The page does not invent deeper filtering beyond the approved query params."
-                />
-                <form
-                  className="form-grid grid--3"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    setFilters(draft);
-                  }}
-                >
-                  <div className="field">
-                    <label htmlFor="zip-code">ZIP code</label>
-                    <input
-                      id="zip-code"
-                      value={draft.zipCode}
-                      onChange={(event) =>
-                        setDraft((current) => ({ ...current, zipCode: event.target.value }))
-                      }
-                      placeholder="10001"
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="budget-min">Budget min ($)</label>
-                    <input
-                      id="budget-min"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={draft.budgetMin}
-                      onChange={(event) =>
-                        setDraft((current) => ({ ...current, budgetMin: event.target.value }))
-                      }
-                      placeholder="12"
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="budget-max">Budget max ($)</label>
-                    <input
-                      id="budget-max"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={draft.budgetMax}
-                      onChange={(event) =>
-                        setDraft((current) => ({ ...current, budgetMax: event.target.value }))
-                      }
-                      placeholder="25"
-                    />
-                  </div>
-                  <ActionRow>
-                    <button type="submit">Apply filters</button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDraft(DEFAULT_FILTERS);
-                        setFilters(DEFAULT_FILTERS);
-                      }}
-                    >
-                      Clear
-                    </button>
-                  </ActionRow>
-                </form>
-                <div className="client-meal-plans-filter-chips">
-                  {(activeFilterChips.length > 0 ? activeFilterChips : ["No active filters"]).map((chip) => (
-                    <Chip key={chip} tone={activeFilterChips.length > 0 ? "accent" : "muted"}>
-                      {chip}
-                    </Chip>
-                  ))}
-                </div>
-              </Card>
-
-              <Card className="client-meal-plans-filter-note" variant="ghost">
-                <ListRow
-                  eyebrow="Current boundary"
-                  title="Discovery remains neutral"
-                  description="The featured plan is a presentation focus only. The page does not imply recommendation scoring, ranking, or hidden selection logic."
-                  footer={
-                    <Badge
-                      label={activeFilterChips.length > 0 ? "Filtered catalog" : "Open catalog"}
-                      tone="accent"
-                    />
-                  }
-                />
-              </Card>
-            </div>
-          </SectionBlock>
 
           <SectionBlock
             eyebrow="Summary"

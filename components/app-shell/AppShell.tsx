@@ -16,16 +16,17 @@ type AppShellProps = {
   user: SessionUser;
   subtitle?: string;
   actions?: ReactNode;
+  className?: string;
   children: ReactNode;
 };
 
-export function AppShell({ title, user, subtitle, actions, children }: AppShellProps) {
+export function AppShell({ title, user, subtitle, actions, className, children }: AppShellProps) {
   const pathname = usePathname();
   const roleMeta = getRoleShellMeta(user.role);
   const activeItem = getActiveNavItem(user.role, pathname);
 
   return (
-    <div className="app-shell">
+    <div className={["app-shell", className ?? ""].filter(Boolean).join(" ")}>
       <div className="app-shell__stack">
         <TopHub
           accent={roleMeta.accent}

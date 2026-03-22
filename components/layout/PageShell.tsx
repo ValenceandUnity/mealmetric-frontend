@@ -10,15 +10,17 @@ type PageShellProps = {
   user: SessionUser;
   navigation?: ReactNode;
   actions?: ReactNode;
+  className?: string;
   children: ReactNode;
 };
 
-export function PageShell({ title, user, navigation, actions, children }: PageShellProps) {
+export function PageShell({ title, user, navigation, actions, className, children }: PageShellProps) {
   return (
     <AppShell
       title={title}
       user={user}
       actions={actions}
+      className={className}
       subtitle="Signed-in workspace backed by MealMetric's protected BFF flow."
     >
       {navigation ? <div className="page-shell__nav row">{navigation}</div> : null}

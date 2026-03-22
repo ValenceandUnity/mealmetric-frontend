@@ -143,6 +143,20 @@ main {
   padding: 1rem 0.9rem calc(7.2rem + env(safe-area-inset-bottom, 0px));
 }
 
+.app-shell--client-meal-plans {
+  position: relative;
+}
+
+.app-shell--client-meal-plans::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(103, 7, 58, 0.96) 0%, rgba(248, 191, 214, 0.84) 52%, rgba(255, 255, 255, 0.98) 100%);
+}
+
 .app-shell__stack,
 .grid,
 .stacked-list,
@@ -1004,6 +1018,7 @@ main {
 }
 
 .client-meal-plans-hero,
+.client-meal-plans-budget-marker,
 .client-meal-plans-filters,
 .client-meal-plans-context,
 .client-meal-plans-featured,
@@ -1015,12 +1030,49 @@ main {
 }
 
 .client-meal-plans-hero__layout,
+.client-meal-plans-budget-marker__row,
 .client-meal-plans-hero__lead,
+.client-meal-plans-filter-panel,
 .client-meal-plans-controls,
 .client-meal-plans-featured-layout,
 .client-meal-plans-catalog {
   display: grid;
   gap: 1rem;
+}
+
+.client-meal-plans-budget-marker {
+  border-color: rgba(255, 208, 227, 0.4);
+  background:
+    linear-gradient(180deg, rgba(122, 10, 67, 0.92), rgba(222, 94, 150, 0.72)),
+    var(--surface);
+}
+
+.client-meal-plans-budget-marker__row {
+  align-items: start;
+}
+
+.client-meal-plans-budget-marker__value-group {
+  display: grid;
+  gap: 0.3rem;
+  justify-items: start;
+}
+
+.client-meal-plans-budget-marker__value {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 2.35rem;
+  line-height: 0.95;
+  color: #fff7fb;
+}
+
+.client-meal-plans-budget-marker__caption {
+  margin: 0;
+  color: rgba(255, 240, 247, 0.86);
+  font-size: 0.88rem;
+}
+
+.client-meal-plans-filter-panel {
+  margin-top: -0.15rem;
 }
 
 .client-meal-plans-hero__stats,
