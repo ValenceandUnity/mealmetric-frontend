@@ -249,16 +249,14 @@ export default function ClientMealPlansPage() {
         return [...current, nextEntry];
       }
 
-      return [
-        ...current.map((entry) =>
-          entry.kind === "zip" ? { ...entry, selected: false } : entry,
-        ),
-        nextEntry,
-      ];
+      return [...current, nextEntry];
     });
 
     if (/^\d{5}$/.test(value)) {
-      setDraft((current) => ({ ...current, zipCode: value }));
+      setDraft((current) => ({
+        ...current,
+        zipCode: current.zipCode.trim() ? current.zipCode : value,
+      }));
     }
 
     setTrackerInput("");
@@ -271,22 +269,14 @@ export default function ClientMealPlansPage() {
         return current;
       }
 
-      const nextSelected = !target.selected;
-      const nextEntries = current.map((entry) => {
-        if (entry.kind !== "zip") {
-          return entry;
-        }
-
-        if (entry.id === entryId) {
-          return { ...entry, selected: nextSelected };
-        }
-
-        return { ...entry, selected: false };
-      });
+      const nextEntries = current.map((entry) =>
+        entry.id === entryId ? { ...entry, selected: !entry.selected } : entry,
+      );
+      const selectedZip = nextEntries.find((entry) => entry.kind === "zip" && entry.selected);
 
       setDraft((currentDraft) => ({
         ...currentDraft,
-        zipCode: nextSelected ? target.label : "",
+        zipCode: selectedZip?.label ?? "",
       }));
 
       return nextEntries;
@@ -299,7 +289,11 @@ export default function ClientMealPlansPage() {
       const nextEntries = current.filter((entry) => entry.id !== entryId);
 
       if (target?.kind === "zip" && target.selected) {
-        setDraft((currentDraft) => ({ ...currentDraft, zipCode: "" }));
+        const nextSelectedZip = nextEntries.find((entry) => entry.kind === "zip" && entry.selected);
+        setDraft((currentDraft) => ({
+          ...currentDraft,
+          zipCode: nextSelectedZip?.label ?? "",
+        }));
       }
 
       return nextEntries;
@@ -510,7 +504,6 @@ export default function ClientMealPlansPage() {
                   <div className="client-meal-plans-edit-section">
                     <div className="client-meal-plans-edit-section__header">
                       <h3>Budget filters</h3>
-                      <Badge label="Live discovery uses one ZIP and budget max" tone="accent" />
                     </div>
                     <div className="form-grid grid--2">
                       <div className="field">
@@ -604,8 +597,10 @@ export default function ClientMealPlansPage() {
                               <span className="client-meal-plans-zip-entry__meta">
                                 {entry.kind === "zip"
                                   ? entry.selected
-                                    ? "Selected for browsing"
-                                    : "Tap to select"
+                                    ? entry.label === draft.zipCode
+                                      ? "Active in live browse"
+                                      : "Saved as active"
+                                    : "Saved but inactive"
                                   : "City note only"}
                               </span>
                             </button>
@@ -630,9 +625,11 @@ export default function ClientMealPlansPage() {
                     )}
                   </div>
 
-                  <ActionRow>
-                    <button type="submit">Apply filters</button>
-                  </ActionRow>
+                  <div className="client-meal-plans-filters__actions">
+                    <ActionRow>
+                      <button type="submit">Apply filters</button>
+                    </ActionRow>
+                  </div>
                 </form>
               </Card>
             </section>

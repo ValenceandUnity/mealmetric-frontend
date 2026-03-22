@@ -1131,6 +1131,11 @@ main {
   gap: 1.1rem;
 }
 
+.client-meal-plans-filters__actions {
+  display: flex;
+  justify-content: center;
+}
+
 .client-meal-plans-edit-section {
   padding: 1rem;
   border-radius: 18px;
