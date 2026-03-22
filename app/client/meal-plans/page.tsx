@@ -29,6 +29,12 @@ import type {
 type MealPlansResponse = ApiResponse<{ items: MealPlanSummary[]; count: number }>;
 type BookmarksResponse = ApiResponse<BookmarkFolderListPayload>;
 type CreateFolderResponse = ApiResponse<BookmarkFolder>;
+type ZipTrackerEntry = {
+  id: string;
+  label: string;
+  kind: "zip" | "city";
+  selected: boolean;
+};
 
 type FilterDraft = {
   zipCode: string;
@@ -99,6 +105,9 @@ export default function ClientMealPlansPage() {
   const [loading, setLoading] = useState(true);
   const [bookmarkBusyId, setBookmarkBusyId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [trackedLocations, setTrackedLocations] = useState<ZipTrackerEntry[]>([]);
+  const [draftTrackedLocations, setDraftTrackedLocations] = useState<ZipTrackerEntry[]>([]);
+  const [trackerInput, setTrackerInput] = useState("");
 
   useEffect(() => {
     if (status !== "authenticated" || !user || user.role !== "client") {
@@ -205,6 +214,97 @@ export default function ClientMealPlansPage() {
 
     return filters.budgetDuration;
   }, [filters.budgetDuration, filters.customDuration]);
+
+  function openBudgetMarkerEditor() {
+    setDraft(filters);
+    setDraftTrackedLocations(trackedLocations);
+    setTrackerInput("");
+    setFiltersOpen(true);
+  }
+
+  function handleAddTrackerEntry() {
+    const value = trackerInput.trim();
+    if (!value) {
+      return;
+    }
+
+    const isZip = /^\d{5}$/.test(value);
+
+    setDraftTrackedLocations((current) => {
+      const duplicate = current.some(
+        (entry) => entry.kind === (isZip ? "zip" : "city") && entry.label.toLowerCase() === value.toLowerCase(),
+      );
+      if (duplicate) {
+        return current;
+      }
+
+      const nextEntry: ZipTrackerEntry = {
+        id: `${isZip ? "zip" : "city"}-${value}-${Date.now()}`,
+        label: value,
+        kind: isZip ? "zip" : "city",
+        selected: isZip,
+      };
+
+      if (!isZip) {
+        return [...current, nextEntry];
+      }
+
+      return [
+        ...current.map((entry) =>
+          entry.kind === "zip" ? { ...entry, selected: false } : entry,
+        ),
+        nextEntry,
+      ];
+    });
+
+    if (/^\d{5}$/.test(value)) {
+      setDraft((current) => ({ ...current, zipCode: value }));
+    }
+
+    setTrackerInput("");
+  }
+
+  function handleToggleZipEntry(entryId: string) {
+    setDraftTrackedLocations((current) => {
+      const target = current.find((entry) => entry.id === entryId);
+      if (!target || target.kind !== "zip") {
+        return current;
+      }
+
+      const nextSelected = !target.selected;
+      const nextEntries = current.map((entry) => {
+        if (entry.kind !== "zip") {
+          return entry;
+        }
+
+        if (entry.id === entryId) {
+          return { ...entry, selected: nextSelected };
+        }
+
+        return { ...entry, selected: false };
+      });
+
+      setDraft((currentDraft) => ({
+        ...currentDraft,
+        zipCode: nextSelected ? target.label : "",
+      }));
+
+      return nextEntries;
+    });
+  }
+
+  function handleDeleteTrackerEntry(entryId: string) {
+    setDraftTrackedLocations((current) => {
+      const target = current.find((entry) => entry.id === entryId);
+      const nextEntries = current.filter((entry) => entry.id !== entryId);
+
+      if (target?.kind === "zip" && target.selected) {
+        setDraft((currentDraft) => ({ ...currentDraft, zipCode: "" }));
+      }
+
+      return nextEntries;
+    });
+  }
 
   async function ensureDefaultFolder(): Promise<BookmarkFolder | null> {
     if (bookmarks.length > 0) {
@@ -373,74 +473,76 @@ export default function ClientMealPlansPage() {
                   type="button"
                   aria-expanded={filtersOpen}
                   aria-controls="budget-marker-controls"
-                  onClick={() => setFiltersOpen((current) => !current)}
+                  onClick={() => {
+                    if (filtersOpen) {
+                      setFiltersOpen(false);
+                      return;
+                    }
+                    openBudgetMarkerEditor();
+                  }}
                 >
                   {filtersOpen ? "Close edit" : "Edit Budget Marker"}
                 </button>
-                <Link className="link-button" href="/client/bookmarks">
-                  Saved plans
-                </Link>
               </ActionRow>
             </div>
           </Card>
 
           {filtersOpen ? (
             <section className="client-meal-plans-filter-panel" id="budget-marker-controls">
-              <div className="client-meal-plans-controls">
-                <Card className="client-meal-plans-filters" variant="soft">
+              <Card className="client-meal-plans-filters" variant="soft">
+                <div className="client-meal-plans-edit-section">
                   <PageHeader
                     eyebrow="Budget Marker edit"
-                    title="ZIP and budget window"
-                    description="Budget max and ZIP keep the existing supported query-param discovery behavior intact. Budget Duration stays UI-local for now."
+                    title="Plan your spend"
+                    description="Set your budget, choose how long it should last, then pick the ZIP you want to browse around."
                   />
-                  <form
-                    className="form-grid grid--3"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      setFilters(draft);
-                      setFiltersOpen(false);
-                    }}
-                  >
-                    <div className="field">
-                      <label htmlFor="zip-code">ZIP code</label>
-                      <input
-                        id="zip-code"
-                        value={draft.zipCode}
-                        onChange={(event) =>
-                          setDraft((current) => ({ ...current, zipCode: event.target.value }))
-                        }
-                        placeholder="10001"
-                      />
+                </div>
+
+                <form
+                  className="client-meal-plans-edit-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    setFilters(draft);
+                    setTrackedLocations(draftTrackedLocations);
+                    setFiltersOpen(false);
+                  }}
+                >
+                  <div className="client-meal-plans-edit-section">
+                    <div className="client-meal-plans-edit-section__header">
+                      <h3>Budget filters</h3>
+                      <Badge label="Live discovery uses one ZIP and budget max" tone="accent" />
                     </div>
-                    <div className="field">
-                      <label htmlFor="budget-max">Budget max ($)</label>
-                      <input
-                        id="budget-max"
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={draft.budgetMax}
-                        onChange={(event) =>
-                          setDraft((current) => ({ ...current, budgetMax: event.target.value }))
-                        }
-                        placeholder="25"
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="budget-duration">Budget Duration</label>
-                      <select
-                        id="budget-duration"
-                        value={draft.budgetDuration}
-                        onChange={(event) =>
-                          setDraft((current) => ({ ...current, budgetDuration: event.target.value }))
-                        }
-                      >
-                        <option value="one day">one day</option>
-                        <option value="one week">one week</option>
-                        <option value="bi weekly">bi weekly</option>
-                        <option value="month">month</option>
-                        <option value="custom duration">custom duration</option>
-                      </select>
+                    <div className="form-grid grid--2">
+                      <div className="field">
+                        <label htmlFor="budget-max">Budget max ($)</label>
+                        <input
+                          id="budget-max"
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={draft.budgetMax}
+                          onChange={(event) =>
+                            setDraft((current) => ({ ...current, budgetMax: event.target.value }))
+                          }
+                          placeholder="25"
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="budget-duration">Budget Duration</label>
+                        <select
+                          id="budget-duration"
+                          value={draft.budgetDuration}
+                          onChange={(event) =>
+                            setDraft((current) => ({ ...current, budgetDuration: event.target.value }))
+                          }
+                        >
+                          <option value="one day">one day</option>
+                          <option value="one week">one week</option>
+                          <option value="bi weekly">bi weekly</option>
+                          <option value="month">month</option>
+                          <option value="custom duration">custom duration</option>
+                        </select>
+                      </div>
                     </div>
                     {draft.budgetDuration === "custom duration" ? (
                       <div className="field">
@@ -455,43 +557,84 @@ export default function ClientMealPlansPage() {
                         />
                       </div>
                     ) : null}
-                    <ActionRow>
-                      <button type="submit">Apply filters</button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDraft(DEFAULT_FILTERS);
-                          setFilters(DEFAULT_FILTERS);
-                          setFiltersOpen(false);
-                        }}
-                      >
-                        Clear
-                      </button>
-                    </ActionRow>
-                  </form>
-                  <div className="client-meal-plans-filter-chips">
-                    {(activeFilterChips.length > 0 ? activeFilterChips : ["No active filters"]).map((chip) => (
-                      <Chip key={chip} tone={activeFilterChips.length > 0 ? "accent" : "muted"}>
-                        {chip}
-                      </Chip>
-                    ))}
                   </div>
-                </Card>
 
-                <Card className="client-meal-plans-filter-note" variant="ghost">
-                  <ListRow
-                    eyebrow="Current boundary"
-                    title="Discovery remains query-param based"
-                    description="Only ZIP code and budget max affect real discovery requests. Budget Duration is displayed locally and does not add unsupported backend params."
-                    footer={
-                      <Badge
-                        label={activeFilterChips.length > 0 ? "Filtered catalog" : "Open catalog"}
-                        tone="accent"
+                  <div className="client-meal-plans-edit-section client-meal-plans-zip-tracker">
+                    <div className="client-meal-plans-edit-section__header">
+                      <h3>ZIP Code Tracker</h3>
+                      <Badge label={draft.zipCode ? `Active ZIP ${draft.zipCode}` : "No active ZIP"} tone="accent" />
+                    </div>
+                    <p className="client-meal-plans-zip-tracker__copy">
+                      Add ZIPs you want to use for browsing. City names stay local as notes until you add a ZIP.
+                    </p>
+                    <div className="client-meal-plans-zip-tracker__add">
+                      <input
+                        aria-label="Add ZIP code or city"
+                        value={trackerInput}
+                        onChange={(event) => setTrackerInput(event.target.value)}
+                        placeholder="10001 or Boston"
                       />
-                    }
-                  />
-                </Card>
-              </div>
+                      <button type="button" onClick={handleAddTrackerEntry}>
+                        Add
+                      </button>
+                    </div>
+                    {draftTrackedLocations.length > 0 ? (
+                      <div className="client-meal-plans-zip-tracker__list">
+                        {draftTrackedLocations.map((entry) => (
+                          <div
+                            key={entry.id}
+                            className={[
+                              "client-meal-plans-zip-entry",
+                              entry.selected ? "client-meal-plans-zip-entry--active" : "",
+                              entry.kind === "city" ? "client-meal-plans-zip-entry--city" : "",
+                            ].filter(Boolean).join(" ")}
+                          >
+                            <button
+                              type="button"
+                              className="client-meal-plans-zip-entry__select"
+                              onClick={() => {
+                                if (entry.kind === "zip") {
+                                  handleToggleZipEntry(entry.id);
+                                }
+                              }}
+                              aria-pressed={entry.kind === "zip" ? entry.selected : undefined}
+                              disabled={entry.kind !== "zip"}
+                            >
+                              <span className="client-meal-plans-zip-entry__label">{entry.label}</span>
+                              <span className="client-meal-plans-zip-entry__meta">
+                                {entry.kind === "zip"
+                                  ? entry.selected
+                                    ? "Selected for browsing"
+                                    : "Tap to select"
+                                  : "City note only"}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              className="client-meal-plans-zip-entry__delete"
+                              aria-label={`Delete ${entry.label}`}
+                              onClick={() => handleDeleteTrackerEntry(entry.id)}
+                            >
+                              <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M9 4.5h6m-8 3h10m-8 0v9m3-9v9m3-9v9M8 7.5l.5 11a1 1 0 0 0 1 .95h5a1 1 0 0 0 1-.95l.5-11" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyState
+                        title="No ZIPs tracked yet"
+                        message="Add a ZIP to keep it ready for browsing, or save a city note locally until you have a ZIP."
+                      />
+                    )}
+                  </div>
+
+                  <ActionRow>
+                    <button type="submit">Apply filters</button>
+                  </ActionRow>
+                </form>
+              </Card>
             </section>
           ) : null}
 
