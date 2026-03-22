@@ -76,9 +76,6 @@ function formatPrice(cents: number): string {
 function getActiveFilterChips(filters: FilterDraft) {
   const chips: string[] = [];
 
-  if (filters.zipCode.trim()) {
-    chips.push(`ZIP ${filters.zipCode.trim()}`);
-  }
   if (filters.budgetMax.trim()) {
     chips.push(`Max $${filters.budgetMax.trim()}`);
   }
@@ -455,7 +452,7 @@ export default function ClientMealPlansPage() {
               </div>
             </div>
             <div className="client-meal-plans-budget-marker__chips">
-              {(activeFilterChips.length > 0 ? activeFilterChips : ["No active filters"]).map((chip) => (
+              {(activeFilterChips.length > 0 ? activeFilterChips : ["Budget open"]).map((chip) => (
                 <Chip key={chip} tone={activeFilterChips.length > 0 ? "accent" : "muted"}>
                   {chip}
                 </Chip>
@@ -555,7 +552,14 @@ export default function ClientMealPlansPage() {
                   <div className="client-meal-plans-edit-section client-meal-plans-zip-tracker">
                     <div className="client-meal-plans-edit-section__header">
                       <h3>ZIP Code Tracker</h3>
-                      <Badge label={draft.zipCode ? `Active ZIP ${draft.zipCode}` : "No active ZIP"} tone="accent" />
+                      <Badge
+                        label={
+                          draftTrackedLocations.some((entry) => entry.kind === "zip" && entry.selected)
+                            ? "ZIP tracking on"
+                            : "ZIP tracking off"
+                        }
+                        tone="accent"
+                      />
                     </div>
                     <p className="client-meal-plans-zip-tracker__copy">
                       Add ZIPs you want to use for browsing. City names stay local as notes until you add a ZIP.
@@ -597,10 +601,8 @@ export default function ClientMealPlansPage() {
                               <span className="client-meal-plans-zip-entry__meta">
                                 {entry.kind === "zip"
                                   ? entry.selected
-                                    ? entry.label === draft.zipCode
-                                      ? "Active in live browse"
-                                      : "Saved as active"
-                                    : "Saved but inactive"
+                                    ? "Active"
+                                    : "Tracking Off"
                                   : "City note only"}
                               </span>
                             </button>
