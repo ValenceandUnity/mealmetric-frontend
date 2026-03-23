@@ -254,13 +254,20 @@ html[data-theme="light"] .top-hub {
 .top-hub__row,
 .top-hub__badges {
   display: flex;
-  flex-wrap: wrap;
   gap: 0.6rem;
   align-items: center;
 }
 
 .top-hub__row {
   justify-content: space-between;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.top-hub__badges {
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .top-hub__eyebrow,
@@ -332,18 +339,20 @@ html[data-theme="light"] .top-hub__section {
 }
 
 .top-hub__actions {
+  flex: 0 0 auto;
   justify-content: flex-end;
   align-items: center;
   margin-left: auto;
+  min-width: 0;
 }
 
 .top-hub__utility-cluster {
   display: flex;
+  flex: 0 0 auto;
   justify-content: flex-end;
   align-items: center;
   gap: 0.6rem;
   flex-wrap: nowrap;
-  width: 100%;
   min-width: 0;
 }
 
@@ -3017,11 +3026,6 @@ html[data-theme="light"] .client-settings-toggle__option {
     gap: 0.6rem;
   }
 
-  .top-hub__actions,
-  .page-shell__nav {
-    width: 100%;
-  }
-
   .top-hub__utility-cluster {
     gap: 0.5rem;
   }
@@ -3039,10 +3043,6 @@ html[data-theme="light"] .client-settings-toggle__option {
 
   .top-hub__actions > .utility-icon-link {
     flex: 0 0 auto;
-  }
-
-  .top-hub__actions > .top-hub__utility-cluster {
-    width: 100%;
   }
 
   .analytics-card__stats {
