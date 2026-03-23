@@ -29,6 +29,12 @@ type RoleShellMeta = {
 const CLIENT_NAV: AppShellNavItem[] = [
   { href: "/client", label: "Home", icon: "home", exact: true },
   {
+    href: "/client/meal-plans",
+    label: "Meal Plans",
+    icon: "meal-plans",
+    matchers: ["/client/meal-plans"],
+  },
+  {
     href: "/client/training",
     label: "Training",
     icon: "training",
@@ -45,12 +51,6 @@ const CLIENT_NAV: AppShellNavItem[] = [
     label: "Metrics",
     icon: "metrics",
     matchers: ["/client/metrics"],
-  },
-  {
-    href: "/client/settings",
-    label: "Settings",
-    icon: "account",
-    matchers: ["/client/settings"],
   },
 ];
 

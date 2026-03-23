@@ -562,8 +562,55 @@ main {
   position: relative;
 }
 
-.notification-link__count {
+.utility-icon-link {
+  position: relative;
   display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 3rem;
+  min-width: 3rem;
+  min-height: 3rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.utility-icon-link:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.utility-icon-link--active {
+  background: var(--accent-soft);
+  border-color: rgba(125, 211, 252, 0.2);
+  color: var(--text);
+}
+
+.utility-icon-link svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.notification-link__count {
+  position: absolute;
+  top: -0.2rem;
+  right: -0.2rem;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
   min-width: 1.6rem;
   min-height: 1.6rem;
   padding: 0.1rem 0.4rem;
@@ -2765,6 +2812,10 @@ main {
   .top-hub__actions > .link-button,
   .top-hub__actions > button {
     flex: 1 1 100%;
+  }
+
+  .top-hub__actions > .utility-icon-link {
+    flex: 0 0 auto;
   }
 
   .analytics-card__stats {
