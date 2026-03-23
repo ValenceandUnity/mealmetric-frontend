@@ -504,43 +504,47 @@ export default function ClientMealPlansPage() {
 
       {!loading && !loadError ? (
         <>
-          <Card className="client-meal-plans-budget-marker" variant="accent" as="section">
-            <div className="client-meal-plans-budget-marker__header">
-              <div className="client-meal-plans-budget-marker__heading">
-                <p className="client-meal-plans-budget-marker__eyebrow">Client meal plans</p>
-                <h2 className="client-meal-plans-budget-marker__title">Budget Marker</h2>
+          <div className="client-meal-plans-sticky-controls">
+            <Card className="client-meal-plans-budget-marker" variant="accent" as="section">
+              <div className="client-meal-plans-budget-marker__header">
+                <div className="client-meal-plans-budget-marker__heading">
+                  <p className="client-meal-plans-budget-marker__eyebrow">Client meal plans</p>
+                  <h2 className="client-meal-plans-budget-marker__title">Budget Marker</h2>
+                </div>
+                <div className="client-meal-plans-budget-marker__meta">
+                  <Chip tone="muted">{resolvedDurationLabel}</Chip>
+                </div>
               </div>
-              <div className="client-meal-plans-budget-marker__meta">
-                <Chip tone="muted">{resolvedDurationLabel}</Chip>
+              <div className="client-meal-plans-budget-marker__row">
+                <div className="client-meal-plans-budget-marker__value-group">
+                  <p className="client-meal-plans-budget-marker__value">{`$${resolvedBudget}`}</p>
+                  <p className="client-meal-plans-budget-marker__caption">
+                    Use the current supported ZIP and budget controls without leaving the top discovery marker open.
+                  </p>
+                </div>
               </div>
-            </div>
-            <div className="client-meal-plans-budget-marker__row">
-              <div className="client-meal-plans-budget-marker__value-group">
-                <p className="client-meal-plans-budget-marker__value">{`$${resolvedBudget}`}</p>
-                <p className="client-meal-plans-budget-marker__caption">
-                  Use the current supported ZIP and budget controls without leaving the top discovery marker open.
-                </p>
+              <div className="client-meal-plans-budget-marker__actions">
+                <ActionRow>
+                  <button
+                    type="button"
+                    aria-expanded={filtersOpen}
+                    aria-controls="budget-marker-controls"
+                    onClick={() => {
+                      if (filtersOpen) {
+                        setFiltersOpen(false);
+                        return;
+                      }
+                      openBudgetMarkerEditor();
+                    }}
+                  >
+                    {filtersOpen ? "Close edit" : "Edit Budget Marker"}
+                  </button>
+                </ActionRow>
               </div>
-            </div>
-            <div className="client-meal-plans-budget-marker__actions">
-              <ActionRow>
-                <button
-                  type="button"
-                  aria-expanded={filtersOpen}
-                  aria-controls="budget-marker-controls"
-                  onClick={() => {
-                    if (filtersOpen) {
-                      setFiltersOpen(false);
-                      return;
-                    }
-                    openBudgetMarkerEditor();
-                  }}
-                >
-                  {filtersOpen ? "Close edit" : "Edit Budget Marker"}
-                </button>
-              </ActionRow>
-            </div>
-          </Card>
+            </Card>
+
+            <MealPlansTopNav />
+          </div>
 
           {filtersOpen ? (
             <section className="client-meal-plans-filter-panel" id="budget-marker-controls">
@@ -700,8 +704,6 @@ export default function ClientMealPlansPage() {
               </Card>
             </section>
           ) : null}
-
-          <MealPlansTopNav />
 
           <SectionBlock
             eyebrow="Discover"

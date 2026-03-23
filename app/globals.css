@@ -1992,6 +1992,7 @@ html[data-theme="light"] .client-settings-toggle__option {
 .client-meal-plans-hero__layout,
 .client-meal-plans-budget-marker__header,
 .client-meal-plans-budget-marker__row,
+.client-meal-plans-sticky-controls,
 .client-meal-plans-hero__lead,
 .client-meal-plans-filter-panel,
 .client-meal-plans-edit-form,
@@ -2011,7 +2012,30 @@ html[data-theme="light"] .client-settings-toggle__option {
     rgba(255, 248, 252, 0.96);
   box-shadow:
     0 20px 38px rgba(125, 16, 79, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.58);
+      inset 0 1px 0 rgba(255, 255, 255, 0.58);
+}
+
+.client-meal-plans-sticky-controls {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 0.7rem);
+  z-index: 18;
+  gap: 0.75rem;
+  padding: 0.15rem 0 0.35rem;
+}
+
+.client-meal-plans-sticky-controls::before {
+  content: "";
+  position: absolute;
+  inset: -0.1rem -0.3rem 0;
+  border-radius: 30px;
+  background:
+    linear-gradient(180deg, rgba(255, 246, 252, 0.95), rgba(250, 239, 248, 0.78)),
+    rgba(255, 248, 252, 0.72);
+  border: 1px solid rgba(255, 221, 244, 0.18);
+  box-shadow: 0 14px 28px rgba(84, 18, 55, 0.12);
+  backdrop-filter: blur(16px);
+  pointer-events: none;
+  z-index: -1;
 }
 
 .client-meal-plans-budget-marker__row {
@@ -2275,7 +2299,9 @@ html[data-theme="light"] .client-settings-toggle__option {
 .app-shell--client-meal-plans .client-meal-plans-budget-marker + .section-block,
 .app-shell--client-meal-plans .section-block + #meal-plan-catalog,
 .app-shell--client-meal-plans .section-block + .client-meal-plans-filter-panel,
-.app-shell--client-meal-plans .client-meal-plans-budget-marker + .client-meal-plans-filter-panel {
+.app-shell--client-meal-plans .client-meal-plans-budget-marker + .client-meal-plans-filter-panel,
+.app-shell--client-meal-plans .client-meal-plans-sticky-controls + .section-block,
+.app-shell--client-meal-plans .client-meal-plans-sticky-controls + .client-meal-plans-filter-panel {
   margin-top: 0.45rem;
 }
 
@@ -3024,6 +3050,17 @@ html[data-theme="light"] .client-settings-toggle__option {
 
   .meal-plans-top-nav {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .client-meal-plans-sticky-controls {
+    top: calc(env(safe-area-inset-top, 0px) + 0.45rem);
+    gap: 0.6rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .client-meal-plans-sticky-controls::before {
+    inset: -0.05rem -0.2rem 0;
+    border-radius: 26px;
   }
 
   .client-meal-plans-upcoming-row {
