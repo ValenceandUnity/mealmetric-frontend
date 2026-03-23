@@ -5,6 +5,7 @@ import { useState } from "react";
 import { AccountSection } from "@/components/settings/AccountSection";
 import { AppControls } from "@/components/settings/AppControls";
 import { PreferencesSection } from "@/components/settings/PreferencesSection";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import { PageShell } from "@/components/layout/PageShell";
 import { Card } from "@/components/ui/Card";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
@@ -20,8 +21,9 @@ export default function ClientSettingsPage() {
     unauthenticatedRedirectTo: "/login",
   });
 
-  const [darkMode, setDarkMode] = useState(true);
+  const { theme, setTheme } = useTheme();
   const [notifications, setNotifications] = useState(false);
+  const darkMode = theme === "dark";
 
   if (status === "loading") {
     return <LoadingBlock title="Loading settings" message="Validating your client session." />;
@@ -37,9 +39,9 @@ export default function ClientSettingsPage() {
         <PageHeader
           eyebrow="Client settings"
           title="Settings"
-          description="Lightweight account and app controls using existing session data and local-only UI state."
+          description="Lightweight account and app controls using existing session data, with theme stored locally in this browser."
           chips={[
-            darkMode ? "Dark mode preview on" : "Dark mode preview off",
+            darkMode ? "Theme: Dark" : "Theme: Light",
             notifications ? "Notifications preview on" : "Notifications preview off",
           ]}
         />
@@ -56,12 +58,12 @@ export default function ClientSettingsPage() {
       <SectionBlock
         eyebrow="Preferences"
         title="Preferences"
-        description="These controls are local to the UI and are not persisted."
+        description="Theme is stored locally in this browser. Notification state remains local-only and does not use backend storage."
       >
         <PreferencesSection
-          darkMode={darkMode}
+          theme={theme}
           notifications={notifications}
-          onToggleDarkMode={() => setDarkMode((current) => !current)}
+          onThemeChange={(nextTheme) => setTheme(nextTheme)}
           onToggleNotifications={() => setNotifications((current) => !current)}
         />
       </SectionBlock>

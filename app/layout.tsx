@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { DEFAULT_THEME, getThemeInitScript } from "@/lib/client/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,9 +10,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme={DEFAULT_THEME} suppressHydrationWarning>
       <body>
-        <main>{children}</main>
+        <script dangerouslySetInnerHTML={{ __html: getThemeInitScript() }} />
+        <ThemeProvider>
+          <main>{children}</main>
+        </ThemeProvider>
       </body>
     </html>
   );
