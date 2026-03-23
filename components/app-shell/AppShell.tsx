@@ -49,7 +49,7 @@ export function AppShell({
             subtitle={subtitle}
             email={user.email}
             actions={
-              <>
+              <div className="top-hub__utility-cluster">
                 <NotificationLink role={user.role} />
                 {isClient ? (
                   <Link
@@ -70,7 +70,7 @@ export function AppShell({
                   </Link>
                 ) : null}
                 {actions}
-              </>
+              </div>
             }
           />
         )}

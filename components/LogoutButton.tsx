@@ -27,17 +27,16 @@ export function LogoutButton() {
   }
 
   return (
-    <div className="grid">
-      <button type="button" onClick={handleLogout} disabled={loading}>
+    <div className="logout-button">
+      <button
+        type="button"
+        className="logout-button__control"
+        onClick={handleLogout}
+        disabled={loading}
+      >
         {loading ? "Signing out..." : "Sign out"}
       </button>
-      {errorMessage ? (
-        <FeedbackBanner
-          tone="error"
-          title="Sign out failed"
-          message={errorMessage}
-        />
-      ) : null}
+      {errorMessage ? <div className="logout-button__feedback"><FeedbackBanner tone="error" title="Sign out failed" message={errorMessage} /></div> : null}
     </div>
   );
 }
