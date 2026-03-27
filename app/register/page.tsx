@@ -4,21 +4,24 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import type { ApiResponse, SessionUser } from "@/lib/types/api";
-import { dashboardPathForRole, useSessionBootstrap } from "@/lib/client/session";
+import { dashboardPathForRole } from "@/lib/client/session";
+import type { ApiResponse, SelfRegistrationRole, SessionUser } from "@/lib/types/api";
 
-type LoginResponse = ApiResponse<{
+type RegisterResponse = ApiResponse<{
   user: SessionUser;
 }>;
 
-export default function LoginPage() {
-  const router = useRouter();
-  const { status, user } = useSessionBootstrap({
-    redirectAuthenticatedToDashboard: true,
-  });
+const ROLE_OPTIONS: Array<{ value: SelfRegistrationRole; label: string }> = [
+  { value: "client", label: "Client" },
+  { value: "pt", label: "PT" },
+];
 
-  const [email, setEmail] = useState("client@example.com");
-  const [password, setPassword] = useState("password123");
+export default function RegisterPage() {
+  const router = useRouter();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<SelfRegistrationRole>("client");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -28,15 +31,15 @@ export default function LoginPage() {
     setErrorMessage(null);
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, role }),
       });
 
-      const payload = (await response.json()) as LoginResponse;
+      const payload = (await response.json()) as RegisterResponse;
 
       if (!payload.ok) {
         setErrorMessage(payload.error.message);
@@ -52,34 +55,16 @@ export default function LoginPage() {
 
       router.replace(dashboardPath);
     } catch {
-      setErrorMessage("Unable to reach the login endpoint.");
+      setErrorMessage("Unable to reach the registration endpoint.");
     } finally {
       setLoading(false);
     }
   }
 
-  if (status === "loading") {
-    return (
-      <section>
-        <h2>Loading session</h2>
-        <p>Checking if you already have a valid session.</p>
-      </section>
-    );
-  }
-
-  if (status === "unsupported_role") {
-    return (
-      <section>
-        <h2>Unsupported Role</h2>
-        <p>This frontend does not support the <code>{user.role}</code> role.</p>
-      </section>
-    );
-  }
-
   return (
     <section>
-      <h2>Sign in</h2>
-      <p>Credentials are submitted only to the local BFF endpoint at <code>/api/auth/login</code>.</p>
+      <h2>Create account</h2>
+      <p>Registration is submitted only to the local BFF endpoint at <code>/api/auth/register</code>.</p>
       <form onSubmit={handleSubmit}>
         <div>
           <label htmlFor="email">Email</label>
@@ -89,6 +74,7 @@ export default function LoginPage() {
             autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
+            required
           />
         </div>
         <div>
@@ -96,20 +82,37 @@ export default function LoginPage() {
           <input
             id="password"
             type="password"
-            autoComplete="current-password"
+            autoComplete="new-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
+            required
           />
         </div>
+        <div>
+          <label htmlFor="role">Role</label>
+          <select
+            id="role"
+            value={role}
+            onChange={(event) => setRole(event.target.value as SelfRegistrationRole)}
+          >
+            {ROLE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <button type="submit" disabled={loading}>
-          {loading ? "Signing in..." : "Sign in"}
+          {loading ? "Creating account..." : "Create account"}
         </button>
       </form>
       <p style={{ marginTop: 16 }}>
-        Need an account? <Link href="/register">Create account</Link>
+        Already have an account? <Link href="/login">Sign in</Link>
       </p>
       {errorMessage ? (
-        <p style={{ marginTop: 16, color: "#fca5a5" }}>{errorMessage}</p>
+        <p role="alert" style={{ marginTop: 16, color: "#fca5a5" }}>
+          {errorMessage}
+        </p>
       ) : null}
     </section>
   );

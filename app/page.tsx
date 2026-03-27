@@ -33,6 +33,8 @@ export default function LandingPage() {
       </ul>
       <nav>
         <Link href="/login">Go to Login</Link>
+        {" | "}
+        <Link href="/register">Create Account</Link>
       </nav>
     </section>
   );

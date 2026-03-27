@@ -1,4 +1,5 @@
 export type UserRole = "client" | "pt" | "admin" | "vendor";
+export type SelfRegistrationRole = "client" | "pt";
 
 export type JsonPrimitive = string | number | boolean | null;
 
