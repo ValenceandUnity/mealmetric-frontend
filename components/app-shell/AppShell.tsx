@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { LogoutButton } from "@/components/LogoutButton";
 import { NotificationLink } from "@/components/app-shell/NotificationLink";
 import { TopHub } from "@/components/app-shell/TopHub";
 import { BottomNavigation } from "@/components/navigation/BottomNavigation";
@@ -36,6 +37,7 @@ export function AppShell({
   const roleMeta = getRoleShellMeta(user.role);
   const activeItem = getActiveNavItem(user.role, pathname);
   const isClient = user.role === "client";
+  const showPtLogout = user.role === "pt";
 
   return (
     <div className={["app-shell", className ?? ""].filter(Boolean).join(" ")}>
@@ -69,6 +71,7 @@ export function AppShell({
                     </svg>
                   </Link>
                 ) : null}
+                {showPtLogout ? <LogoutButton /> : null}
                 {actions}
               </div>
             }
