@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { CSSProperties, FormEvent, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { ContextSelector } from "@/components/training/ContextSelector";
 import {
   ExerciseInputList,
 } from "@/components/training/ExerciseInputList";
@@ -22,7 +21,7 @@ import type { CreateWorkoutLogInput, WorkoutLogExerciseEntryInput } from "@/lib/
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
 
 type WorkoutLogResponse = ApiResponse<JsonValue>;
-type ContextMode = "routine" | "general";
+type ContextMode = "rep" | "set" | "general";
 
 function createExerciseRow(): ExerciseInputRowState {
   return {
@@ -124,7 +123,7 @@ export function AddLogPageClient() {
   const initialAssignmentId = searchParams.get("assignmentId")?.trim() ?? "";
   const initialRoutineLabel = searchParams.get("routineLabel")?.trim() ?? "";
 
-  const [contextMode, setContextMode] = useState<ContextMode>(initialRoutineName ? "routine" : "general");
+  const [contextMode, setContextMode] = useState<ContextMode>(initialRoutineName ? "rep" : "general");
   const [routineName, setRoutineName] = useState(initialRoutineName);
   const [performedAt, setPerformedAt] = useState(new Date().toISOString().slice(0, 16));
   const [durationMinutes, setDurationMinutes] = useState("");
@@ -136,13 +135,6 @@ export function AddLogPageClient() {
 
   const hasPrefilledRoutine = initialRoutineName.length > 0;
   const hasValidAnchor = initialAssignmentId.length > 0;
-  const visibleRoutineLabel = useMemo(() => {
-    if (contextMode !== "routine" || routineName.trim().length === 0) {
-      return null;
-    }
-
-    return initialRoutineLabel.length > 0 ? `${initialRoutineLabel} - ${routineName.trim()}` : routineName.trim();
-  }, [contextMode, initialRoutineLabel, routineName]);
   const hasInvalidDurationMinutes = hasInvalidIntegerValue(durationMinutes);
   const hasInvalidExerciseIntegers = exercises.some(
     (exercise) =>
@@ -180,7 +172,7 @@ export function AddLogPageClient() {
       const normalizedDurationMinutes = normalizeOptionalInteger(durationMinutes);
       const requestBody: CreateWorkoutLogInput = {
         assignment_id: initialAssignmentId,
-        routine_id: contextMode === "routine" && initialRoutineId ? initialRoutineId : undefined,
+        routine_id: contextMode === "rep" && initialRoutineId ? initialRoutineId : undefined,
         performed_at: new Date(performedAt).toISOString(),
         duration_minutes: normalizedDurationMinutes,
         completion_status: "completed",
@@ -229,6 +221,16 @@ export function AddLogPageClient() {
     setExercises((current) => current.filter((exercise) => exercise.id !== id));
   }
 
+  const contextCaption =
+    "For one offs, select Rep. For logging consecutive Reps, select Set. For logging an entire routine with multiple sets, select General Workout";
+  const centeredActionsStyle: CSSProperties = {
+    justifyContent: "center",
+  };
+  const centeredToggleStyle: CSSProperties = {
+    justifyContent: "center",
+  };
+  const addEntryLabel = contextMode === "set" ? "Add Rep" : "Add Exercise";
+
   return (
     <PageShell
       title="Log Workout"
@@ -251,24 +253,22 @@ export function AddLogPageClient() {
 
       <Card className="client-add-log-hero" variant="accent" as="section">
         <div className="page-header">
-          <div className="page-header__row">
-            <div className="page-header__lead">
-              <p className="page-header__eyebrow">Workout log</p>
-              <p className="page-header__description">
-                Capture a workout quickly through the existing protected client logging route.
-              </p>
-            </div>
-            <div className="page-header__actions">
-              <button
-                type="button"
-                className="link-button link-button--accent"
-                onClick={() => setShowWorkoutForm(true)}
-                aria-expanded={showWorkoutForm}
-                aria-controls="client-workout-entry-form"
-              >
-                Log A New Workout
-              </button>
-            </div>
+          <div className="page-header__lead">
+            <p className="page-header__eyebrow">Workout log</p>
+            <p className="page-header__description">
+              Capture a workout quickly through the existing protected client logging route.
+            </p>
+          </div>
+          <div className="page-header__actions" style={centeredActionsStyle}>
+            <button
+              type="button"
+              className="link-button link-button--accent"
+              onClick={() => setShowWorkoutForm(true)}
+              aria-expanded={showWorkoutForm}
+              aria-controls="client-workout-entry-form"
+            >
+              Log A New Workout
+            </button>
           </div>
         </div>
       </Card>
@@ -277,16 +277,55 @@ export function AddLogPageClient() {
         <>
           <SectionBlock
             eyebrow="Context"
-            title="Workout context"
-            description="Use routine context when it exists, or log a general workout without requiring extra lookup."
+            title="Workout Type"
+            description={contextCaption}
           >
-            <ContextSelector
-              mode={contextMode}
-              routineName={routineName}
-              hasPrefilledRoutine={hasPrefilledRoutine}
-              onModeChange={setContextMode}
-              onRoutineNameChange={setRoutineName}
-            />
+            <div className="client-add-log-context">
+              <div
+                className="client-add-log-context__toggle"
+                role="radiogroup"
+                aria-label="Workout type"
+                style={centeredToggleStyle}
+              >
+                <button
+                  type="button"
+                  className={contextMode === "rep" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
+                  onClick={() => setContextMode("rep")}
+                  aria-pressed={contextMode === "rep"}
+                >
+                  Rep
+                </button>
+                <button
+                  type="button"
+                  className={contextMode === "set" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
+                  onClick={() => setContextMode("set")}
+                  aria-pressed={contextMode === "set"}
+                >
+                  Set
+                </button>
+                <button
+                  type="button"
+                  className={contextMode === "general" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
+                  onClick={() => setContextMode("general")}
+                  aria-pressed={contextMode === "general"}
+                >
+                  General Workout
+                </button>
+              </div>
+
+              {contextMode === "rep" ? (
+                <div className="field">
+                  <label htmlFor="routine-context-name">Rep</label>
+                  <input
+                    id="routine-context-name"
+                    value={routineName}
+                    onChange={(event) => setRoutineName(event.target.value)}
+                    placeholder={initialRoutineLabel.length > 0 ? initialRoutineLabel : "Enter rep name"}
+                    readOnly={hasPrefilledRoutine}
+                  />
+                </div>
+              ) : null}
+            </div>
           </SectionBlock>
 
           <SectionBlock
@@ -336,7 +375,7 @@ export function AddLogPageClient() {
 
               <ActionRow>
                 <button type="button" onClick={handleAddExercise} disabled={submitting}>
-                  Add Exercise
+                  {addEntryLabel}
                 </button>
                 <button type="submit" disabled={submitting || durationMinutes.trim().length === 0 || blockingMessage !== null}>
                   {submitting ? "Saving..." : "Save Workout"}
