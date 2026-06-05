@@ -16,7 +16,6 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionBlock } from "@/components/ui/SectionBlock";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { CreateWorkoutLogInput, WorkoutLogExerciseEntryInput } from "@/lib/types/training";
@@ -130,6 +129,14 @@ export function AddLogPageClient() {
   const [performedAt, setPerformedAt] = useState(new Date().toISOString().slice(0, 16));
   const [durationMinutes, setDurationMinutes] = useState("");
   const [exercises, setExercises] = useState<ExerciseInputRowState[]>([createExerciseRow()]);
+  const [showNewWorkoutInput, setShowNewWorkoutInput] = useState(false);
+  const [newWorkoutInput, setNewWorkoutInput] = useState(
+    initialRoutineName.length > 0
+      ? initialRoutineLabel.length > 0
+        ? `${initialRoutineLabel} - ${initialRoutineName}`
+        : initialRoutineName
+      : "",
+  );
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
@@ -240,9 +247,6 @@ export function AddLogPageClient() {
         </Link>
       }
     >
-      {blockingMessage ? (
-        <ErrorBlock title="Workout log blocked" message={blockingMessage} />
-      ) : null}
       {submitError ? <ErrorBlock title="Unable to save workout" message={submitError} /> : null}
       {submitSuccess ? (
         <FeedbackBanner
@@ -253,12 +257,40 @@ export function AddLogPageClient() {
       ) : null}
 
       <Card className="client-add-log-hero" variant="accent" as="section">
-        <PageHeader
-          eyebrow="Workout log"
-          title="Log Workout"
-          description="Capture a workout quickly through the existing protected client logging route."
-          chips={visibleRoutineLabel ? [visibleRoutineLabel] : ["No routine context"]}
-        />
+        <div className="page-header">
+          <div className="page-header__row">
+            <div className="page-header__lead">
+              <p className="page-header__eyebrow">Workout log</p>
+              <p className="page-header__description">
+                Capture a workout quickly through the existing protected client logging route.
+              </p>
+            </div>
+            <div className="page-header__actions">
+              <button
+                type="button"
+                className="link-button link-button--accent"
+                onClick={() => setShowNewWorkoutInput((current) => !current)}
+                aria-expanded={showNewWorkoutInput}
+                aria-controls="new-workout-input"
+              >
+                Log A New Workout
+              </button>
+            </div>
+          </div>
+          {showNewWorkoutInput ? (
+            <div className="client-add-log-hero__input field">
+              <label htmlFor="new-workout-input">Workout</label>
+              <input
+                id="new-workout-input"
+                type="text"
+                value={newWorkoutInput}
+                onChange={(event) => setNewWorkoutInput(event.target.value)}
+                placeholder="Select or enter workout"
+                disabled={submitting}
+              />
+            </div>
+          ) : null}
+        </div>
       </Card>
 
       <SectionBlock
