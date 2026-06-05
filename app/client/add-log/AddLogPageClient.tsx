@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { CSSProperties, FormEvent, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -126,7 +125,6 @@ export function AddLogPageClient() {
   const [contextMode, setContextMode] = useState<ContextMode>(initialRoutineName ? "rep" : "general");
   const [routineName, setRoutineName] = useState(initialRoutineName);
   const [performedAt, setPerformedAt] = useState(new Date().toISOString().slice(0, 16));
-  const [durationMinutes, setDurationMinutes] = useState("");
   const [exercises, setExercises] = useState<ExerciseInputRowState[]>([createExerciseRow()]);
   const [showWorkoutForm, setShowWorkoutForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -135,19 +133,14 @@ export function AddLogPageClient() {
 
   const hasPrefilledRoutine = initialRoutineName.length > 0;
   const hasValidAnchor = initialAssignmentId.length > 0;
-  const hasInvalidDurationMinutes = hasInvalidIntegerValue(durationMinutes);
   const hasInvalidExerciseIntegers = exercises.some(
     (exercise) =>
       hasInvalidIntegerValue(exercise.sets) ||
       hasInvalidIntegerValue(exercise.reps),
   );
-  const blockingMessage = !hasValidAnchor
-    ? "Workout logs require valid training context. Open this form from a training assignment to save the workout."
-    : hasInvalidDurationMinutes
-      ? "Workout time must be a non-negative whole number of minutes."
-      : hasInvalidExerciseIntegers
-        ? "Sets and reps must be non-negative whole numbers before saving."
-        : null;
+  const blockingMessage = hasInvalidExerciseIntegers
+    ? "Sets and reps must be non-negative whole numbers before saving."
+    : null;
 
   if (status === "loading") {
     return <LoadingBlock title="Loading log workout" message="Validating your client session." />;
@@ -169,12 +162,10 @@ export function AddLogPageClient() {
 
     try {
       const exerciseEntries = normalizeExerciseEntries(exercises);
-      const normalizedDurationMinutes = normalizeOptionalInteger(durationMinutes);
       const requestBody: CreateWorkoutLogInput = {
-        assignment_id: initialAssignmentId,
+        assignment_id: hasValidAnchor ? initialAssignmentId : undefined,
         routine_id: contextMode === "rep" && initialRoutineId ? initialRoutineId : undefined,
         performed_at: new Date(performedAt).toISOString(),
-        duration_minutes: normalizedDurationMinutes,
         completion_status: "completed",
         exercise_entries: exerciseEntries.length > 0 ? exerciseEntries : undefined,
       };
@@ -195,7 +186,6 @@ export function AddLogPageClient() {
 
       setSubmitSuccess("Workout saved through the protected client workout-log route.");
       setExercises([createExerciseRow()]);
-      setDurationMinutes("");
     } catch {
       setSubmitError("Unable to save workout.");
     } finally {
@@ -236,11 +226,6 @@ export function AddLogPageClient() {
       title="Log Workout"
       user={user}
       className="app-shell--client-add-log"
-      navigation={
-        <Link className="link-button" href={hasValidAnchor ? `/client/training/${initialAssignmentId}` : "/client/training"}>
-          Back to training
-        </Link>
-      }
     >
       {submitError ? <ErrorBlock title="Unable to save workout" message={submitError} /> : null}
       {submitSuccess ? (
@@ -345,19 +330,6 @@ export function AddLogPageClient() {
                     disabled={submitting}
                   />
                 </div>
-                <div className="field">
-                  <label htmlFor="duration-minutes">Workout time (minutes)</label>
-                  <input
-                    id="duration-minutes"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={durationMinutes}
-                    onChange={(event) => setDurationMinutes(event.target.value)}
-                    placeholder="45"
-                    disabled={submitting}
-                  />
-                </div>
               </div>
 
               {exercises.length > 0 ? (
@@ -377,7 +349,7 @@ export function AddLogPageClient() {
                 <button type="button" onClick={handleAddExercise} disabled={submitting}>
                   {addEntryLabel}
                 </button>
-                <button type="submit" disabled={submitting || durationMinutes.trim().length === 0 || blockingMessage !== null}>
+                <button type="submit" disabled={submitting || blockingMessage !== null}>
                   {submitting ? "Saving..." : "Save Workout"}
                 </button>
               </ActionRow>
