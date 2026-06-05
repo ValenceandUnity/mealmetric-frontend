@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "clean:next": "node scripts/clean-generated.mjs --next-only",
+    "clean:generated": "node scripts/clean-generated.mjs",
+    "dev:clean": "npm run clean:generated && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
