@@ -129,14 +129,7 @@ export function AddLogPageClient() {
   const [performedAt, setPerformedAt] = useState(new Date().toISOString().slice(0, 16));
   const [durationMinutes, setDurationMinutes] = useState("");
   const [exercises, setExercises] = useState<ExerciseInputRowState[]>([createExerciseRow()]);
-  const [showNewWorkoutInput, setShowNewWorkoutInput] = useState(false);
-  const [newWorkoutInput, setNewWorkoutInput] = useState(
-    initialRoutineName.length > 0
-      ? initialRoutineLabel.length > 0
-        ? `${initialRoutineLabel} - ${initialRoutineName}`
-        : initialRoutineName
-      : "",
-  );
+  const [showWorkoutForm, setShowWorkoutForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
@@ -269,99 +262,90 @@ export function AddLogPageClient() {
               <button
                 type="button"
                 className="link-button link-button--accent"
-                onClick={() => setShowNewWorkoutInput((current) => !current)}
-                aria-expanded={showNewWorkoutInput}
-                aria-controls="new-workout-input"
+                onClick={() => setShowWorkoutForm(true)}
+                aria-expanded={showWorkoutForm}
+                aria-controls="client-workout-entry-form"
               >
                 Log A New Workout
               </button>
             </div>
           </div>
-          {showNewWorkoutInput ? (
-            <div className="client-add-log-hero__input field">
-              <label htmlFor="new-workout-input">Workout</label>
-              <input
-                id="new-workout-input"
-                type="text"
-                value={newWorkoutInput}
-                onChange={(event) => setNewWorkoutInput(event.target.value)}
-                placeholder="Select or enter workout"
-                disabled={submitting}
-              />
-            </div>
-          ) : null}
         </div>
       </Card>
 
-      <SectionBlock
-        eyebrow="Context"
-        title="Workout context"
-        description="Use routine context when it exists, or log a general workout without requiring extra lookup."
-      >
-        <ContextSelector
-          mode={contextMode}
-          routineName={routineName}
-          hasPrefilledRoutine={hasPrefilledRoutine}
-          onModeChange={setContextMode}
-          onRoutineNameChange={setRoutineName}
-        />
-      </SectionBlock>
-
-      <SectionBlock
-        eyebrow="Exercises"
-        title="Exercise List"
-        description="Add one or more exercise rows for this workout."
-      >
-        <form className="client-add-log-form" onSubmit={handleSubmit}>
-          <div className="client-add-log-form__meta">
-            <div className="field">
-              <label htmlFor="performed-at">Performed at</label>
-              <input
-                id="performed-at"
-                type="datetime-local"
-                value={performedAt}
-                onChange={(event) => setPerformedAt(event.target.value)}
-                disabled={submitting}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="duration-minutes">Workout time (minutes)</label>
-              <input
-                id="duration-minutes"
-                type="number"
-                min="0"
-                step="1"
-                value={durationMinutes}
-                onChange={(event) => setDurationMinutes(event.target.value)}
-                placeholder="45"
-                disabled={submitting}
-              />
-            </div>
-          </div>
-
-          {exercises.length > 0 ? (
-            <ExerciseInputList
-              exercises={exercises}
-              onChange={handleExerciseChange}
-              onRemove={handleRemoveExercise}
+      {showWorkoutForm ? (
+        <>
+          <SectionBlock
+            eyebrow="Context"
+            title="Workout context"
+            description="Use routine context when it exists, or log a general workout without requiring extra lookup."
+          >
+            <ContextSelector
+              mode={contextMode}
+              routineName={routineName}
+              hasPrefilledRoutine={hasPrefilledRoutine}
+              onModeChange={setContextMode}
+              onRoutineNameChange={setRoutineName}
             />
-          ) : (
-            <EmptyState
-              title="Start your workout log"
-              message="Add an exercise row to begin capturing this workout."
-            />
-          )}
+          </SectionBlock>
 
-          <ActionRow>
-            <button type="button" onClick={handleAddExercise} disabled={submitting}>
-              Add Exercise
-            </button>
-            <button type="submit" disabled={submitting || durationMinutes.trim().length === 0 || blockingMessage !== null}>
-              {submitting ? "Saving..." : "Save Workout"}
-            </button>
-          </ActionRow>
-        </form>
-      </SectionBlock>
+          <SectionBlock
+            eyebrow="Exercises"
+            title="Exercise List"
+            description="Add one or more exercise rows for this workout."
+          >
+            <form id="client-workout-entry-form" className="client-add-log-form" onSubmit={handleSubmit}>
+              <div className="client-add-log-form__meta">
+                <div className="field">
+                  <label htmlFor="performed-at">Performed at</label>
+                  <input
+                    id="performed-at"
+                    type="datetime-local"
+                    value={performedAt}
+                    onChange={(event) => setPerformedAt(event.target.value)}
+                    disabled={submitting}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="duration-minutes">Workout time (minutes)</label>
+                  <input
+                    id="duration-minutes"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={durationMinutes}
+                    onChange={(event) => setDurationMinutes(event.target.value)}
+                    placeholder="45"
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+
+              {exercises.length > 0 ? (
+                <ExerciseInputList
+                  exercises={exercises}
+                  onChange={handleExerciseChange}
+                  onRemove={handleRemoveExercise}
+                />
+              ) : (
+                <EmptyState
+                  title="Start your workout log"
+                  message="Add an exercise row to begin capturing this workout."
+                />
+              )}
+
+              <ActionRow>
+                <button type="button" onClick={handleAddExercise} disabled={submitting}>
+                  Add Exercise
+                </button>
+                <button type="submit" disabled={submitting || durationMinutes.trim().length === 0 || blockingMessage !== null}>
+                  {submitting ? "Saving..." : "Save Workout"}
+                </button>
+              </ActionRow>
+            </form>
+          </SectionBlock>
+        </>
+      ) : null}
     </PageShell>
   );
 }
