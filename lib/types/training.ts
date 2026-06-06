@@ -1,3 +1,5 @@
+export type WorkoutLogMode = "rep" | "set" | "general_workout";
+
 export type WorkoutLogExerciseEntryInput = {
   exercise_name?: string;
   sets?: number;
@@ -11,6 +13,7 @@ export type WorkoutLogExerciseEntryInput = {
 export type CreateWorkoutLogInput = {
   assignment_id?: string;
   routine_id?: string;
+  mode?: WorkoutLogMode;
   performed_at: string;
   duration_minutes?: number;
   completion_status: string;

@@ -9,30 +9,31 @@ import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { SectionBlock } from "@/components/ui/SectionBlock";
 import {
-  adaptWorkoutHistory,
+  adaptWorkoutHistoryPage,
   type WorkoutHistoryExerciseEntryView,
   type WorkoutHistoryItemView,
 } from "@/lib/adapters/workout-history";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
+import type { WorkoutLogMode } from "@/lib/types/training";
 
 type WorkoutHistoryResponse = ApiResponse<JsonValue>;
-type WorkoutTypeFilter = "all" | "rep" | "set" | "general";
+type WorkoutTypeFilter = "all" | WorkoutLogMode;
 type WorkoutHistoryTableRow = {
   id: string;
   performedAtLabel: string;
   performedAtTimestamp: number;
-  typeLabel: "Rep" | "General Workout";
+  typeMode: WorkoutLogMode;
+  typeLabel: string;
   exerciseName: string;
   sets: string;
   reps: string;
   weight: string;
   duration: string;
   notes: string;
-  searchText: string;
 };
 
-const ROWS_PER_PAGE = 30;
+const PAGE_LIMIT = 30;
 
 function getPerformedTimestamp(value: string | null): number {
   if (!value) {
@@ -45,7 +46,7 @@ function getPerformedTimestamp(value: string | null): number {
 
 function formatPerformedAt(value: string | null): string {
   if (!value) {
-    return "—";
+    return "-";
   }
 
   const parsed = new Date(value);
@@ -61,7 +62,7 @@ function formatPerformedAt(value: string | null): string {
 
 function formatDuration(value: number | null): string {
   if (value === null) {
-    return "—";
+    return "-";
   }
 
   if (value < 60) {
@@ -74,40 +75,27 @@ function formatDuration(value: number | null): string {
 }
 
 function formatCellNumber(value: number | null): string {
-  return value === null ? "—" : String(value);
+  return value === null ? "-" : String(value);
 }
 
-function deriveWorkoutType(log: WorkoutHistoryItemView): "Rep" | "General Workout" {
-  return log.routineContext ? "Rep" : "General Workout";
-}
-
-function matchesWorkoutType(row: WorkoutHistoryTableRow, filter: WorkoutTypeFilter): boolean {
-  switch (filter) {
-    case "all":
-      return true;
+function formatWorkoutType(mode: WorkoutLogMode): string {
+  switch (mode) {
     case "rep":
-      return row.typeLabel === "Rep";
+      return "Rep";
     case "set":
-      return false;
-    case "general":
-      return row.typeLabel === "General Workout";
+      return "Set";
+    case "general_workout":
+      return "General Workout";
     default:
-      return true;
+      return "General Workout";
   }
 }
 
 function flattenExerciseEntries(logs: WorkoutHistoryItemView[]): WorkoutHistoryTableRow[] {
   return logs.flatMap((log, logIndex) => {
-    const typeLabel = deriveWorkoutType(log);
+    const typeLabel = formatWorkoutType(log.mode);
     const performedAtLabel = formatPerformedAt(log.performedAt);
     const performedAtTimestamp = getPerformedTimestamp(log.performedAt);
-    const sharedSearchValues = [
-      typeLabel,
-      performedAtLabel,
-      log.routineContext ?? "",
-      log.clientNotes ?? "",
-      log.ptNotes ?? "",
-    ];
 
     if (log.exerciseEntries.length === 0) {
       const notes = [log.clientNotes, log.ptNotes].filter(Boolean).join(" ").trim();
@@ -116,31 +104,27 @@ function flattenExerciseEntries(logs: WorkoutHistoryItemView[]): WorkoutHistoryT
         id: `${log.id}-entryless-${logIndex}`,
         performedAtLabel,
         performedAtTimestamp,
+        typeMode: log.mode,
         typeLabel,
-        exerciseName: "—",
-        sets: "—",
-        reps: "—",
-        weight: "—",
-        duration: "—",
-        notes: notes.length > 0 ? notes : "—",
-        searchText: [...sharedSearchValues, notes].join(" ").toLowerCase(),
+        exerciseName: "-",
+        sets: "-",
+        reps: "-",
+        weight: "-",
+        duration: "-",
+        notes: notes.length > 0 ? notes : "-",
       }];
     }
 
-    return log.exerciseEntries.map((entry, entryIndex) => {
-      const notes = [entry.notes, log.clientNotes, log.ptNotes].filter(Boolean).join(" ").trim();
-      return buildTableRow({
+    return log.exerciseEntries.map((entry, entryIndex) =>
+      buildTableRow({
         entry,
         entryIndex,
         log,
         logIndex,
-        notes,
         performedAtLabel,
         performedAtTimestamp,
-        typeLabel,
-        sharedSearchValues,
-      });
-    });
+      }),
+    );
   });
 }
 
@@ -149,42 +133,31 @@ function buildTableRow({
   entryIndex,
   log,
   logIndex,
-  notes,
   performedAtLabel,
   performedAtTimestamp,
-  typeLabel,
-  sharedSearchValues,
 }: {
   entry: WorkoutHistoryExerciseEntryView;
   entryIndex: number;
   log: WorkoutHistoryItemView;
   logIndex: number;
-  notes: string;
   performedAtLabel: string;
   performedAtTimestamp: number;
-  typeLabel: "Rep" | "General Workout";
-  sharedSearchValues: string[];
 }): WorkoutHistoryTableRow {
+  const notes = [entry.notes, log.clientNotes, log.ptNotes].filter(Boolean).join(" ").trim();
   const exerciseName = entry.exerciseName ?? `Exercise ${entryIndex + 1}`;
 
   return {
     id: `${log.id}-${entry.id}-${entryIndex}-${logIndex}`,
     performedAtLabel,
     performedAtTimestamp,
-    typeLabel,
+    typeMode: log.mode,
+    typeLabel: formatWorkoutType(log.mode),
     exerciseName,
     sets: formatCellNumber(entry.sets),
     reps: formatCellNumber(entry.reps),
     weight: formatCellNumber(entry.weight),
     duration: formatDuration(entry.durationSeconds),
-    notes: notes.length > 0 ? notes : "—",
-    searchText: [
-      ...sharedSearchValues,
-      exerciseName,
-      notes,
-      entry.exerciseName ?? "",
-      entry.notes ?? "",
-    ].join(" ").toLowerCase(),
+    notes: notes.length > 0 ? notes : "-",
   };
 }
 
@@ -199,7 +172,7 @@ export default function ClientWorkoutHistoryPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<WorkoutTypeFilter>("all");
   const [searchValue, setSearchValue] = useState("");
-  const [pageIndex, setPageIndex] = useState(0);
+  const [offset, setOffset] = useState(0);
 
   useEffect(() => {
     if (status !== "authenticated" || !user || user.role !== "client") {
@@ -207,13 +180,31 @@ export default function ClientWorkoutHistoryPage() {
     }
 
     let active = true;
+    const controller = new AbortController();
 
     async function load() {
       setLoading(true);
       setErrorMessage(null);
 
       try {
-        const response = await fetch("/api/client/training/workout-logs", { cache: "no-store" });
+        const params = new URLSearchParams({
+          limit: String(PAGE_LIMIT),
+          offset: String(offset),
+        });
+        const normalizedSearch = searchValue.trim();
+
+        if (typeFilter !== "all") {
+          params.set("mode", typeFilter);
+        }
+
+        if (normalizedSearch.length > 0) {
+          params.set("search", normalizedSearch);
+        }
+
+        const response = await fetch(`/api/client/training/workout-logs?${params.toString()}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         const payload = (await response.json()) as WorkoutHistoryResponse;
 
         if (!active) {
@@ -227,8 +218,8 @@ export default function ClientWorkoutHistoryPage() {
         }
 
         setHistoryData(payload.data);
-      } catch {
-        if (!active) {
+      } catch (error) {
+        if (!active || controller.signal.aborted) {
           return;
         }
 
@@ -245,34 +236,19 @@ export default function ClientWorkoutHistoryPage() {
 
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [status, user]);
+  }, [offset, searchValue, status, typeFilter, user]);
 
-  const logs = useMemo(() => adaptWorkoutHistory(historyData), [historyData]);
-  const flattenedRows = useMemo(
-    () => flattenExerciseEntries(logs).sort((left, right) => right.performedAtTimestamp - left.performedAtTimestamp),
-    [logs],
+  const historyPage = useMemo(() => adaptWorkoutHistoryPage(historyData), [historyData]);
+  const tableRows = useMemo(
+    () =>
+      flattenExerciseEntries(historyPage.items).sort(
+        (left, right) => right.performedAtTimestamp - left.performedAtTimestamp,
+      ),
+    [historyPage.items],
   );
-  const filteredRows = useMemo(() => {
-    const normalizedSearch = searchValue.trim().toLowerCase();
-    return flattenedRows.filter((row) => {
-      if (!matchesWorkoutType(row, typeFilter)) {
-        return false;
-      }
 
-      if (normalizedSearch.length === 0) {
-        return true;
-      }
-
-      return row.searchText.includes(normalizedSearch);
-    });
-  }, [flattenedRows, searchValue, typeFilter]);
-  const visibleRows = useMemo(() => {
-    const start = pageIndex * ROWS_PER_PAGE;
-    return filteredRows.slice(start, start + ROWS_PER_PAGE);
-  }, [filteredRows, pageIndex]);
-  const hasOlderEntries = (pageIndex + 1) * ROWS_PER_PAGE < filteredRows.length;
-  const tableRows = visibleRows.length > 0 ? visibleRows : null;
   const filterToggleStyle: CSSProperties = {
     justifyContent: "center",
   };
@@ -291,10 +267,6 @@ export default function ClientWorkoutHistoryPage() {
   const emptyNoteStyle: CSSProperties = {
     marginBottom: "1rem",
   };
-
-  useEffect(() => {
-    setPageIndex(0);
-  }, [searchValue, typeFilter]);
 
   if (status === "loading") {
     return <LoadingBlock title="Loading workout history" message="Validating your client session." />;
@@ -319,7 +291,7 @@ export default function ClientWorkoutHistoryPage() {
           <SectionBlock
             eyebrow="Log history"
             title="Filters and search"
-            description="Filter by workout type and search exercise names or notes in real time."
+            description="Filter by workout type and search saved entries through the protected history route."
           >
             <div className="client-add-log-context">
               <div
@@ -331,7 +303,10 @@ export default function ClientWorkoutHistoryPage() {
                 <button
                   type="button"
                   className={typeFilter === "all" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
-                  onClick={() => setTypeFilter("all")}
+                  onClick={() => {
+                    setTypeFilter("all");
+                    setOffset(0);
+                  }}
                   aria-pressed={typeFilter === "all"}
                 >
                   All
@@ -339,7 +314,10 @@ export default function ClientWorkoutHistoryPage() {
                 <button
                   type="button"
                   className={typeFilter === "rep" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
-                  onClick={() => setTypeFilter("rep")}
+                  onClick={() => {
+                    setTypeFilter("rep");
+                    setOffset(0);
+                  }}
                   aria-pressed={typeFilter === "rep"}
                 >
                   Rep
@@ -347,16 +325,22 @@ export default function ClientWorkoutHistoryPage() {
                 <button
                   type="button"
                   className={typeFilter === "set" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
-                  onClick={() => setTypeFilter("set")}
+                  onClick={() => {
+                    setTypeFilter("set");
+                    setOffset(0);
+                  }}
                   aria-pressed={typeFilter === "set"}
                 >
                   Set
                 </button>
                 <button
                   type="button"
-                  className={typeFilter === "general" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
-                  onClick={() => setTypeFilter("general")}
-                  aria-pressed={typeFilter === "general"}
+                  className={typeFilter === "general_workout" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
+                  onClick={() => {
+                    setTypeFilter("general_workout");
+                    setOffset(0);
+                  }}
+                  aria-pressed={typeFilter === "general_workout"}
                 >
                   General Workout
                 </button>
@@ -369,14 +353,17 @@ export default function ClientWorkoutHistoryPage() {
                   type="search"
                   placeholder="Search exercises, equipment, or notes"
                   value={searchValue}
-                  onChange={(event) => setSearchValue(event.target.value)}
+                  onChange={(event) => {
+                    setSearchValue(event.target.value);
+                    setOffset(0);
+                  }}
                 />
               </div>
             </div>
           </SectionBlock>
 
           <Card as="section" className="section-block">
-            {filteredRows.length === 0 ? (
+            {tableRows.length === 0 ? (
               <p className="section__copy" style={emptyNoteStyle}>
                 No logged workouts yet.
               </p>
@@ -397,7 +384,7 @@ export default function ClientWorkoutHistoryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {tableRows ? (
+                  {tableRows.length > 0 ? (
                     tableRows.map((row) => (
                       <tr key={row.id}>
                         <td>{row.performedAtLabel}</td>
@@ -412,14 +399,14 @@ export default function ClientWorkoutHistoryPage() {
                     ))
                   ) : (
                     <tr>
-                      <td>—</td>
-                      <td>—</td>
-                      <td>—</td>
-                      <td>—</td>
-                      <td>—</td>
-                      <td>—</td>
-                      <td>—</td>
-                      <td>—</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
                     </tr>
                   )}
                 </tbody>
@@ -430,8 +417,12 @@ export default function ClientWorkoutHistoryPage() {
               <button
                 type="button"
                 className="utility-icon-link"
-                onClick={() => setPageIndex((current) => current + 1)}
-                disabled={!hasOlderEntries}
+                onClick={() => {
+                  if (historyPage.nextOffset !== null) {
+                    setOffset(historyPage.nextOffset);
+                  }
+                }}
+                disabled={!historyPage.hasMore || historyPage.nextOffset === null}
                 aria-label="Show older workout entries"
                 title="Show older workout entries"
               >

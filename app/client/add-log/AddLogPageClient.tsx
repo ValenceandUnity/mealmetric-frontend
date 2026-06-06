@@ -17,9 +17,13 @@ import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { SectionBlock } from "@/components/ui/SectionBlock";
-import { adaptWorkoutHistory } from "@/lib/adapters/workout-history";
+import { adaptWorkoutHistoryPage } from "@/lib/adapters/workout-history";
 import { useSessionBootstrap } from "@/lib/client/session";
-import type { CreateWorkoutLogInput, WorkoutLogExerciseEntryInput } from "@/lib/types/training";
+import type {
+  CreateWorkoutLogInput,
+  WorkoutLogExerciseEntryInput,
+  WorkoutLogMode,
+} from "@/lib/types/training";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
 
 type WorkoutLogResponse = ApiResponse<JsonValue>;
@@ -113,6 +117,14 @@ function normalizeExerciseEntries(exercises: ExerciseInputRowState[]): WorkoutLo
   });
 }
 
+function getWorkoutModePayload(contextMode: ContextMode): WorkoutLogMode {
+  if (contextMode === "general") {
+    return "general_workout";
+  }
+
+  return contextMode;
+}
+
 export function AddLogPageClient() {
   const searchParams = useSearchParams();
   const { status, user } = useSessionBootstrap({
@@ -161,7 +173,7 @@ export function AddLogPageClient() {
       setHistoryErrorMessage(null);
 
       try {
-        const response = await fetch("/api/client/training/workout-logs", { cache: "no-store" });
+        const response = await fetch("/api/client/training/workout-logs?limit=8", { cache: "no-store" });
         const payload = (await response.json()) as WorkoutLogResponse;
 
         if (!active) {
@@ -219,6 +231,7 @@ export function AddLogPageClient() {
       const requestBody: CreateWorkoutLogInput = {
         assignment_id: hasValidAnchor ? initialAssignmentId : undefined,
         routine_id: contextMode === "rep" && initialRoutineId ? initialRoutineId : undefined,
+        mode: getWorkoutModePayload(contextMode),
         performed_at: new Date(performedAt).toISOString(),
         completion_status: "completed",
         exercise_entries: exerciseEntries.length > 0 ? exerciseEntries : undefined,
@@ -281,7 +294,7 @@ export function AddLogPageClient() {
     zIndex: 1,
   };
   const addEntryLabel = contextMode === "set" ? "Add Rep" : "Add Exercise";
-  const historyLogs = adaptWorkoutHistory(historyData).slice(0, 8);
+  const historyLogs = adaptWorkoutHistoryPage(historyData).items;
 
   return (
     <PageShell

@@ -1,4 +1,5 @@
 import type { JsonValue } from "@/lib/types/api";
+import type { WorkoutLogMode } from "@/lib/types/training";
 
 import {
   getArray,
@@ -22,12 +23,22 @@ export type WorkoutHistoryExerciseEntryView = {
 export type WorkoutHistoryItemView = {
   id: string;
   performedAt: string | null;
+  mode: WorkoutLogMode;
   routineContext: string | null;
   durationMinutes: number | null;
   completionStatus: string | null;
   clientNotes: string | null;
   ptNotes: string | null;
   exerciseEntries: WorkoutHistoryExerciseEntryView[];
+};
+
+export type WorkoutHistoryPageView = {
+  items: WorkoutHistoryItemView[];
+  count: number | null;
+  limit: number | null;
+  offset: number | null;
+  nextOffset: number | null;
+  hasMore: boolean;
 };
 
 function getExerciseEntries(value: JsonValue | null | undefined): WorkoutHistoryExerciseEntryView[] {
@@ -71,6 +82,21 @@ function getRoutineContext(value: JsonValue | null | undefined): string | null {
   ]);
 }
 
+function getWorkoutMode(value: JsonValue | null | undefined): WorkoutLogMode {
+  if (isObject(value)) {
+    const candidate = value.mode;
+    if (
+      candidate === "rep" ||
+      candidate === "set" ||
+      candidate === "general_workout"
+    ) {
+      return candidate;
+    }
+  }
+
+  return getRoutineContext(value) ? "rep" : "general_workout";
+}
+
 export function adaptWorkoutHistory(value: JsonValue | null): WorkoutHistoryItemView[] {
   return getArray(value).flatMap((item, index) => {
     if (!isObject(item)) {
@@ -80,6 +106,7 @@ export function adaptWorkoutHistory(value: JsonValue | null): WorkoutHistoryItem
     return [{
       id: getId(item) ?? `workout-log-${index}`,
       performedAt: pickOptionalText(item, ["performed_at"]),
+      mode: getWorkoutMode(item),
       routineContext: getRoutineContext(item),
       durationMinutes: pickNumber(item, ["duration_minutes"]),
       completionStatus: pickOptionalText(item, ["completion_status"]),
@@ -88,4 +115,28 @@ export function adaptWorkoutHistory(value: JsonValue | null): WorkoutHistoryItem
       exerciseEntries: getExerciseEntries(item),
     }];
   });
+}
+
+export function adaptWorkoutHistoryPage(value: JsonValue | null): WorkoutHistoryPageView {
+  const items = adaptWorkoutHistory(value);
+
+  if (!isObject(value)) {
+    return {
+      items,
+      count: null,
+      limit: null,
+      offset: null,
+      nextOffset: null,
+      hasMore: false,
+    };
+  }
+
+  return {
+    items,
+    count: pickNumber(value, ["count"]),
+    limit: pickNumber(value, ["limit"]),
+    offset: pickNumber(value, ["offset"]),
+    nextOffset: pickNumber(value, ["next_offset"]),
+    hasMore: value.has_more === true,
+  };
 }
