@@ -1,14 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { CSSProperties, FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
 
 import {
   ExerciseInputList,
 } from "@/components/training/ExerciseInputList";
 import type { ExerciseInputRowState } from "@/components/training/ExerciseInputRow";
-import { WorkoutHistoryList } from "@/components/training/WorkoutHistoryList";
 import { PageShell } from "@/components/layout/PageShell";
 import { ActionRow } from "@/components/ui/ActionRow";
 import { Card } from "@/components/ui/Card";
@@ -17,17 +15,38 @@ import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { SectionBlock } from "@/components/ui/SectionBlock";
-import { adaptWorkoutHistoryPage } from "@/lib/adapters/workout-history";
+import {
+  adaptWorkoutHistoryPage,
+  type WorkoutHistoryExerciseEntryView,
+  type WorkoutHistoryItemView,
+} from "@/lib/adapters/workout-history";
+import { getId } from "@/lib/adapters/common";
 import { useSessionBootstrap } from "@/lib/client/session";
+import type { ApiResponse, JsonValue } from "@/lib/types/api";
 import type {
   CreateWorkoutLogInput,
   WorkoutLogExerciseEntryInput,
   WorkoutLogMode,
 } from "@/lib/types/training";
-import type { ApiResponse, JsonValue } from "@/lib/types/api";
 
 type WorkoutLogResponse = ApiResponse<JsonValue>;
 type ContextMode = "rep" | "set" | "general";
+type WorkoutTypeFilter = "all" | WorkoutLogMode;
+type WorkoutHistoryTableRow = {
+  id: string;
+  performedAtLabel: string;
+  performedAtTimestamp: number;
+  typeMode: WorkoutLogMode;
+  typeLabel: string;
+  exerciseName: string;
+  sets: string;
+  reps: string;
+  weight: string;
+  duration: string;
+  notes: string;
+};
+
+const HISTORY_PAGE_LIMIT = 30;
 
 function createExerciseRow(): ExerciseInputRowState {
   return {
@@ -125,8 +144,175 @@ function getWorkoutModePayload(contextMode: ContextMode): WorkoutLogMode {
   return contextMode;
 }
 
+function getPerformedTimestamp(value: string | null): number {
+  if (!value) {
+    return 0;
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+}
+
+function formatPerformedAt(value: string | null): string {
+  if (!value) {
+    return "-";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(parsed);
+}
+
+function formatDuration(value: number | null): string {
+  if (value === null) {
+    return "-";
+  }
+
+  if (value < 60) {
+    return `${value}s`;
+  }
+
+  const minutes = Math.floor(value / 60);
+  const seconds = value % 60;
+  return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+}
+
+function formatCellNumber(value: number | null): string {
+  return value === null ? "-" : String(value);
+}
+
+function formatWorkoutType(mode: WorkoutLogMode): string {
+  switch (mode) {
+    case "rep":
+      return "Rep";
+    case "set":
+      return "Set";
+    case "general_workout":
+      return "General Workout";
+    default:
+      return "General Workout";
+  }
+}
+
+function flattenExerciseEntries(logs: WorkoutHistoryItemView[]): WorkoutHistoryTableRow[] {
+  return logs
+    .flatMap((log, logIndex) => {
+      const typeLabel = formatWorkoutType(log.mode);
+      const performedAtLabel = formatPerformedAt(log.performedAt);
+      const performedAtTimestamp = getPerformedTimestamp(log.performedAt);
+
+      if (log.exerciseEntries.length === 0) {
+        const notes = [log.clientNotes, log.ptNotes].filter(Boolean).join(" ").trim();
+
+        return [{
+          id: `${log.id}-entryless-${logIndex}`,
+          performedAtLabel,
+          performedAtTimestamp,
+          typeMode: log.mode,
+          typeLabel,
+          exerciseName: "-",
+          sets: "-",
+          reps: "-",
+          weight: "-",
+          duration: "-",
+          notes: notes.length > 0 ? notes : "-",
+        }];
+      }
+
+      return log.exerciseEntries.map((entry, entryIndex) =>
+        buildTableRow({
+          entry,
+          entryIndex,
+          log,
+          logIndex,
+          performedAtLabel,
+          performedAtTimestamp,
+        }),
+      );
+    })
+    .sort((left, right) => right.performedAtTimestamp - left.performedAtTimestamp);
+}
+
+function buildTableRow({
+  entry,
+  entryIndex,
+  log,
+  logIndex,
+  performedAtLabel,
+  performedAtTimestamp,
+}: {
+  entry: WorkoutHistoryExerciseEntryView;
+  entryIndex: number;
+  log: WorkoutHistoryItemView;
+  logIndex: number;
+  performedAtLabel: string;
+  performedAtTimestamp: number;
+}): WorkoutHistoryTableRow {
+  const notes = [entry.notes, log.clientNotes, log.ptNotes].filter(Boolean).join(" ").trim();
+  const exerciseName = entry.exerciseName ?? `Exercise ${entryIndex + 1}`;
+
+  return {
+    id: `${log.id}-${entry.id}-${entryIndex}-${logIndex}`,
+    performedAtLabel,
+    performedAtTimestamp,
+    typeMode: log.mode,
+    typeLabel: formatWorkoutType(log.mode),
+    exerciseName,
+    sets: formatCellNumber(entry.sets),
+    reps: formatCellNumber(entry.reps),
+    weight: formatCellNumber(entry.weight),
+    duration: formatDuration(entry.durationSeconds),
+    notes: notes.length > 0 ? notes : "-",
+  };
+}
+
+async function fetchWorkoutHistory({
+  typeFilter,
+  searchValue,
+  offset,
+  signal,
+}: {
+  typeFilter: WorkoutTypeFilter;
+  searchValue: string;
+  offset: number;
+  signal?: AbortSignal;
+}): Promise<JsonValue> {
+  const params = new URLSearchParams({
+    limit: String(HISTORY_PAGE_LIMIT),
+    offset: String(offset),
+  });
+  const normalizedSearch = searchValue.trim();
+
+  if (typeFilter !== "all") {
+    params.set("mode", typeFilter);
+  }
+
+  if (normalizedSearch.length > 0) {
+    params.set("search", normalizedSearch);
+  }
+
+  const response = await fetch(`/api/client/training/workout-logs?${params.toString()}`, {
+    cache: "no-store",
+    signal,
+  });
+  const payload = (await response.json()) as WorkoutLogResponse;
+
+  if (!payload.ok) {
+    throw new Error(payload.error.message);
+  }
+
+  return payload.data;
+}
+
 export function AddLogPageClient() {
   const searchParams = useSearchParams();
+  const historySectionRef = useRef<HTMLElement | null>(null);
   const { status, user } = useSessionBootstrap({
     requiredRole: "client",
     unauthenticatedRedirectTo: "/login",
@@ -148,7 +334,9 @@ export function AddLogPageClient() {
   const [historyData, setHistoryData] = useState<JsonValue | null>(null);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyErrorMessage, setHistoryErrorMessage] = useState<string | null>(null);
-  const [historyRefreshNonce, setHistoryRefreshNonce] = useState(0);
+  const [historyTypeFilter, setHistoryTypeFilter] = useState<WorkoutTypeFilter>("all");
+  const [historySearchValue, setHistorySearchValue] = useState("");
+  const [historyOffset, setHistoryOffset] = useState(0);
 
   const hasPrefilledRoutine = initialRoutineName.length > 0;
   const hasValidAnchor = initialAssignmentId.length > 0;
@@ -167,32 +355,33 @@ export function AddLogPageClient() {
     }
 
     let active = true;
+    const controller = new AbortController();
 
     async function loadHistory() {
       setHistoryLoading(true);
       setHistoryErrorMessage(null);
 
       try {
-        const response = await fetch("/api/client/training/workout-logs?limit=8", { cache: "no-store" });
-        const payload = (await response.json()) as WorkoutLogResponse;
+        const data = await fetchWorkoutHistory({
+          typeFilter: historyTypeFilter,
+          searchValue: historySearchValue,
+          offset: historyOffset,
+          signal: controller.signal,
+        });
 
         if (!active) {
           return;
         }
 
-        if (!payload.ok) {
-          setHistoryErrorMessage(payload.error.message);
-          setHistoryData(null);
+        setHistoryData(data);
+      } catch (error) {
+        if (!active || controller.signal.aborted) {
           return;
         }
 
-        setHistoryData(payload.data);
-      } catch {
-        if (!active) {
-          return;
-        }
-
-        setHistoryErrorMessage("Unable to load workout history.");
+        setHistoryErrorMessage(
+          error instanceof Error ? error.message : "Unable to load workout history.",
+        );
         setHistoryData(null);
       } finally {
         if (active) {
@@ -205,8 +394,9 @@ export function AddLogPageClient() {
 
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [historyRefreshNonce, status, user]);
+  }, [historyOffset, historySearchValue, historyTypeFilter, status, user]);
 
   if (status === "loading") {
     return <LoadingBlock title="Loading log workout" message="Validating your client session." />;
@@ -244,18 +434,46 @@ export function AddLogPageClient() {
         },
         body: JSON.stringify(requestBody),
       });
-
       const payload = (await response.json()) as WorkoutLogResponse;
+
       if (!payload.ok) {
         setSubmitError(payload.error.message);
         return;
       }
 
-      setSubmitSuccess("Workout saved through the protected client workout-log route.");
+      const savedLogId = getId(payload.data);
+      const confirmedHistoryData = await fetchWorkoutHistory({
+        typeFilter: "all",
+        searchValue: "",
+        offset: 0,
+      });
+      const confirmedLogs = adaptWorkoutHistoryPage(confirmedHistoryData).items;
+      const confirmedSavedLog = savedLogId !== null
+        ? confirmedLogs.some((log) => log.id === savedLogId)
+        : false;
+
+      setHistoryTypeFilter("all");
+      setHistorySearchValue("");
+      setHistoryOffset(0);
+      setHistoryData(confirmedHistoryData);
+      setHistoryErrorMessage(null);
+      setHistoryLoading(false);
+
+      if (!confirmedSavedLog) {
+        setSubmitError("The workout request completed, but the refreshed log history could not confirm the saved entry.");
+        return;
+      }
+
+      setSubmitSuccess("Workout Saved");
       setExercises([createExerciseRow()]);
-      setHistoryRefreshNonce((current) => current + 1);
-    } catch {
-      setSubmitError("Unable to save workout.");
+      setShowWorkoutForm(false);
+      historySectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : "Unable to complete the workout save confirmation.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -279,6 +497,10 @@ export function AddLogPageClient() {
     setExercises((current) => current.filter((exercise) => exercise.id !== id));
   }
 
+  function handleViewInlineHistory() {
+    historySectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   const contextCaption =
     "For one offs, select Rep. For logging consecutive Reps, select Set. For logging an entire routine with multiple sets, select General Workout";
   const centeredActionsStyle: CSSProperties = {
@@ -293,8 +515,24 @@ export function AddLogPageClient() {
     right: "1.25rem",
     zIndex: 1,
   };
+  const tableWrapperStyle: CSSProperties = {
+    overflowX: "auto",
+  };
+  const tableStyle: CSSProperties = {
+    width: "100%",
+    borderCollapse: "collapse",
+    minWidth: "760px",
+  };
+  const paginationStyle: CSSProperties = {
+    justifyContent: "flex-end",
+    marginTop: "1rem",
+  };
+  const emptyNoteStyle: CSSProperties = {
+    marginBottom: "1rem",
+  };
   const addEntryLabel = contextMode === "set" ? "Add Rep" : "Add Exercise";
-  const historyLogs = adaptWorkoutHistoryPage(historyData).items;
+  const historyPage = adaptWorkoutHistoryPage(historyData);
+  const historyRows = flattenExerciseEntries(historyPage.items);
 
   return (
     <PageShell
@@ -302,12 +540,18 @@ export function AddLogPageClient() {
       user={user}
       className="app-shell--client-add-log"
     >
-      {submitError ? <ErrorBlock title="Unable to save workout" message={submitError} /> : null}
+      {submitError ? (
+        <FeedbackBanner
+          tone="error"
+          title="Error: Unable To Save"
+          message={submitError}
+        />
+      ) : null}
       {submitSuccess ? (
         <FeedbackBanner
           tone="success"
-          title="Workout saved"
-          message={submitSuccess}
+          title="Workout Saved"
+          message="The workout was saved through the protected BFF route and confirmed in refreshed log history."
         />
       ) : null}
 
@@ -450,36 +694,171 @@ export function AddLogPageClient() {
       ) : null}
 
       <div style={{ position: "relative" }}>
-        <Link
-          href="/client/training/history"
+        <button
+          type="button"
           className="utility-icon-link"
           aria-label="View full workout history"
           title="View full workout history"
           style={sectionIconStyle}
+          onClick={handleViewInlineHistory}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M7.75 3.75A1.75 1.75 0 0 1 9.5 2h5A1.75 1.75 0 0 1 16.25 3.75V5h1A2.75 2.75 0 0 1 20 7.75v8.5A2.75 2.75 0 0 1 17.25 19h-10.5A2.75 2.75 0 0 1 4 16.25v-8.5A2.75 2.75 0 0 1 6.75 5h1V3.75Zm1.5 0V5h5V3.75a.25.25 0 0 0-.25-.25h-5a.25.25 0 0 0-.25.25ZM5.5 9.25v7a1.25 1.25 0 0 0 1.25 1.25h10.5a1.25 1.25 0 0 0 1.25-1.25v-7h-13Z" />
           </svg>
-        </Link>
+        </button>
         <SectionBlock
           title="LOG HISTORY"
-          description="Preview the latest saved workout entries returned by the current protected workout-log route."
+          description="Review and filter saved workout entries returned by the protected client workout-log route."
         >
-          {historyLoading ? (
-            <LoadingBlock
-              title="Loading history"
-              message="Fetching the latest workout logs through the protected client route."
-            />
-          ) : historyErrorMessage ? (
-            <ErrorBlock title="Unable to load workout history" message={historyErrorMessage} />
-          ) : historyLogs.length === 0 ? (
-            <EmptyState
-              title="No logged workouts yet."
-              message="Saved Rep, Set, and General Workout entries will appear here after they are submitted."
-            />
-          ) : (
-            <WorkoutHistoryList logs={historyLogs} />
-          )}
+          <section id="client-inline-workout-history" ref={historySectionRef}>
+            <div className="client-add-log-context">
+              <div
+                className="client-add-log-context__toggle"
+                role="radiogroup"
+                aria-label="Workout history type filter"
+                style={centeredToggleStyle}
+              >
+                <button
+                  type="button"
+                  className={historyTypeFilter === "all" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
+                  onClick={() => {
+                    setHistoryTypeFilter("all");
+                    setHistoryOffset(0);
+                  }}
+                  aria-pressed={historyTypeFilter === "all"}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  className={historyTypeFilter === "rep" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
+                  onClick={() => {
+                    setHistoryTypeFilter("rep");
+                    setHistoryOffset(0);
+                  }}
+                  aria-pressed={historyTypeFilter === "rep"}
+                >
+                  Rep
+                </button>
+                <button
+                  type="button"
+                  className={historyTypeFilter === "set" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
+                  onClick={() => {
+                    setHistoryTypeFilter("set");
+                    setHistoryOffset(0);
+                  }}
+                  aria-pressed={historyTypeFilter === "set"}
+                >
+                  Set
+                </button>
+                <button
+                  type="button"
+                  className={historyTypeFilter === "general_workout" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
+                  onClick={() => {
+                    setHistoryTypeFilter("general_workout");
+                    setHistoryOffset(0);
+                  }}
+                  aria-pressed={historyTypeFilter === "general_workout"}
+                >
+                  General Workout
+                </button>
+              </div>
+
+              <div className="field">
+                <label htmlFor="history-search">Search</label>
+                <input
+                  id="history-search"
+                  type="search"
+                  placeholder="Search exercises, equipment, or notes"
+                  value={historySearchValue}
+                  onChange={(event) => {
+                    setHistorySearchValue(event.target.value);
+                    setHistoryOffset(0);
+                  }}
+                />
+              </div>
+            </div>
+
+            {historyLoading ? (
+              <LoadingBlock
+                title="Loading history"
+                message="Fetching the latest workout logs through the protected client route."
+              />
+            ) : historyErrorMessage ? (
+              <ErrorBlock title="Unable to load workout history" message={historyErrorMessage} />
+            ) : (
+              <Card as="section" className="section-block">
+                {historyRows.length === 0 ? (
+                  <p className="section__copy" style={emptyNoteStyle}>
+                    No logged workouts yet.
+                  </p>
+                ) : null}
+
+                <div style={tableWrapperStyle}>
+                  <table style={tableStyle}>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Exercise</th>
+                        <th>Sets</th>
+                        <th>Reps</th>
+                        <th>Weight</th>
+                        <th>Time / Duration</th>
+                        <th>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historyRows.length > 0 ? (
+                        historyRows.map((row) => (
+                          <tr key={row.id}>
+                            <td>{row.performedAtLabel}</td>
+                            <td>{row.typeLabel}</td>
+                            <td>{row.exerciseName}</td>
+                            <td>{row.sets}</td>
+                            <td>{row.reps}</td>
+                            <td>{row.weight}</td>
+                            <td>{row.duration}</td>
+                            <td>{row.notes}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td>-</td>
+                          <td>-</td>
+                          <td>-</td>
+                          <td>-</td>
+                          <td>-</td>
+                          <td>-</td>
+                          <td>-</td>
+                          <td>-</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="action-row" style={paginationStyle}>
+                  <button
+                    type="button"
+                    className="utility-icon-link"
+                    onClick={() => {
+                      if (historyPage.nextOffset !== null) {
+                        setHistoryOffset(historyPage.nextOffset);
+                      }
+                    }}
+                    disabled={!historyPage.hasMore || historyPage.nextOffset === null}
+                    aria-label="Show older workout entries"
+                    title="Show older workout entries"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M8.97 5.97a.75.75 0 0 1 1.06 0l5.5 5.5a.75.75 0 0 1 0 1.06l-5.5 5.5a.75.75 0 1 1-1.06-1.06L13.94 12 8.97 7.03a.75.75 0 0 1 0-1.06Z" />
+                    </svg>
+                  </button>
+                </div>
+              </Card>
+            )}
+          </section>
         </SectionBlock>
       </div>
     </PageShell>

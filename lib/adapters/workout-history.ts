@@ -41,6 +41,36 @@ export type WorkoutHistoryPageView = {
   hasMore: boolean;
 };
 
+function getNumericValue(
+  value: JsonValue | null | undefined,
+  keys: string[],
+): number | null {
+  if (!isObject(value)) {
+    return null;
+  }
+
+  for (const key of keys) {
+    const candidate = value[key];
+    if (typeof candidate === "number" && Number.isFinite(candidate)) {
+      return candidate;
+    }
+
+    if (typeof candidate === "string") {
+      const normalized = candidate.trim();
+      if (normalized.length === 0) {
+        continue;
+      }
+
+      const parsed = Number(normalized);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+
+  return null;
+}
+
 function getExerciseEntries(value: JsonValue | null | undefined): WorkoutHistoryExerciseEntryView[] {
   if (!isObject(value)) {
     return [];
@@ -60,7 +90,7 @@ function getExerciseEntries(value: JsonValue | null | undefined): WorkoutHistory
         exerciseName: pickOptionalText(entry, ["exercise_name"]),
         sets: pickNumber(entry, ["sets"]),
         reps: pickNumber(entry, ["reps"]),
-        weight: pickNumber(entry, ["weight"]),
+        weight: getNumericValue(entry, ["weight"]),
         durationSeconds: pickNumber(entry, ["duration_seconds"]),
         notes: pickOptionalText(entry, ["notes"]),
         position,
