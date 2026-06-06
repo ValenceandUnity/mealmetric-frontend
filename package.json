@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "clean:next": "node scripts/clean-generated.mjs --next-only",
+    "clean:next:force": "node scripts/clean-generated.mjs --next-only --force",
     "clean:generated": "node scripts/clean-generated.mjs",
+    "clean:generated:force": "node scripts/clean-generated.mjs --force",
     "dev:clean": "npm run clean:generated && next dev",
     "build": "next build",
     "start": "next start",
