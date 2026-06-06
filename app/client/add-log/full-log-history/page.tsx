@@ -1,10 +1,10 @@
 import { ClientWorkoutHistoryLedger } from "@/components/client/ClientWorkoutHistoryLedger";
 
-export default function ClientWorkoutHistoryPage() {
+export default function AddLogFullHistoryPage() {
   return (
     <ClientWorkoutHistoryLedger
-      backHref="/client/training"
-      backLabel="Back to training"
+      backHref="/client/add-log"
+      backLabel="Back to log workout"
       className="app-shell--client-workout-history"
     />
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
 
@@ -28,6 +29,7 @@ import type {
   WorkoutLogExerciseEntryInput,
   WorkoutLogMode,
 } from "@/lib/types/training";
+import { FULL_LOG_HISTORY_ROUTE } from "@/lib/workout-history-routes";
 
 type WorkoutLogResponse = ApiResponse<JsonValue>;
 type ContextMode = "rep" | "set" | "general";
@@ -45,8 +47,6 @@ type WorkoutHistoryTableRow = {
   duration: string;
   notes: string;
 };
-
-const HISTORY_PAGE_LIMIT = 30;
 
 function createExerciseRow(): ExerciseInputRowState {
   return {
@@ -273,18 +273,20 @@ function buildTableRow({
 }
 
 async function fetchWorkoutHistory({
+  limit,
   typeFilter,
   searchValue,
   offset,
   signal,
 }: {
+  limit: number;
   typeFilter: WorkoutTypeFilter;
   searchValue: string;
   offset: number;
   signal?: AbortSignal;
 }): Promise<JsonValue> {
   const params = new URLSearchParams({
-    limit: String(HISTORY_PAGE_LIMIT),
+    limit: String(limit),
     offset: String(offset),
   });
   const normalizedSearch = searchValue.trim();
@@ -334,9 +336,6 @@ export function AddLogPageClient() {
   const [historyData, setHistoryData] = useState<JsonValue | null>(null);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyErrorMessage, setHistoryErrorMessage] = useState<string | null>(null);
-  const [historyTypeFilter, setHistoryTypeFilter] = useState<WorkoutTypeFilter>("all");
-  const [historySearchValue, setHistorySearchValue] = useState("");
-  const [historyOffset, setHistoryOffset] = useState(0);
 
   const hasPrefilledRoutine = initialRoutineName.length > 0;
   const hasValidAnchor = initialAssignmentId.length > 0;
@@ -363,9 +362,10 @@ export function AddLogPageClient() {
 
       try {
         const data = await fetchWorkoutHistory({
-          typeFilter: historyTypeFilter,
-          searchValue: historySearchValue,
-          offset: historyOffset,
+          limit: 5,
+          typeFilter: "all",
+          searchValue: "",
+          offset: 0,
           signal: controller.signal,
         });
 
@@ -396,7 +396,7 @@ export function AddLogPageClient() {
       active = false;
       controller.abort();
     };
-  }, [historyOffset, historySearchValue, historyTypeFilter, status, user]);
+  }, [status, user]);
 
   if (status === "loading") {
     return <LoadingBlock title="Loading log workout" message="Validating your client session." />;
@@ -443,6 +443,7 @@ export function AddLogPageClient() {
 
       const savedLogId = getId(payload.data);
       const confirmedHistoryData = await fetchWorkoutHistory({
+        limit: 5,
         typeFilter: "all",
         searchValue: "",
         offset: 0,
@@ -452,9 +453,6 @@ export function AddLogPageClient() {
         ? confirmedLogs.some((log) => log.id === savedLogId)
         : false;
 
-      setHistoryTypeFilter("all");
-      setHistorySearchValue("");
-      setHistoryOffset(0);
       setHistoryData(confirmedHistoryData);
       setHistoryErrorMessage(null);
       setHistoryLoading(false);
@@ -497,18 +495,12 @@ export function AddLogPageClient() {
     setExercises((current) => current.filter((exercise) => exercise.id !== id));
   }
 
-  function handleViewInlineHistory() {
-    historySectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
   const contextCaption =
     "For one offs, select Rep. For logging consecutive Reps, select Set. For logging an entire routine with multiple sets, select General Workout";
   const centeredActionsStyle: CSSProperties = {
     justifyContent: "center",
   };
-  const centeredToggleStyle: CSSProperties = {
-    justifyContent: "center",
-  };
+  const centeredToggleStyle: CSSProperties = { justifyContent: "center" };
   const sectionIconStyle: CSSProperties = {
     position: "absolute",
     top: "1.25rem",
@@ -523,16 +515,12 @@ export function AddLogPageClient() {
     borderCollapse: "collapse",
     minWidth: "760px",
   };
-  const paginationStyle: CSSProperties = {
-    justifyContent: "flex-end",
-    marginTop: "1rem",
-  };
   const emptyNoteStyle: CSSProperties = {
     marginBottom: "1rem",
   };
   const addEntryLabel = contextMode === "set" ? "Add Rep" : "Add Exercise";
   const historyPage = adaptWorkoutHistoryPage(historyData);
-  const historyRows = flattenExerciseEntries(historyPage.items);
+  const historyRows = flattenExerciseEntries(historyPage.items).slice(0, 3);
 
   return (
     <PageShell
@@ -694,90 +682,25 @@ export function AddLogPageClient() {
       ) : null}
 
       <div style={{ position: "relative" }}>
-        <button
-          type="button"
+        <Link
+          href={FULL_LOG_HISTORY_ROUTE}
           className="utility-icon-link"
           aria-label="View full workout history"
           title="View full workout history"
           style={sectionIconStyle}
-          onClick={handleViewInlineHistory}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M7.75 3.75A1.75 1.75 0 0 1 9.5 2h5A1.75 1.75 0 0 1 16.25 3.75V5h1A2.75 2.75 0 0 1 20 7.75v8.5A2.75 2.75 0 0 1 17.25 19h-10.5A2.75 2.75 0 0 1 4 16.25v-8.5A2.75 2.75 0 0 1 6.75 5h1V3.75Zm1.5 0V5h5V3.75a.25.25 0 0 0-.25-.25h-5a.25.25 0 0 0-.25.25ZM5.5 9.25v7a1.25 1.25 0 0 0 1.25 1.25h10.5a1.25 1.25 0 0 0 1.25-1.25v-7h-13Z" />
           </svg>
-        </button>
+        </Link>
         <SectionBlock
           title="LOG HISTORY"
-          description="Review and filter saved workout entries returned by the protected client workout-log route."
+          description="Preview recent saved workout entries from the protected client workout-log route."
         >
           <section id="client-inline-workout-history" ref={historySectionRef}>
-            <div className="client-add-log-context">
-              <div
-                className="client-add-log-context__toggle"
-                role="radiogroup"
-                aria-label="Workout history type filter"
-                style={centeredToggleStyle}
-              >
-                <button
-                  type="button"
-                  className={historyTypeFilter === "all" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
-                  onClick={() => {
-                    setHistoryTypeFilter("all");
-                    setHistoryOffset(0);
-                  }}
-                  aria-pressed={historyTypeFilter === "all"}
-                >
-                  All
-                </button>
-                <button
-                  type="button"
-                  className={historyTypeFilter === "rep" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
-                  onClick={() => {
-                    setHistoryTypeFilter("rep");
-                    setHistoryOffset(0);
-                  }}
-                  aria-pressed={historyTypeFilter === "rep"}
-                >
-                  Rep
-                </button>
-                <button
-                  type="button"
-                  className={historyTypeFilter === "set" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
-                  onClick={() => {
-                    setHistoryTypeFilter("set");
-                    setHistoryOffset(0);
-                  }}
-                  aria-pressed={historyTypeFilter === "set"}
-                >
-                  Set
-                </button>
-                <button
-                  type="button"
-                  className={historyTypeFilter === "general_workout" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
-                  onClick={() => {
-                    setHistoryTypeFilter("general_workout");
-                    setHistoryOffset(0);
-                  }}
-                  aria-pressed={historyTypeFilter === "general_workout"}
-                >
-                  General Workout
-                </button>
-              </div>
-
-              <div className="field">
-                <label htmlFor="history-search">Search</label>
-                <input
-                  id="history-search"
-                  type="search"
-                  placeholder="Search exercises, equipment, or notes"
-                  value={historySearchValue}
-                  onChange={(event) => {
-                    setHistorySearchValue(event.target.value);
-                    setHistoryOffset(0);
-                  }}
-                />
-              </div>
-            </div>
+            <p className="section__copy" style={emptyNoteStyle}>
+              Open the calendar view for filters, search, and older entries.
+            </p>
 
             {historyLoading ? (
               <LoadingBlock
@@ -837,25 +760,13 @@ export function AddLogPageClient() {
                     </tbody>
                   </table>
                 </div>
-
-                <div className="action-row" style={paginationStyle}>
-                  <button
-                    type="button"
-                    className="utility-icon-link"
-                    onClick={() => {
-                      if (historyPage.nextOffset !== null) {
-                        setHistoryOffset(historyPage.nextOffset);
-                      }
-                    }}
-                    disabled={!historyPage.hasMore || historyPage.nextOffset === null}
-                    aria-label="Show older workout entries"
-                    title="Show older workout entries"
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M8.97 5.97a.75.75 0 0 1 1.06 0l5.5 5.5a.75.75 0 0 1 0 1.06l-5.5 5.5a.75.75 0 1 1-1.06-1.06L13.94 12 8.97 7.03a.75.75 0 0 1 0-1.06Z" />
-                    </svg>
-                  </button>
-                </div>
+                {historyPage.hasMore ? (
+                  <div className="action-row">
+                    <Link className="link-button" href={FULL_LOG_HISTORY_ROUTE}>
+                      View Full Log History
+                    </Link>
+                  </div>
+                ) : null}
               </Card>
             )}
           </section>
