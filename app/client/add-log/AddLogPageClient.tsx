@@ -1,12 +1,14 @@
 "use client";
 
-import { CSSProperties, FormEvent, useState } from "react";
+import Link from "next/link";
+import { CSSProperties, FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import {
   ExerciseInputList,
 } from "@/components/training/ExerciseInputList";
 import type { ExerciseInputRowState } from "@/components/training/ExerciseInputRow";
+import { WorkoutHistoryList } from "@/components/training/WorkoutHistoryList";
 import { PageShell } from "@/components/layout/PageShell";
 import { ActionRow } from "@/components/ui/ActionRow";
 import { Card } from "@/components/ui/Card";
@@ -15,6 +17,7 @@ import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { SectionBlock } from "@/components/ui/SectionBlock";
+import { adaptWorkoutHistory } from "@/lib/adapters/workout-history";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { CreateWorkoutLogInput, WorkoutLogExerciseEntryInput } from "@/lib/types/training";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
@@ -130,6 +133,10 @@ export function AddLogPageClient() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [historyData, setHistoryData] = useState<JsonValue | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyErrorMessage, setHistoryErrorMessage] = useState<string | null>(null);
+  const [historyRefreshNonce, setHistoryRefreshNonce] = useState(0);
 
   const hasPrefilledRoutine = initialRoutineName.length > 0;
   const hasValidAnchor = initialAssignmentId.length > 0;
@@ -141,6 +148,53 @@ export function AddLogPageClient() {
   const blockingMessage = hasInvalidExerciseIntegers
     ? "Sets and reps must be non-negative whole numbers before saving."
     : null;
+
+  useEffect(() => {
+    if (status !== "authenticated" || !user || user.role !== "client") {
+      return;
+    }
+
+    let active = true;
+
+    async function loadHistory() {
+      setHistoryLoading(true);
+      setHistoryErrorMessage(null);
+
+      try {
+        const response = await fetch("/api/client/training/workout-logs", { cache: "no-store" });
+        const payload = (await response.json()) as WorkoutLogResponse;
+
+        if (!active) {
+          return;
+        }
+
+        if (!payload.ok) {
+          setHistoryErrorMessage(payload.error.message);
+          setHistoryData(null);
+          return;
+        }
+
+        setHistoryData(payload.data);
+      } catch {
+        if (!active) {
+          return;
+        }
+
+        setHistoryErrorMessage("Unable to load workout history.");
+        setHistoryData(null);
+      } finally {
+        if (active) {
+          setHistoryLoading(false);
+        }
+      }
+    }
+
+    void loadHistory();
+
+    return () => {
+      active = false;
+    };
+  }, [historyRefreshNonce, status, user]);
 
   if (status === "loading") {
     return <LoadingBlock title="Loading log workout" message="Validating your client session." />;
@@ -186,6 +240,7 @@ export function AddLogPageClient() {
 
       setSubmitSuccess("Workout saved through the protected client workout-log route.");
       setExercises([createExerciseRow()]);
+      setHistoryRefreshNonce((current) => current + 1);
     } catch {
       setSubmitError("Unable to save workout.");
     } finally {
@@ -219,7 +274,14 @@ export function AddLogPageClient() {
   const centeredToggleStyle: CSSProperties = {
     justifyContent: "center",
   };
+  const sectionIconStyle: CSSProperties = {
+    position: "absolute",
+    top: "1.25rem",
+    right: "1.25rem",
+    zIndex: 1,
+  };
   const addEntryLabel = contextMode === "set" ? "Add Rep" : "Add Exercise";
+  const historyLogs = adaptWorkoutHistory(historyData).slice(0, 8);
 
   return (
     <PageShell
@@ -239,79 +301,95 @@ export function AddLogPageClient() {
       <Card className="client-add-log-hero" variant="accent" as="section">
         <div className="page-header">
           <div className="page-header__lead">
-            <p className="page-header__eyebrow">Workout log</p>
+            <p className="page-header__eyebrow">LOG A WORKOUT</p>
             <p className="page-header__description">
               Capture a workout quickly through the existing protected client logging route.
             </p>
           </div>
-          <div className="page-header__actions" style={centeredActionsStyle}>
-            <button
-              type="button"
-              className="link-button link-button--accent"
-              onClick={() => setShowWorkoutForm(true)}
-              aria-expanded={showWorkoutForm}
-              aria-controls="client-workout-entry-form"
-            >
-              Log A New Workout
-            </button>
-          </div>
+          {!showWorkoutForm ? (
+            <div className="page-header__actions" style={centeredActionsStyle}>
+              <button
+                type="button"
+                className="link-button link-button--accent"
+                onClick={() => setShowWorkoutForm(true)}
+                aria-expanded={showWorkoutForm}
+                aria-controls="client-workout-entry-form"
+              >
+                New Entry
+              </button>
+            </div>
+          ) : null}
         </div>
       </Card>
 
       {showWorkoutForm ? (
         <>
-          <SectionBlock
-            eyebrow="Context"
-            title="Workout Type"
-            description={contextCaption}
-          >
-            <div className="client-add-log-context">
-              <div
-                className="client-add-log-context__toggle"
-                role="radiogroup"
-                aria-label="Workout type"
-                style={centeredToggleStyle}
-              >
-                <button
-                  type="button"
-                  className={contextMode === "rep" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
-                  onClick={() => setContextMode("rep")}
-                  aria-pressed={contextMode === "rep"}
+          <div style={{ position: "relative" }}>
+            <button
+              type="button"
+              className="utility-icon-link"
+              onClick={() => setShowWorkoutForm(false)}
+              aria-label="Close workout entry form"
+              title="Close workout entry form"
+              style={sectionIconStyle}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6.97 6.97a.75.75 0 0 1 1.06 0L12 10.94l3.97-3.97a.75.75 0 1 1 1.06 1.06L13.06 12l3.97 3.97a.75.75 0 1 1-1.06 1.06L12 13.06l-3.97 3.97a.75.75 0 1 1-1.06-1.06L10.94 12 6.97 8.03a.75.75 0 0 1 0-1.06Z" />
+              </svg>
+            </button>
+            <SectionBlock
+              eyebrow="Context"
+              title="Workout Type"
+              description={contextCaption}
+            >
+              <div className="client-add-log-context">
+                <div
+                  className="client-add-log-context__toggle"
+                  role="radiogroup"
+                  aria-label="Workout type"
+                  style={centeredToggleStyle}
                 >
-                  Rep
-                </button>
-                <button
-                  type="button"
-                  className={contextMode === "set" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
-                  onClick={() => setContextMode("set")}
-                  aria-pressed={contextMode === "set"}
-                >
-                  Set
-                </button>
-                <button
-                  type="button"
-                  className={contextMode === "general" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
-                  onClick={() => setContextMode("general")}
-                  aria-pressed={contextMode === "general"}
-                >
-                  General Workout
-                </button>
-              </div>
-
-              {contextMode === "rep" ? (
-                <div className="field">
-                  <label htmlFor="routine-context-name">Rep</label>
-                  <input
-                    id="routine-context-name"
-                    value={routineName}
-                    onChange={(event) => setRoutineName(event.target.value)}
-                    placeholder={initialRoutineLabel.length > 0 ? initialRoutineLabel : "Enter rep name"}
-                    readOnly={hasPrefilledRoutine}
-                  />
+                  <button
+                    type="button"
+                    className={contextMode === "rep" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
+                    onClick={() => setContextMode("rep")}
+                    aria-pressed={contextMode === "rep"}
+                  >
+                    Rep
+                  </button>
+                  <button
+                    type="button"
+                    className={contextMode === "set" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
+                    onClick={() => setContextMode("set")}
+                    aria-pressed={contextMode === "set"}
+                  >
+                    Set
+                  </button>
+                  <button
+                    type="button"
+                    className={contextMode === "general" ? "client-add-log-context__chip client-add-log-context__chip--active" : "client-add-log-context__chip"}
+                    onClick={() => setContextMode("general")}
+                    aria-pressed={contextMode === "general"}
+                  >
+                    General Workout
+                  </button>
                 </div>
-              ) : null}
-            </div>
-          </SectionBlock>
+
+                {contextMode === "rep" ? (
+                  <div className="field">
+                    <label htmlFor="routine-context-name">Rep</label>
+                    <input
+                      id="routine-context-name"
+                      value={routineName}
+                      onChange={(event) => setRoutineName(event.target.value)}
+                      placeholder={initialRoutineLabel.length > 0 ? initialRoutineLabel : "Enter rep name"}
+                      readOnly={hasPrefilledRoutine}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </SectionBlock>
+          </div>
 
           <SectionBlock
             eyebrow="Exercises"
@@ -357,6 +435,40 @@ export function AddLogPageClient() {
           </SectionBlock>
         </>
       ) : null}
+
+      <div style={{ position: "relative" }}>
+        <Link
+          href="/client/training/history"
+          className="utility-icon-link"
+          aria-label="View full workout history"
+          title="View full workout history"
+          style={sectionIconStyle}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7.75 3.75A1.75 1.75 0 0 1 9.5 2h5A1.75 1.75 0 0 1 16.25 3.75V5h1A2.75 2.75 0 0 1 20 7.75v8.5A2.75 2.75 0 0 1 17.25 19h-10.5A2.75 2.75 0 0 1 4 16.25v-8.5A2.75 2.75 0 0 1 6.75 5h1V3.75Zm1.5 0V5h5V3.75a.25.25 0 0 0-.25-.25h-5a.25.25 0 0 0-.25.25ZM5.5 9.25v7a1.25 1.25 0 0 0 1.25 1.25h10.5a1.25 1.25 0 0 0 1.25-1.25v-7h-13Z" />
+          </svg>
+        </Link>
+        <SectionBlock
+          title="LOG HISTORY"
+          description="Preview the latest saved workout entries returned by the current protected workout-log route."
+        >
+          {historyLoading ? (
+            <LoadingBlock
+              title="Loading history"
+              message="Fetching the latest workout logs through the protected client route."
+            />
+          ) : historyErrorMessage ? (
+            <ErrorBlock title="Unable to load workout history" message={historyErrorMessage} />
+          ) : historyLogs.length === 0 ? (
+            <EmptyState
+              title="No logged workouts yet."
+              message="Saved Rep, Set, and General Workout entries will appear here after they are submitted."
+            />
+          ) : (
+            <WorkoutHistoryList logs={historyLogs} />
+          )}
+        </SectionBlock>
+      </div>
     </PageShell>
   );
 }
