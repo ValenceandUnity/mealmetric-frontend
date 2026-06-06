@@ -4,23 +4,35 @@ import Link from "next/link";
 import { CSSProperties, useEffect, useMemo, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
-import { WorkoutHistoryList } from "@/components/training/WorkoutHistoryList";
-import { ActionRow } from "@/components/ui/ActionRow";
 import { Card } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionBlock } from "@/components/ui/SectionBlock";
-import { adaptWorkoutHistory } from "@/lib/adapters/workout-history";
+import {
+  adaptWorkoutHistory,
+  type WorkoutHistoryExerciseEntryView,
+  type WorkoutHistoryItemView,
+} from "@/lib/adapters/workout-history";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
-import type { WorkoutHistoryItemView } from "@/lib/adapters/workout-history";
 
 type WorkoutHistoryResponse = ApiResponse<JsonValue>;
 type WorkoutTypeFilter = "all" | "rep" | "set" | "general";
+type WorkoutHistoryTableRow = {
+  id: string;
+  performedAtLabel: string;
+  performedAtTimestamp: number;
+  typeLabel: "Rep" | "General Workout";
+  exerciseName: string;
+  sets: string;
+  reps: string;
+  weight: string;
+  duration: string;
+  notes: string;
+  searchText: string;
+};
 
-const LOGS_PER_PAGE = 30;
+const ROWS_PER_PAGE = 30;
 
 function getPerformedTimestamp(value: string | null): number {
   if (!value) {
@@ -31,47 +43,149 @@ function getPerformedTimestamp(value: string | null): number {
   return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 }
 
+function formatPerformedAt(value: string | null): string {
+  if (!value) {
+    return "—";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(parsed);
+}
+
+function formatDuration(value: number | null): string {
+  if (value === null) {
+    return "—";
+  }
+
+  if (value < 60) {
+    return `${value}s`;
+  }
+
+  const minutes = Math.floor(value / 60);
+  const seconds = value % 60;
+  return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+}
+
+function formatCellNumber(value: number | null): string {
+  return value === null ? "—" : String(value);
+}
+
 function deriveWorkoutType(log: WorkoutHistoryItemView): "Rep" | "General Workout" {
   return log.routineContext ? "Rep" : "General Workout";
 }
 
-function matchesWorkoutType(log: WorkoutHistoryItemView, filter: WorkoutTypeFilter): boolean {
-  const type = deriveWorkoutType(log);
-
+function matchesWorkoutType(row: WorkoutHistoryTableRow, filter: WorkoutTypeFilter): boolean {
   switch (filter) {
     case "all":
       return true;
     case "rep":
-      return type === "Rep";
+      return row.typeLabel === "Rep";
     case "set":
       return false;
     case "general":
-      return type === "General Workout";
+      return row.typeLabel === "General Workout";
     default:
       return true;
   }
 }
 
-function matchesSearch(log: WorkoutHistoryItemView, searchValue: string): boolean {
-  const query = searchValue.trim().toLowerCase();
-  if (query.length === 0) {
-    return true;
-  }
+function flattenExerciseEntries(logs: WorkoutHistoryItemView[]): WorkoutHistoryTableRow[] {
+  return logs.flatMap((log, logIndex) => {
+    const typeLabel = deriveWorkoutType(log);
+    const performedAtLabel = formatPerformedAt(log.performedAt);
+    const performedAtTimestamp = getPerformedTimestamp(log.performedAt);
+    const sharedSearchValues = [
+      typeLabel,
+      performedAtLabel,
+      log.routineContext ?? "",
+      log.clientNotes ?? "",
+      log.ptNotes ?? "",
+    ];
 
-  const type = deriveWorkoutType(log).toLowerCase();
-  const values = [
-    type,
-    log.performedAt ?? "",
-    log.routineContext ?? "",
-    log.clientNotes ?? "",
-    log.ptNotes ?? "",
-    ...log.exerciseEntries.flatMap((entry) => [
+    if (log.exerciseEntries.length === 0) {
+      const notes = [log.clientNotes, log.ptNotes].filter(Boolean).join(" ").trim();
+
+      return [{
+        id: `${log.id}-entryless-${logIndex}`,
+        performedAtLabel,
+        performedAtTimestamp,
+        typeLabel,
+        exerciseName: "—",
+        sets: "—",
+        reps: "—",
+        weight: "—",
+        duration: "—",
+        notes: notes.length > 0 ? notes : "—",
+        searchText: [...sharedSearchValues, notes].join(" ").toLowerCase(),
+      }];
+    }
+
+    return log.exerciseEntries.map((entry, entryIndex) => {
+      const notes = [entry.notes, log.clientNotes, log.ptNotes].filter(Boolean).join(" ").trim();
+      return buildTableRow({
+        entry,
+        entryIndex,
+        log,
+        logIndex,
+        notes,
+        performedAtLabel,
+        performedAtTimestamp,
+        typeLabel,
+        sharedSearchValues,
+      });
+    });
+  });
+}
+
+function buildTableRow({
+  entry,
+  entryIndex,
+  log,
+  logIndex,
+  notes,
+  performedAtLabel,
+  performedAtTimestamp,
+  typeLabel,
+  sharedSearchValues,
+}: {
+  entry: WorkoutHistoryExerciseEntryView;
+  entryIndex: number;
+  log: WorkoutHistoryItemView;
+  logIndex: number;
+  notes: string;
+  performedAtLabel: string;
+  performedAtTimestamp: number;
+  typeLabel: "Rep" | "General Workout";
+  sharedSearchValues: string[];
+}): WorkoutHistoryTableRow {
+  const exerciseName = entry.exerciseName ?? `Exercise ${entryIndex + 1}`;
+
+  return {
+    id: `${log.id}-${entry.id}-${entryIndex}-${logIndex}`,
+    performedAtLabel,
+    performedAtTimestamp,
+    typeLabel,
+    exerciseName,
+    sets: formatCellNumber(entry.sets),
+    reps: formatCellNumber(entry.reps),
+    weight: formatCellNumber(entry.weight),
+    duration: formatDuration(entry.durationSeconds),
+    notes: notes.length > 0 ? notes : "—",
+    searchText: [
+      ...sharedSearchValues,
+      exerciseName,
+      notes,
       entry.exerciseName ?? "",
       entry.notes ?? "",
-    ]),
-  ];
-
-  return values.some((value) => value.toLowerCase().includes(query));
+    ].join(" ").toLowerCase(),
+  };
 }
 
 export default function ClientWorkoutHistoryPage() {
@@ -135,24 +249,47 @@ export default function ClientWorkoutHistoryPage() {
   }, [status, user]);
 
   const logs = useMemo(() => adaptWorkoutHistory(historyData), [historyData]);
-  const sortedLogs = useMemo(
-    () => [...logs].sort((left, right) => getPerformedTimestamp(right.performedAt) - getPerformedTimestamp(left.performedAt)),
+  const flattenedRows = useMemo(
+    () => flattenExerciseEntries(logs).sort((left, right) => right.performedAtTimestamp - left.performedAtTimestamp),
     [logs],
   );
-  const filteredLogs = useMemo(
-    () => sortedLogs.filter((log) => matchesWorkoutType(log, typeFilter) && matchesSearch(log, searchValue)),
-    [searchValue, sortedLogs, typeFilter],
-  );
-  const visibleLogs = useMemo(() => {
-    const start = pageIndex * LOGS_PER_PAGE;
-    return filteredLogs.slice(start, start + LOGS_PER_PAGE);
-  }, [filteredLogs, pageIndex]);
-  const hasOlderEntries = (pageIndex + 1) * LOGS_PER_PAGE < filteredLogs.length;
+  const filteredRows = useMemo(() => {
+    const normalizedSearch = searchValue.trim().toLowerCase();
+    return flattenedRows.filter((row) => {
+      if (!matchesWorkoutType(row, typeFilter)) {
+        return false;
+      }
+
+      if (normalizedSearch.length === 0) {
+        return true;
+      }
+
+      return row.searchText.includes(normalizedSearch);
+    });
+  }, [flattenedRows, searchValue, typeFilter]);
+  const visibleRows = useMemo(() => {
+    const start = pageIndex * ROWS_PER_PAGE;
+    return filteredRows.slice(start, start + ROWS_PER_PAGE);
+  }, [filteredRows, pageIndex]);
+  const hasOlderEntries = (pageIndex + 1) * ROWS_PER_PAGE < filteredRows.length;
+  const tableRows = visibleRows.length > 0 ? visibleRows : null;
   const filterToggleStyle: CSSProperties = {
     justifyContent: "center",
   };
+  const tableWrapperStyle: CSSProperties = {
+    overflowX: "auto",
+  };
+  const tableStyle: CSSProperties = {
+    width: "100%",
+    borderCollapse: "collapse",
+    minWidth: "760px",
+  };
   const paginationStyle: CSSProperties = {
     justifyContent: "flex-end",
+    marginTop: "1rem",
+  };
+  const emptyNoteStyle: CSSProperties = {
+    marginBottom: "1rem",
   };
 
   useEffect(() => {
@@ -179,25 +316,9 @@ export default function ClientWorkoutHistoryPage() {
 
       {!loading && !errorMessage ? (
         <>
-          <Card className="client-workout-history-hero" variant="accent" as="section">
-            <PageHeader
-              eyebrow="Client training"
-              title="Log History"
-              description="Review all saved workout entries from newest to oldest."
-              chips={[`${filteredLogs.length} entr${filteredLogs.length === 1 ? "y" : "ies"}`]}
-              actions={
-                <ActionRow>
-                  <Link className="link-button" href="/client">
-                    Client home
-                  </Link>
-                </ActionRow>
-              }
-            />
-          </Card>
-
           <SectionBlock
-            eyebrow="Filter station"
-            title="Refine history"
+            eyebrow="Log history"
+            title="Filters and search"
             description="Filter by workout type and search exercise names or notes in real time."
           >
             <div className="client-add-log-context">
@@ -254,36 +375,72 @@ export default function ClientWorkoutHistoryPage() {
             </div>
           </SectionBlock>
 
-          <SectionBlock
-            eyebrow="Read only"
-            title="Saved workout logs"
-            description="Review structured workout entries in newest-to-oldest order."
-          >
-            {filteredLogs.length === 0 ? (
-              <EmptyState
-                title="No logged workouts yet."
-                message="Saved workout logs will appear here after you complete a workout through the current logging flow."
-              />
-            ) : (
-              <>
-                <WorkoutHistoryList logs={visibleLogs} />
-                <div className="action-row" style={paginationStyle}>
-                  <button
-                    type="button"
-                    className="utility-icon-link"
-                    onClick={() => setPageIndex((current) => current + 1)}
-                    disabled={!hasOlderEntries}
-                    aria-label="Show older workout entries"
-                    title="Show older workout entries"
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M8.97 5.97a.75.75 0 0 1 1.06 0l5.5 5.5a.75.75 0 0 1 0 1.06l-5.5 5.5a.75.75 0 1 1-1.06-1.06L13.94 12 8.97 7.03a.75.75 0 0 1 0-1.06Z" />
-                    </svg>
-                  </button>
-                </div>
-              </>
-            )}
-          </SectionBlock>
+          <Card as="section" className="section-block">
+            {filteredRows.length === 0 ? (
+              <p className="section__copy" style={emptyNoteStyle}>
+                No logged workouts yet.
+              </p>
+            ) : null}
+
+            <div style={tableWrapperStyle}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Exercise</th>
+                    <th>Sets</th>
+                    <th>Reps</th>
+                    <th>Weight</th>
+                    <th>Time / Duration</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableRows ? (
+                    tableRows.map((row) => (
+                      <tr key={row.id}>
+                        <td>{row.performedAtLabel}</td>
+                        <td>{row.typeLabel}</td>
+                        <td>{row.exerciseName}</td>
+                        <td>{row.sets}</td>
+                        <td>{row.reps}</td>
+                        <td>{row.weight}</td>
+                        <td>{row.duration}</td>
+                        <td>{row.notes}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td>—</td>
+                      <td>—</td>
+                      <td>—</td>
+                      <td>—</td>
+                      <td>—</td>
+                      <td>—</td>
+                      <td>—</td>
+                      <td>—</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="action-row" style={paginationStyle}>
+              <button
+                type="button"
+                className="utility-icon-link"
+                onClick={() => setPageIndex((current) => current + 1)}
+                disabled={!hasOlderEntries}
+                aria-label="Show older workout entries"
+                title="Show older workout entries"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M8.97 5.97a.75.75 0 0 1 1.06 0l5.5 5.5a.75.75 0 0 1 0 1.06l-5.5 5.5a.75.75 0 1 1-1.06-1.06L13.94 12 8.97 7.03a.75.75 0 0 1 0-1.06Z" />
+                </svg>
+              </button>
+            </div>
+          </Card>
         </>
       ) : null}
     </PageShell>
