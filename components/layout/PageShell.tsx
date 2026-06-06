@@ -9,6 +9,7 @@ type PageShellProps = {
   title: string;
   user: SessionUser;
   subtitle?: string;
+  hideTopHubMeta?: boolean;
   navigation?: ReactNode;
   actions?: ReactNode;
   className?: string;
@@ -20,6 +21,7 @@ export function PageShell({
   title,
   user,
   subtitle,
+  hideTopHubMeta = false,
   navigation,
   actions,
   className,
@@ -31,6 +33,7 @@ export function PageShell({
       title={title}
       user={user}
       subtitle={subtitle ?? "Signed-in workspace backed by MealMetric's protected BFF flow."}
+      hideTopHubMeta={hideTopHubMeta}
       actions={actions}
       className={className}
       hideTopHub={hideTopHub}

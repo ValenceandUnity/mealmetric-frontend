@@ -9,6 +9,7 @@ type TopHubProps = {
   title: string;
   subtitle?: string;
   email: string;
+  hideMeta?: boolean;
   actions?: ReactNode;
 };
 
@@ -19,6 +20,7 @@ export function TopHub({
   title,
   subtitle,
   email,
+  hideMeta = false,
   actions,
 }: TopHubProps) {
   return (
@@ -32,13 +34,17 @@ export function TopHub({
       </div>
       <div className="top-hub__copy">
         <h1 className="top-hub__title">{title}</h1>
-        <p className="top-hub__subtitle">
-          {subtitle ?? "Authenticated shell running through MealMetric's protected BFF boundary."}
-        </p>
+        {!hideMeta ? (
+          <p className="top-hub__subtitle">
+            {subtitle ?? "Authenticated shell running through MealMetric's protected BFF boundary."}
+          </p>
+        ) : null}
       </div>
-      <div className="top-hub__meta">
-        <span className="chip chip--muted top-hub__email">{email}</span>
-      </div>
+      {!hideMeta ? (
+        <div className="top-hub__meta">
+          <span className="chip chip--muted top-hub__email">{email}</span>
+        </div>
+      ) : null}
     </header>
   );
 }

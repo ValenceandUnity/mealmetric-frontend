@@ -71,6 +71,37 @@ export type PTDashboardResponse = {
   count: number;
 };
 
+export type PTRosterCategory = {
+  id: string;
+  pt_user_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PTRosterCategoryListResponse = {
+  items: PTRosterCategory[];
+  count: number;
+};
+
+export type PTRosterClient = {
+  id: string;
+  pt_user_id: string;
+  client_user_id: string;
+  status: string;
+  client_name: string;
+  client_email: string;
+  roster_category_id: string | null;
+  roster_name: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PTRosterClientListResponse = {
+  items: PTRosterClient[];
+  count: number;
+};
+
 export type OverviewMetricsPayload = {
   client_user_id: string;
   as_of_date: string;

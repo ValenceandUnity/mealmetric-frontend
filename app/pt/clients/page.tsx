@@ -1,26 +1,24 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
-import { AnalyticsCard } from "@/components/analytics/AnalyticsCard";
 import { PageShell } from "@/components/layout/PageShell";
-import { RoutineCard } from "@/components/training/RoutineCard";
-import { ActionRow } from "@/components/ui/ActionRow";
 import { Card } from "@/components/ui/Card";
-import { DebugPreview } from "@/components/ui/DebugPreview";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBlock } from "@/components/ui/ErrorBlock";
+import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
-import { ListRow } from "@/components/ui/ListRow";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionBlock } from "@/components/ui/SectionBlock";
-import { StatPill } from "@/components/ui/StatPill";
-import { adaptPTClients } from "@/lib/adapters/client-records";
 import { useSessionBootstrap } from "@/lib/client/session";
-import type { ApiResponse, JsonValue } from "@/lib/types/api";
+import type {
+  ApiResponse,
+  PTRosterCategory,
+  PTRosterCategoryListResponse,
+  PTRosterClient,
+  PTRosterClientListResponse,
+} from "@/lib/types/api";
 
-type PTClientsApiResponse = ApiResponse<JsonValue>;
+type PTRosterCategoriesApiResponse = ApiResponse<PTRosterCategoryListResponse>;
+type PTRosterClientsApiResponse = ApiResponse<PTRosterClientListResponse>;
 
 export default function PTClientsPage() {
   const { status, user } = useSessionBootstrap({
@@ -28,9 +26,42 @@ export default function PTClientsPage() {
     unauthenticatedRedirectTo: "/login",
   });
 
-  const [clientsData, setClientsData] = useState<JsonValue | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [categories, setCategories] = useState<PTRosterCategory[]>([]);
+  const [allClients, setAllClients] = useState<PTRosterClient[]>([]);
+  const [visibleClients, setVisibleClients] = useState<PTRosterClient[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [draftCategoryName, setDraftCategoryName] = useState("");
+  const [submittingCategory, setSubmittingCategory] = useState(false);
+  const [updatingClientId, setUpdatingClientId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    title: string;
+    message: string;
+  } | null>(null);
+
+  const selectedFolderName = useMemo(() => {
+    if (selectedCategoryId === null) {
+      return "All Clients";
+    }
+
+    return categories.find((category) => category.id === selectedCategoryId)?.name ?? "Selected Category";
+  }, [categories, selectedCategoryId]);
+
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const client of allClients) {
+      if (!client.roster_category_id) {
+        continue;
+      }
+      counts.set(client.roster_category_id, (counts.get(client.roster_category_id) ?? 0) + 1);
+    }
+
+    return counts;
+  }, [allClients]);
 
   useEffect(() => {
     if (status !== "authenticated" || !user || user.role !== "pt") {
@@ -39,29 +70,56 @@ export default function PTClientsPage() {
 
     let active = true;
 
-    async function load() {
+    async function load(categoryId: string | null) {
       setLoading(true);
       setErrorMessage(null);
 
       try {
-        const response = await fetch("/api/pt/clients", { cache: "no-store" });
-        const payload = (await response.json()) as PTClientsApiResponse;
+        const [categoriesResponse, allClientsResponse, filteredClientsResponse] = await Promise.all([
+          fetch("/api/pt/roster-categories", { cache: "no-store" }),
+          fetch("/api/pt/clients", { cache: "no-store" }),
+          categoryId
+            ? fetch(`/api/pt/clients?category_id=${encodeURIComponent(categoryId)}`, {
+                cache: "no-store",
+              })
+            : Promise.resolve(null),
+        ]);
+
+        const categoriesPayload = (await categoriesResponse.json()) as PTRosterCategoriesApiResponse;
+        const allClientsPayload = (await allClientsResponse.json()) as PTRosterClientsApiResponse;
+        const filteredClientsPayload = filteredClientsResponse
+          ? ((await filteredClientsResponse.json()) as PTRosterClientsApiResponse)
+          : null;
 
         if (!active) {
           return;
         }
 
-        if (!payload.ok) {
-          setErrorMessage(payload.error.message);
-          setClientsData(null);
+        if (!categoriesPayload.ok) {
+          setErrorMessage(categoriesPayload.error.message);
           return;
         }
 
-        setClientsData(payload.data);
+        if (!allClientsPayload.ok) {
+          setErrorMessage(allClientsPayload.error.message);
+          return;
+        }
+
+        if (filteredClientsPayload && !filteredClientsPayload.ok) {
+          setErrorMessage(filteredClientsPayload.error.message);
+          return;
+        }
+
+        setCategories(categoriesPayload.data.items);
+        setAllClients(allClientsPayload.data.items);
+        setVisibleClients(
+          categoryId === null
+            ? allClientsPayload.data.items
+            : (filteredClientsPayload?.data.items ?? []),
+        );
       } catch {
         if (active) {
-          setErrorMessage("Unable to load PT clients.");
-          setClientsData(null);
+          setErrorMessage("Unable to load the PT roster workspace.");
         }
       } finally {
         if (active) {
@@ -70,12 +128,12 @@ export default function PTClientsPage() {
       }
     }
 
-    void load();
+    void load(selectedCategoryId);
 
     return () => {
       active = false;
     };
-  }, [status, user]);
+  }, [selectedCategoryId, status, user]);
 
   if (status === "loading") {
     return <LoadingBlock title="Loading PT clients" message="Validating your BFF-managed session." />;
@@ -85,262 +143,292 @@ export default function PTClientsPage() {
     return <LoadingBlock title="Redirecting" message="PT access requires an authenticated PT session." />;
   }
 
-  const view = adaptPTClients(clientsData);
-  const featuredClient = view.clients[0] ?? null;
-  const activeClientsLabel =
-    view.summary.find((item) => item.label === "Clients")?.value ?? `${view.clients.length} items`;
-  const clientCount = view.clients.length;
+  async function handleCreateCategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmittingCategory(true);
+    setFeedback(null);
+
+    try {
+      const response = await fetch("/api/pt/roster-categories", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: draftCategoryName }),
+      });
+      const payload = (await response.json()) as ApiResponse<PTRosterCategory>;
+
+      if (!payload.ok) {
+        setFeedback({
+          tone: "error",
+          title: "Unable To Create Category",
+          message: payload.error.message,
+        });
+        return;
+      }
+
+      const createdCategory = payload.data;
+      setCategories((current) => [...current, createdCategory]);
+      setDraftCategoryName("");
+      setShowCategoryForm(false);
+      setSelectedCategoryId(createdCategory.id);
+      setFeedback({
+        tone: "success",
+        title: "Category Created",
+        message: "The roster category was created through the protected PT BFF route.",
+      });
+    } catch {
+      setFeedback({
+        tone: "error",
+        title: "Unable To Create Category",
+        message: "The PT roster category request could not be completed.",
+      });
+    } finally {
+      setSubmittingCategory(false);
+    }
+  }
+
+  async function handleRosterAssignment(
+    clientId: string,
+    rosterCategoryId: string | null,
+  ) {
+    setUpdatingClientId(clientId);
+    setFeedback(null);
+
+    try {
+      const response = await fetch(`/api/pt/clients/${clientId}/roster-category`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ roster_category_id: rosterCategoryId }),
+      });
+      const payload = (await response.json()) as ApiResponse<PTRosterClient>;
+
+      if (!payload.ok) {
+        setFeedback({
+          tone: "error",
+          title: "Unable To Update Roster",
+          message: payload.error.message,
+        });
+        return;
+      }
+
+      const updatedClient = payload.data;
+      setAllClients((current) =>
+        current.map((client) => (client.client_user_id === updatedClient.client_user_id ? updatedClient : client)),
+      );
+      setVisibleClients((current) => {
+        if (selectedCategoryId === null) {
+          return current.map((client) =>
+            client.client_user_id === updatedClient.client_user_id ? updatedClient : client,
+          );
+        }
+
+        const remaining = current.filter((client) => client.client_user_id !== updatedClient.client_user_id);
+        return updatedClient.roster_category_id === selectedCategoryId
+          ? [...remaining, updatedClient]
+          : remaining;
+      });
+      setFeedback({
+        tone: "success",
+        title: "Roster Updated",
+        message: "The client roster assignment was updated through the protected PT BFF route.",
+      });
+    } catch {
+      setFeedback({
+        tone: "error",
+        title: "Unable To Update Roster",
+        message: "The roster assignment request could not be completed.",
+      });
+    } finally {
+      setUpdatingClientId(null);
+    }
+  }
 
   return (
-    <PageShell title="Client command center" user={user}>
-      {loading ? <LoadingBlock title="Loading clients" message="Calling /api/pt/clients through the BFF." /> : null}
+    <PageShell
+      title="Client command center"
+      user={user}
+      hideTopHubMeta
+      className="app-shell--pt-clients-roster"
+    >
+      {loading ? <LoadingBlock title="Loading clients" message="Calling PT roster routes through the BFF." /> : null}
       {errorMessage ? <ErrorBlock title="Unable to load PT clients" message={errorMessage} /> : null}
+      {feedback ? (
+        <FeedbackBanner
+          tone={feedback.tone}
+          title={feedback.title}
+          message={feedback.message}
+        />
+      ) : null}
 
       {!loading && !errorMessage ? (
-        <>
-          <Card className="pt-clients-hero" variant="accent" as="section">
-            <div className="pt-clients-hero__layout">
-              <Card className="pt-clients-hero__lead" variant="soft">
-                <PageHeader
-                  eyebrow="PT clients"
-                  title="Coaching roster workspace"
-                  description="Use the roster as the live anchor for client-specific metrics, training assignment, and meal-plan recommendation flows already supported through the PT BFF."
-                  chips={[
-                    "Client-first operations",
-                    "BFF-backed roster",
-                    "Route-safe actions",
-                  ]}
-                  actions={
-                    <ActionRow>
-                      <Link className="link-button link-button--accent" href="/pt">
-                        PT dashboard
-                      </Link>
-                      <Link className="link-button" href="/pt/settings">
-                        Settings
-                      </Link>
-                    </ActionRow>
-                  }
-                />
-                <div className="pt-clients-hero__stats">
-                  {view.summary.length > 0 ? (
-                    view.summary.map((item, index) => (
-                      <StatPill
-                        key={item.label}
-                        label={item.label}
-                        value={item.value}
-                        hint={item.hint}
-                        active={index === 0}
-                      />
+        <SectionBlock
+          eyebrow="Roster"
+          title="Your Roster"
+          description="Open every linked client, create PT-owned roster categories, and keep each client mapped to the right roster folder through the protected BFF workflow."
+        >
+          <div className="pt-roster-folders" role="list" aria-label="PT roster folders">
+            <button
+              type="button"
+              className={[
+                "pt-roster-folder",
+                selectedCategoryId === null ? "pt-roster-folder--active" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              onClick={() => {
+                setSelectedCategoryId(null);
+                setShowCategoryForm(false);
+              }}
+              aria-label="Open All Clients roster folder"
+            >
+              <span className="pt-roster-folder__tab" />
+              <span className="pt-roster-folder__body">
+                <span className="pt-roster-folder__title">All Clients</span>
+                <span className="pt-roster-folder__meta">{allClients.length} linked client{allClients.length === 1 ? "" : "s"}</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={[
+                "pt-roster-folder",
+                showCategoryForm ? "pt-roster-folder--active" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              onClick={() => setShowCategoryForm((current) => !current)}
+              aria-label="Add a new roster category"
+            >
+              <span className="pt-roster-folder__tab" />
+              <span className="pt-roster-folder__body">
+                <span className="pt-roster-folder__title">Add a New Category</span>
+                <span className="pt-roster-folder__meta">Create a PT-owned roster folder</span>
+              </span>
+            </button>
+
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                className={[
+                  "pt-roster-folder",
+                  selectedCategoryId === category.id ? "pt-roster-folder--active" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onClick={() => {
+                  setSelectedCategoryId(category.id);
+                  setShowCategoryForm(false);
+                }}
+                aria-label={`Open ${category.name} roster folder`}
+              >
+                <span className="pt-roster-folder__tab" />
+                <span className="pt-roster-folder__body">
+                  <span className="pt-roster-folder__title">{category.name}</span>
+                  <span className="pt-roster-folder__meta">
+                    {categoryCounts.get(category.id) ?? 0} client{(categoryCounts.get(category.id) ?? 0) === 1 ? "" : "s"}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {showCategoryForm ? (
+            <Card className="pt-roster-category-form" variant="soft">
+              <form className="pt-roster-category-form__layout" onSubmit={handleCreateCategory}>
+                <div className="field">
+                  <label htmlFor="pt-roster-category-name">Category name</label>
+                  <input
+                    id="pt-roster-category-name"
+                    value={draftCategoryName}
+                    onChange={(event) => setDraftCategoryName(event.target.value)}
+                    placeholder="Strength Focus"
+                    disabled={submittingCategory}
+                  />
+                </div>
+                <div className="action-row">
+                  <button type="submit" disabled={submittingCategory}>
+                    {submittingCategory ? "Creating..." : "Create Category"}
+                  </button>
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() => {
+                      setShowCategoryForm(false);
+                      setDraftCategoryName("");
+                    }}
+                    disabled={submittingCategory}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </Card>
+          ) : null}
+
+          <Card className="pt-roster-table-card" as="section">
+            <div className="pt-roster-table-card__header">
+              <div>
+                <p className="page-header__eyebrow">Selected folder</p>
+                <h3 className="page-header__title">{selectedFolderName}</h3>
+              </div>
+            </div>
+
+            <div className="pt-roster-table-wrap">
+              <table className="pt-roster-table">
+                <thead>
+                  <tr>
+                    <th>Client Name</th>
+                    <th>Client Email</th>
+                    <th>Roster</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleClients.length > 0 ? (
+                    visibleClients.map((client) => (
+                      <tr key={client.id}>
+                        <td>{client.client_name}</td>
+                        <td>{client.client_email}</td>
+                        <td>
+                          <label className="sr-only" htmlFor={`roster-category-${client.client_user_id}`}>
+                            Update roster category for {client.client_email}
+                          </label>
+                          <select
+                            id={`roster-category-${client.client_user_id}`}
+                            value={client.roster_category_id ?? ""}
+                            disabled={updatingClientId === client.client_user_id}
+                            onChange={(event) =>
+                              void handleRosterAssignment(
+                                client.client_user_id,
+                                event.target.value.length > 0 ? event.target.value : null,
+                              )
+                            }
+                          >
+                            <option value="">Uncategorized</option>
+                            {categories.map((category) => (
+                              <option key={category.id} value={category.id}>
+                                {category.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
                     ))
                   ) : (
-                    <>
-                      <StatPill
-                        label="Clients"
-                        value={`${clientCount}`}
-                        hint="Loaded through /api/pt/clients."
-                        active
-                      />
-                      <StatPill
-                        label="Workspace"
-                        value="Client-led"
-                        hint="Metrics, training, and meal plans continue inside each client route."
-                      />
-                    </>
+                    <tr>
+                      <td colSpan={3} className="pt-roster-table__empty">
+                        No clients in this roster yet.
+                      </td>
+                    </tr>
                   )}
-                </div>
-              </Card>
-
-              <Card className="pt-clients-hero__focus" variant="default">
-                <PageHeader
-                  eyebrow="Workspace focus"
-                  title={featuredClient ? featuredClient.name : "Roster ready"}
-                  description={
-                    featuredClient
-                      ? "The first visible client is highlighted here so the PT can move from overview into the next operational action quickly."
-                      : "Once the PT roster returns clients, this focus area will spotlight the next real client workspace entry point."
-                  }
-                />
-                {featuredClient ? (
-                  <>
-                    <ListRow
-                      eyebrow="Client spotlight"
-                      title={featuredClient.name}
-                      description={featuredClient.summary}
-                      metadata={featuredClient.metadata}
-                    />
-                    {featuredClient.id ? (
-                      <ActionRow>
-                        <Link className="link-button link-button--accent" href={`/pt/clients/${featuredClient.id}`}>
-                          Open overview
-                        </Link>
-                        <Link className="link-button" href={`/pt/clients/${featuredClient.id}/assign`}>
-                          Assign training
-                        </Link>
-                      </ActionRow>
-                    ) : null}
-                  </>
-                ) : (
-                  <EmptyState
-                    title="No client spotlight yet"
-                    message="The spotlight stays empty until the PT clients route returns at least one client."
-                  />
-                )}
-              </Card>
+                </tbody>
+              </table>
             </div>
           </Card>
-
-          <SectionBlock
-            eyebrow="Workspace"
-            title="Roster overview"
-            description="Separate the high-level roster state from the client actions the PT can take today."
-          >
-            <div className="pt-clients-overview">
-              <AnalyticsCard
-                eyebrow="Roster summary"
-                title="Current client visibility"
-                description="This overview reflects only the roster payload currently returned through the PT clients BFF route."
-                stats={
-                  view.summary.length > 0
-                    ? view.summary
-                    : [
-                        { label: "Clients", value: `${clientCount}` },
-                        { label: "Workspace", value: "Client-led" },
-                      ]
-                }
-                actions={
-                  <Link className="link-button" href="/pt">
-                    Back to dashboard
-                  </Link>
-                }
-              />
-              <Card className="pt-clients-overview__context" variant="soft">
-                <ListRow
-                  eyebrow="Operational framing"
-                  title="Actionable PT work stays client-specific"
-                  description="The roster provides overview and routing. Metrics review, assignment management, and meal-plan recommendations remain deeper client workflows rather than PT-wide aggregate tabs."
-                  metadata={[
-                    { label: "Roster route", value: "/api/pt/clients" },
-                    { label: "Overview path", value: "/pt/clients/[clientId]" },
-                    { label: "Visible clients", value: activeClientsLabel },
-                  ]}
-                />
-              </Card>
-            </div>
-          </SectionBlock>
-
-          <SectionBlock
-            eyebrow="Actionability"
-            title="Client operations"
-            description="A focused scan of the actions the PT can take right now for each client."
-          >
-            <div className="pt-clients-actions">
-              <Card className="pt-clients-actions__summary" variant="soft">
-                <PageHeader
-                  eyebrow="Operational note"
-                  title="Use overview first, then move into the next task"
-                  description="The workspace is organized to help the PT identify the client, confirm their visible context, and route into one of the supported downstream flows."
-                />
-                <div className="pt-clients-actions__pills">
-                  <StatPill
-                    label="Overview"
-                    value="Route anchor"
-                    hint="Client snapshots and next-step links live on the overview route."
-                    active
-                  />
-                  <StatPill
-                    label="Metrics"
-                    value="Per client"
-                    hint="Progress review remains a client-specific screen."
-                  />
-                  <StatPill
-                    label="Training"
-                    value="Assignment flow"
-                    hint="Package assignment is available only inside each client workspace."
-                  />
-                  <StatPill
-                    label="Meal plans"
-                    value="Recommendation flow"
-                    hint="Nutrition guidance also stays client-specific."
-                  />
-                </div>
-              </Card>
-
-              {view.clients.length > 0 ? (
-                <div className="stacked-list">
-                  {view.clients.map((client, index) => (
-                    <RoutineCard
-                      key={client.id ?? `${client.name}-${index}`}
-                      eyebrow="Client"
-                      title={client.name}
-                      description={client.summary}
-                      metadata={client.metadata}
-                      active={index === 0}
-                      footer={
-                        client.id ? (
-                          <>
-                            <Link className="link-button link-button--accent" href={`/pt/clients/${client.id}`}>
-                              Overview
-                            </Link>
-                            <Link className="link-button" href={`/pt/clients/${client.id}/metrics`}>
-                              Metrics
-                            </Link>
-                            <Link className="link-button" href={`/pt/clients/${client.id}/assign`}>
-                              Training
-                            </Link>
-                            <Link className="link-button" href={`/pt/clients/${client.id}/recommend-meal-plan`}>
-                              Meal plans
-                            </Link>
-                          </>
-                        ) : null
-                      }
-                    />
-                  ))}
-                </div>
-              ) : (
-                <>
-                  <EmptyState
-                    title="No clients returned"
-                    message="Clients will appear here as soon as the PT roster route returns structured client data."
-                  />
-                  {view.debugData ? <DebugPreview value={view.debugData} label="PT clients payload fallback" /> : null}
-                </>
-              )}
-            </div>
-          </SectionBlock>
-
-          <SectionBlock
-            eyebrow="Next steps"
-            title="Route-safe coaching actions"
-            description="Keep PT-wide placeholder tabs honest while pointing the coach toward the backed client flows."
-          >
-            <Card className="pt-clients-next" variant="soft">
-              <ListRow
-                eyebrow="Current boundary"
-                title="Roster first, workflows second"
-                description="This screen stays within the supported roster boundary and uses the existing child routes for deeper coaching work."
-                metadata={[
-                  { label: "PT training tab", value: "/pt/training" },
-                  { label: "PT metrics tab", value: "/pt/metrics" },
-                  { label: "PT meal plans tab", value: "/pt/meal-plans" },
-                ]}
-              />
-              <ActionRow>
-                <Link className="link-button link-button--accent" href="/pt">
-                  PT dashboard
-                </Link>
-                <Link className="link-button" href="/pt/training">
-                  Training tab
-                </Link>
-                <Link className="link-button" href="/pt/metrics">
-                  Metrics tab
-                </Link>
-                <Link className="link-button" href="/pt/meal-plans">
-                  Meal plans tab
-                </Link>
-              </ActionRow>
-            </Card>
-          </SectionBlock>
-        </>
+        </SectionBlock>
       ) : null}
     </PageShell>
   );

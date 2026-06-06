@@ -18,6 +18,7 @@ type AppShellProps = {
   title: string;
   user: SessionUser;
   subtitle?: string;
+  hideTopHubMeta?: boolean;
   actions?: ReactNode;
   className?: string;
   hideTopHub?: boolean;
@@ -28,6 +29,7 @@ export function AppShell({
   title,
   user,
   subtitle,
+  hideTopHubMeta = false,
   actions,
   className,
   hideTopHub = false,
@@ -50,6 +52,7 @@ export function AppShell({
             title={title}
             subtitle={subtitle}
             email={user.email}
+            hideMeta={hideTopHubMeta}
             actions={
               <div className="top-hub__utility-cluster">
                 <NotificationLink role={user.role} />
