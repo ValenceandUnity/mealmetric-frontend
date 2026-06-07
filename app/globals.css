@@ -1732,6 +1732,11 @@ html[data-theme="light"] .mobile-training-form textarea {
 .mobile-pt-client-card,
 .mobile-pt-training-card,
 .mobile-pt-training-management-card,
+.mobile-client-metrics-state-card,
+.mobile-client-metrics-progress-card,
+.mobile-client-metrics-history-card,
+.mobile-client-metrics-detail-card,
+.mobile-client-metrics-highlight-card,
 .mobile-pt-form-card,
 .mobile-pt-form-grid,
 .mobile-pt-detail-hero,
@@ -1798,6 +1803,90 @@ html[data-theme="light"] .mobile-training-form textarea {
 
 .mobile-pt-training-disabled-actions {
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.mobile-client-metrics-grid,
+.mobile-client-metrics-highlight-grid,
+.mobile-client-metrics-history-grid,
+.mobile-client-metrics-detail-list,
+.mobile-client-metrics-progress-meta {
+  display: grid;
+  gap: var(--mobile-space-3);
+}
+
+.mobile-client-metrics-highlight-grid,
+.mobile-client-metrics-grid {
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+
+.mobile-client-metrics-history-header,
+.mobile-client-metrics-progress-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--mobile-space-3);
+  flex-wrap: wrap;
+}
+
+.mobile-client-metrics-progress-range {
+  margin: 0;
+  color: var(--mobile-text-muted);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.mobile-client-metrics-progress-track {
+  display: grid;
+  gap: var(--mobile-space-2);
+}
+
+.mobile-client-metrics-progress-bar {
+  height: 0.85rem;
+  border-radius: var(--mobile-radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.mobile-client-metrics-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.92), rgba(139, 92, 246, 0.88));
+  box-shadow: 0 0 18px rgba(250, 204, 21, 0.25);
+}
+
+.mobile-client-metrics-progress-meta,
+.mobile-client-metrics-history-meta {
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  margin: 0;
+}
+
+.mobile-client-metrics-detail-list div,
+.mobile-client-metrics-progress-meta div,
+.mobile-client-metrics-history-meta div {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid var(--mobile-card-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mobile-client-metrics-detail-list dt,
+.mobile-client-metrics-progress-meta dt,
+.mobile-client-metrics-history-meta dt {
+  margin: 0;
+  color: var(--mobile-text-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mobile-client-metrics-detail-list dd,
+.mobile-client-metrics-progress-meta dd,
+.mobile-client-metrics-history-meta dd {
+  margin: 0;
+  color: var(--mobile-text);
+  line-height: 1.45;
 }
 
 .mobile-pt-chip-card {
@@ -1951,9 +2040,16 @@ html[data-theme="light"] .mobile-pt-form-grid textarea {
 
   .mobile-pt-chip-grid,
   .mobile-pt-training-disabled-actions,
+  .mobile-client-metrics-grid,
+  .mobile-client-metrics-highlight-grid,
   .mobile-pt-fact-grid,
   .mobile-pt-detail-action-grid,
   .mobile-pt-log-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-client-metrics-progress-meta,
+  .mobile-client-metrics-history-meta {
     grid-template-columns: 1fr;
   }
 
