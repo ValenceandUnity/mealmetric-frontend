@@ -1730,6 +1730,8 @@ html[data-theme="light"] .mobile-training-form textarea {
 
 .mobile-pt-state-card,
 .mobile-pt-client-card,
+.mobile-pt-training-card,
+.mobile-pt-training-management-card,
 .mobile-pt-form-card,
 .mobile-pt-form-grid,
 .mobile-pt-detail-hero,
@@ -1757,6 +1759,45 @@ html[data-theme="light"] .mobile-training-form textarea {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   gap: var(--mobile-space-3);
+}
+
+.mobile-pt-training-stack,
+.mobile-pt-training-meta-grid,
+.mobile-pt-training-disabled-actions {
+  display: grid;
+  gap: var(--mobile-space-3);
+}
+
+.mobile-pt-training-meta-grid {
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  margin: 0;
+}
+
+.mobile-pt-training-meta-grid div {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid var(--mobile-card-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mobile-pt-training-meta-grid dt {
+  margin: 0;
+  color: var(--mobile-text-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mobile-pt-training-meta-grid dd {
+  margin: 0;
+  color: var(--mobile-text);
+  line-height: 1.45;
+}
+
+.mobile-pt-training-disabled-actions {
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
 }
 
 .mobile-pt-chip-card {
@@ -1909,6 +1950,7 @@ html[data-theme="light"] .mobile-pt-form-grid textarea {
   }
 
   .mobile-pt-chip-grid,
+  .mobile-pt-training-disabled-actions,
   .mobile-pt-fact-grid,
   .mobile-pt-detail-action-grid,
   .mobile-pt-log-meta {
