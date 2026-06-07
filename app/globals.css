@@ -1809,7 +1809,8 @@ html[data-theme="light"] .mobile-training-form textarea {
 .mobile-client-metrics-highlight-grid,
 .mobile-client-metrics-history-grid,
 .mobile-client-metrics-detail-list,
-.mobile-client-metrics-progress-meta {
+.mobile-client-metrics-progress-meta,
+.mobile-pt-metrics-progress-grid {
   display: grid;
   gap: var(--mobile-space-3);
 }
@@ -1852,6 +1853,13 @@ html[data-theme="light"] .mobile-training-form textarea {
   border-radius: inherit;
   background: linear-gradient(135deg, rgba(250, 204, 21, 0.92), rgba(139, 92, 246, 0.88));
   box-shadow: 0 0 18px rgba(250, 204, 21, 0.25);
+}
+
+.mobile-pt-metrics-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.92), rgba(250, 204, 21, 0.82));
+  box-shadow: 0 0 18px rgba(139, 92, 246, 0.24);
 }
 
 .mobile-client-metrics-progress-meta,
