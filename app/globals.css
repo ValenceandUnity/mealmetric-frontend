@@ -1571,6 +1571,146 @@ html[data-theme="light"] .mobile-bottom-nav {
   color: var(--mobile-yellow-strong);
 }
 
+.mobile-training-action-row,
+.mobile-training-pill-row,
+.mobile-training-checklist-card__header,
+.mobile-training-accordion__summary {
+  display: flex;
+  gap: var(--mobile-space-2);
+  flex-wrap: wrap;
+}
+
+.mobile-training-action-row,
+.mobile-training-pill-row {
+  align-items: center;
+}
+
+.mobile-training-card-media {
+  display: grid;
+  align-items: start;
+  min-height: 4.9rem;
+  padding: var(--mobile-space-3);
+  border-radius: 1.15rem;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0)),
+    var(--mobile-routine-gradient, linear-gradient(135deg, rgba(139, 92, 246, 0.82), rgba(250, 204, 21, 0.22)));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.mobile-training-meta-grid,
+.mobile-training-meta-card,
+.mobile-training-checklist-card,
+.mobile-training-state-card,
+.mobile-training-accordion__body,
+.mobile-training-exercise-grid,
+.mobile-training-exercise-card,
+.mobile-training-log-card,
+.mobile-training-form,
+.mobile-training-form__grid {
+  display: grid;
+  gap: var(--mobile-space-3);
+}
+
+.mobile-training-meta-grid {
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+}
+
+.mobile-training-meta-card__value,
+.mobile-training-exercise-card__title,
+.mobile-training-checklist-item__label {
+  margin: 0;
+  color: var(--mobile-text);
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.mobile-training-checklist-list {
+  display: grid;
+  gap: var(--mobile-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mobile-training-checklist-list__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--mobile-space-2);
+  align-items: start;
+}
+
+.mobile-training-checklist-card__header,
+.mobile-training-accordion__summary {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.mobile-training-accordion {
+  overflow: hidden;
+  border-radius: var(--mobile-radius-card);
+  border: 1px solid var(--mobile-card-border);
+  background: var(--mobile-card-soft);
+}
+
+.mobile-training-accordion summary {
+  list-style: none;
+}
+
+.mobile-training-accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.mobile-training-accordion__summary {
+  cursor: pointer;
+  padding: var(--mobile-space-4);
+}
+
+.mobile-training-accordion[open] .mobile-training-accordion__summary {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="light"] .mobile-training-accordion[open] .mobile-training-accordion__summary {
+  border-bottom-color: rgba(70, 89, 131, 0.12);
+}
+
+.mobile-training-accordion__body {
+  padding: 0 var(--mobile-space-4) var(--mobile-space-4);
+}
+
+.mobile-training-form .field label,
+.mobile-training-form .field span {
+  color: var(--mobile-text-muted);
+}
+
+.mobile-training-form input,
+.mobile-training-form select,
+.mobile-training-form textarea {
+  border-radius: 1rem;
+  border-color: var(--mobile-card-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--mobile-text);
+}
+
+html[data-theme="light"] .mobile-training-form input,
+html[data-theme="light"] .mobile-training-form select,
+html[data-theme="light"] .mobile-training-form textarea {
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.mobile-training-button {
+  min-height: 3rem;
+  padding: 0.82rem 1.15rem;
+  border-radius: 1.2rem;
+  box-shadow: none;
+}
+
+.mobile-training-button--primary {
+  border-color: rgba(139, 92, 246, 0.24);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.92), rgba(91, 33, 182, 0.94));
+  color: #f8f6ff;
+}
+
 .mobile-focus-ring:focus-visible,
 .mobile-top-hub__search-input:focus-visible,
 .mobile-bottom-nav__link:focus-visible,
@@ -1590,6 +1730,15 @@ html[data-theme="light"] .mobile-bottom-nav {
 
   .mobile-scroll-row {
     grid-auto-columns: minmax(14.1rem, 88%);
+  }
+
+  .mobile-training-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mobile-training-checklist-card__header,
+  .mobile-training-accordion__summary {
+    display: grid;
   }
 
   .mobile-meal-plan-row {

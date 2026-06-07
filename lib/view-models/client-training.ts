@@ -8,8 +8,8 @@ import {
 import { adaptWorkoutHistoryPage } from "@/lib/adapters/workout-history";
 import {
   formatDateTimeLabel,
+  formatCountLabel,
   getGradient,
-  getNestedArray,
   getTextLike,
   parseLeadingCount,
 } from "@/lib/view-models/common";
@@ -57,17 +57,82 @@ export type MobileClientTrainingAssignmentCardView = {
   subtitle: string;
   taskCount: number;
   progressLabel: string | null;
+  statusLabel: string | null;
+  coachLabel: string | null;
+  scheduleLabel: string;
+  checklistLabel: string;
+  routineCountLabel: string;
   href: string;
   gradient: string;
 };
 
+export type MobileTrainingChecklistPreviewView = {
+  id: string;
+  title: string;
+  statusLabel: string | null;
+  items: MobileWorkoutChecklistItemView[];
+  guidance: string;
+  href: string;
+};
+
 export type MobileClientTrainingView = {
   assignmentCards: MobileClientTrainingAssignmentCardView[];
+  weeklyChecklist: MobileTrainingChecklistPreviewView[];
+  checklistItems: MobileWorkoutChecklistItemView[];
   routineDetails: MobileRoutineDetailView[];
   workoutJournalCards: MobileWorkoutJournalCardView[];
   hasAssignments: boolean;
   hasChecklistItems: boolean;
 };
+
+function adaptChecklistCollection(items: JsonValue[]): MobileWorkoutChecklistItemView[] {
+  return items.flatMap((item, index) => {
+    if (typeof item === "string" && item.trim().length > 0) {
+      return [{
+        id: `checklist-${index}`,
+        label: item,
+        complete: false,
+        note: null,
+      }];
+    }
+
+    if (!isObject(item)) {
+      return [];
+    }
+
+    const label = getTextLike(item, ["name", "title", "label"]);
+    if (!label) {
+      return [];
+    }
+
+    const complete =
+      item.completed === true ||
+      item.done === true ||
+      pickOptionalText(item, ["status"])?.toLowerCase() === "completed";
+
+    return [{
+      id: getId(item) ?? `checklist-${index}`,
+      label,
+      complete,
+      note: getTextLike(item, ["notes", "description"]),
+    }];
+  });
+}
+
+function adaptChecklist(value: JsonValue | null): MobileWorkoutChecklistItemView[] {
+  if (!isObject(value)) {
+    return [];
+  }
+
+  for (const key of ["checklist", "tasks", "items"]) {
+    const items = adaptChecklistCollection(getArray(value[key]));
+    if (items.length > 0) {
+      return items;
+    }
+  }
+
+  return [];
+}
 
 function adaptAssignmentCards(assignments: JsonValue | null): MobileClientTrainingAssignmentCardView[] {
   return adaptTrainingAssignments(assignments).map((assignment, index) => ({
@@ -79,50 +144,35 @@ function adaptAssignmentCards(assignments: JsonValue | null): MobileClientTraini
       parseLeadingCount(assignment.routineCount),
     ),
     progressLabel: assignment.progressLabel,
+    statusLabel: assignment.status,
+    coachLabel: assignment.coachName ? `With ${assignment.coachName}` : null,
+    scheduleLabel: assignment.schedule,
+    checklistLabel: assignment.checklistCount,
+    routineCountLabel: assignment.routineCount ?? "Open routine for detail",
     href: assignment.id ? `/client/training/${assignment.id}` : "/client/training",
     gradient: getGradient(index),
   }));
 }
 
-function adaptChecklist(detail: JsonValue | null): MobileWorkoutChecklistItemView[] {
-  const checklistCollections = getNestedArray(detail, ["checklist", "items", "tasks", "exercises"]);
-  if (checklistCollections.length > 0) {
-    return checklistCollections.flatMap((item, index) => {
-      if (typeof item === "string" && item.trim().length > 0) {
-        return [{
-          id: `checklist-${index}`,
-          label: item,
-          complete: false,
-          note: null,
-        }];
-      }
+function adaptWeeklyChecklist(assignments: JsonValue | null): MobileTrainingChecklistPreviewView[] {
+  const assignmentCards = adaptAssignmentCards(assignments);
+  const rawAssignments = getArray(assignments);
 
-      if (!isObject(item)) {
-        return [];
-      }
+  return assignmentCards.map((assignment, index) => {
+    const items = adaptChecklist(rawAssignments[index] ?? null).slice(0, 3);
 
-      const complete =
-        item.completed === true ||
-        item.done === true ||
-        pickOptionalText(item, ["status"])?.toLowerCase() === "completed";
-
-      return [{
-        id: getId(item) ?? `checklist-${index}`,
-        label:
-          getTextLike(item, ["name", "title", "label", "exercise_name"]) ??
-          `Checklist item ${index + 1}`,
-        complete,
-        note: getTextLike(item, ["notes", "description"]),
-      }];
-    });
-  }
-
-  return adaptAssignmentDetail(detail).checklist.map((label, index) => ({
-    id: `checklist-${index}`,
-    label,
-    complete: false,
-    note: null,
-  }));
+    return {
+      id: assignment.id ?? `assignment-${index}`,
+      title: assignment.title,
+      statusLabel: assignment.statusLabel,
+      items,
+      guidance:
+        items.length > 0
+          ? `${formatCountLabel(items.length, "checklist item")} available from the training list response.`
+          : "Open routine to view checklist.",
+      href: assignment.href,
+    };
+  });
 }
 
 function adaptLogEntries(routine: ReturnType<typeof adaptAssignmentDetail>["routines"][number], gradient: string): MobileRoutineDetailView {
@@ -177,6 +227,8 @@ export function adaptClientTrainingView(args: {
 
   return {
     assignmentCards: adaptAssignmentCards(args.assignments),
+    weeklyChecklist: adaptWeeklyChecklist(args.assignments),
+    checklistItems: checklist,
     routineDetails: adaptRoutineDetails(args.assignmentDetail ?? null),
     workoutJournalCards: adaptWorkoutJournalCards(args.workoutHistory ?? null),
     hasAssignments: getArray(args.assignments).length > 0,
