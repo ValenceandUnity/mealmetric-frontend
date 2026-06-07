@@ -2947,8 +2947,9 @@ html[data-theme="light"] .client-settings-toggle__option {
 
 .pt-roster-folder {
   display: grid;
-  gap: 0;
-  padding: 0;
+  gap: 0.4rem;
+  min-height: 7.75rem;
+  padding: 1rem 1rem 1.1rem;
   border: 1px solid var(--border);
   border-radius: 1.1rem;
   background:
@@ -2971,22 +2972,11 @@ html[data-theme="light"] .client-settings-toggle__option {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
-.pt-roster-folder__tab {
-  width: 5.25rem;
-  height: 1.15rem;
-  margin-left: 1rem;
-  border-radius: 0.9rem 0.9rem 0 0;
-  background: color-mix(in srgb, var(--accent) 20%, rgba(255, 255, 255, 0.05));
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-bottom: 0;
-}
-
 .pt-roster-folder__body {
   display: grid;
   gap: 0.4rem;
-  min-height: 7.75rem;
-  padding: 1rem 1rem 1.1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  align-content: start;
+  min-height: 100%;
 }
 
 .pt-roster-folder__title {

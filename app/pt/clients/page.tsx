@@ -387,7 +387,6 @@ export default function PTClientsPage() {
               }}
               aria-label="Open All Clients roster folder"
             >
-              <span className="pt-roster-folder__tab" />
               <span className="pt-roster-folder__body">
                 <span className="pt-roster-folder__title">All Clients</span>
                 <span className="pt-roster-folder__meta">{allClients.length} linked client{allClients.length === 1 ? "" : "s"}</span>
@@ -405,7 +404,6 @@ export default function PTClientsPage() {
               onClick={() => setShowCategoryForm((current) => !current)}
               aria-label="Add a new roster category"
             >
-              <span className="pt-roster-folder__tab" />
               <span className="pt-roster-folder__body">
                 <span className="pt-roster-folder__title">Add a New Category</span>
                 <span className="pt-roster-folder__meta">Create a PT-owned roster folder</span>
@@ -428,7 +426,6 @@ export default function PTClientsPage() {
                 }}
                 aria-label={`Open ${category.name} roster folder`}
               >
-                <span className="pt-roster-folder__tab" />
                 <span className="pt-roster-folder__body">
                   <span className="pt-roster-folder__title">{category.name}</span>
                   <span className="pt-roster-folder__meta">
