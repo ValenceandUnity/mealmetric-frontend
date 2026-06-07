@@ -1346,6 +1346,7 @@ html[data-theme="light"] .mobile-top-hub__search-input {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  box-shadow: none;
 }
 
 html[data-theme="light"] .mobile-pill {
@@ -1711,6 +1712,112 @@ html[data-theme="light"] .mobile-training-form textarea {
   color: #f8f6ff;
 }
 
+.mobile-pt-actions,
+.mobile-pt-client-card__header {
+  display: flex;
+  gap: var(--mobile-space-2);
+  flex-wrap: wrap;
+}
+
+.mobile-pt-actions {
+  align-items: center;
+}
+
+.mobile-pt-client-card__header {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.mobile-pt-state-card,
+.mobile-pt-client-card,
+.mobile-pt-form-card,
+.mobile-pt-form-grid {
+  display: grid;
+  gap: var(--mobile-space-3);
+}
+
+.mobile-pt-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--mobile-space-3);
+}
+
+.mobile-pt-chip-card {
+  display: grid;
+  gap: var(--mobile-space-1);
+  min-height: 6.6rem;
+  padding: var(--mobile-space-3);
+  border-radius: var(--mobile-radius-card);
+  border: 1px solid var(--mobile-card-border);
+  background: var(--mobile-card-soft);
+  color: var(--mobile-text);
+  text-align: left;
+  box-shadow: none;
+}
+
+.mobile-pt-chip-card--active {
+  border-color: rgba(139, 92, 246, 0.26);
+  background: linear-gradient(160deg, rgba(139, 92, 246, 0.18), rgba(11, 15, 30, 0.96));
+}
+
+html[data-theme="light"] .mobile-pt-chip-card--active {
+  background: linear-gradient(160deg, rgba(109, 74, 216, 0.12), rgba(255, 255, 255, 0.96));
+}
+
+.mobile-pt-chip-card__title,
+.mobile-pt-fact-grid dd {
+  margin: 0;
+  color: var(--mobile-text);
+  font-weight: 700;
+}
+
+.mobile-pt-chip-card__meta,
+.mobile-pt-fact-grid dt {
+  margin: 0;
+  color: var(--mobile-text-muted);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.mobile-pt-fact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--mobile-space-3);
+}
+
+.mobile-pt-form-grid input,
+.mobile-pt-form-grid select,
+.mobile-pt-form-grid textarea {
+  border-radius: 1rem;
+  border-color: var(--mobile-card-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--mobile-text);
+}
+
+html[data-theme="light"] .mobile-pt-form-grid input,
+html[data-theme="light"] .mobile-pt-form-grid select,
+html[data-theme="light"] .mobile-pt-form-grid textarea {
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.mobile-pt-form-grid .field label,
+.mobile-pt-form-grid .field span {
+  color: var(--mobile-text-muted);
+}
+
+.mobile-pt-button {
+  min-height: 3rem;
+  padding: 0.82rem 1.15rem;
+  border-radius: 1.2rem;
+  box-shadow: none;
+}
+
+.mobile-pt-button--primary {
+  border-color: rgba(139, 92, 246, 0.24);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.92), rgba(91, 33, 182, 0.94));
+  color: #f8f6ff;
+}
+
 .mobile-focus-ring:focus-visible,
 .mobile-top-hub__search-input:focus-visible,
 .mobile-bottom-nav__link:focus-visible,
@@ -1734,6 +1841,11 @@ html[data-theme="light"] .mobile-training-form textarea {
 
   .mobile-training-meta-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mobile-pt-chip-grid,
+  .mobile-pt-fact-grid {
+    grid-template-columns: 1fr;
   }
 
   .mobile-training-checklist-card__header,

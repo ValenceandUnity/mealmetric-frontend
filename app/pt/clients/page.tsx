@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
-import { PageShell } from "@/components/layout/PageShell";
-import { Card } from "@/components/ui/Card";
-import { ErrorBlock } from "@/components/ui/ErrorBlock";
+import { MobileAppShell } from "@/components/mobile/MobileAppShell";
+import { MobileCard } from "@/components/mobile/MobileCard";
+import { MobileSection } from "@/components/mobile/MobileSection";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
-import { SectionBlock } from "@/components/ui/SectionBlock";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type {
   ApiResponse,
@@ -18,9 +18,75 @@ import type {
   PTRosterClient,
   PTRosterClientListResponse,
 } from "@/lib/types/api";
+import { formatDisplayNameFromUser } from "@/lib/view-models/common";
 
 type PTRosterCategoriesApiResponse = ApiResponse<PTRosterCategoryListResponse>;
 type PTRosterClientsApiResponse = ApiResponse<PTRosterClientListResponse>;
+
+type ActionPillProps = {
+  href: string;
+  children: string;
+  tone?: "purple" | "yellow";
+};
+
+type ActionPillButtonProps = {
+  onClick: () => void;
+  children: string;
+  tone?: "purple" | "yellow";
+  expanded?: boolean;
+};
+
+type PortalStateCardProps = {
+  title: string;
+  message: string;
+  action?: ReactNode;
+};
+
+function ActionPill({ href, children, tone = "yellow" }: ActionPillProps) {
+  return (
+    <Link href={href} className={`mobile-pill mobile-pill--${tone} mobile-focus-ring`}>
+      {children}
+    </Link>
+  );
+}
+
+function ActionPillButton({
+  onClick,
+  children,
+  tone = "yellow",
+  expanded,
+}: ActionPillButtonProps) {
+  return (
+    <button
+      type="button"
+      className={`mobile-pill mobile-pill--${tone} mobile-focus-ring`}
+      onClick={onClick}
+      aria-expanded={expanded}
+    >
+      {children}
+    </button>
+  );
+}
+
+function PortalStateCard({ title, message, action }: PortalStateCardProps) {
+  return (
+    <MobileCard as="div" variant="soft" className="mobile-pt-state-card">
+      <div className="mobile-section__copy">
+        <h3 className="mobile-section__title">{title}</h3>
+        <p className="mobile-section__description">{message}</p>
+      </div>
+      {action ? <div className="mobile-pt-actions">{action}</div> : null}
+    </MobileCard>
+  );
+}
+
+function matchesQuery(query: string, fields: Array<string | null | undefined>): boolean {
+  if (!query) {
+    return true;
+  }
+
+  return fields.some((field) => field?.toLowerCase().includes(query));
+}
 
 export default function PTClientsPage() {
   const { status, user } = useSessionBootstrap({
@@ -46,6 +112,8 @@ export default function PTClientsPage() {
     title: string;
     message: string;
   } | null>(null);
+  const [searchValue, setSearchValue] = useState("");
+  const deferredSearch = useDeferredValue(searchValue);
 
   const selectedFolderName = useMemo(() => {
     if (selectedCategoryId === null) {
@@ -62,6 +130,7 @@ export default function PTClientsPage() {
       if (!client.roster_category_id) {
         continue;
       }
+
       counts.set(client.roster_category_id, (counts.get(client.roster_category_id) ?? 0) + 1);
     }
 
@@ -143,6 +212,20 @@ export default function PTClientsPage() {
       active = false;
     };
   }, [selectedCategoryId, status, user]);
+
+  const query = deferredSearch.trim().toLowerCase();
+  const filteredClients = useMemo(
+    () =>
+      visibleClients.filter((client) =>
+        matchesQuery(query, [
+          client.client_name,
+          client.client_email,
+          client.status,
+          client.roster_name,
+        ]),
+      ),
+    [query, visibleClients],
+  );
 
   if (status === "loading") {
     return <LoadingBlock title="Loading PT clients" message="Validating your BFF-managed session." />;
@@ -297,15 +380,34 @@ export default function PTClientsPage() {
     }
   }
 
+  const showLoadingState = loading && allClients.length === 0 && !errorMessage;
+  const showSearchEmptyState = query.length > 0;
+
   return (
-    <PageShell
-      title="Client command center"
+    <MobileAppShell
       user={user}
-      hideTopHubMeta
-      className="app-shell--pt-clients-roster"
+      greeting={formatDisplayNameFromUser(user)}
+      title="Client Portal"
+      subtitle="Invite, organize, and launch PT client workspaces through the existing protected roster and invitation routes."
+      searchLabel="Search roster clients"
+      searchPlaceholder="Search clients or categories"
+      searchValue={searchValue}
+      onSearchChange={(nextValue) => {
+        startTransition(() => {
+          setSearchValue(nextValue);
+        });
+      }}
+      notificationSlot={<ActionPill href="/pt" tone="purple">Dashboard</ActionPill>}
+      topHubAction={(
+        <ActionPillButton
+          onClick={() => setShowInviteForm((current) => !current)}
+          expanded={showInviteForm}
+        >
+          {showInviteForm ? "Close invite" : "Open invite"}
+        </ActionPillButton>
+      )}
+      activePath="/pt/clients"
     >
-      {loading ? <LoadingBlock title="Loading clients" message="Calling PT roster routes through the BFF." /> : null}
-      {errorMessage ? <ErrorBlock title="Unable to load PT clients" message={errorMessage} /> : null}
       {feedback ? (
         <FeedbackBanner
           tone={feedback.tone}
@@ -314,222 +416,254 @@ export default function PTClientsPage() {
         />
       ) : null}
 
-      {!loading && !errorMessage ? (
-        <SectionBlock
-          eyebrow="Roster"
-          title="Client Roster"
+      {errorMessage ? (
+        <MobileSection
+          eyebrow="Roster sync"
+          title="Client portal unavailable"
+          description="This screen stays on the existing PT roster and invitation BFF routes and does not fall back to direct backend calls."
         >
-          {showInviteForm ? (
-            <Card className="pt-roster-category-form" variant="soft">
-              <form className="pt-roster-category-form__layout" onSubmit={handleInviteClient}>
-                <div>
-                  <p className="page-header__eyebrow">Invite Client</p>
-                  <h3 className="page-header__title">Invite an existing client</h3>
-                </div>
-                <div className="field">
-                  <label htmlFor="pt-invite-client-email">Client email</label>
-                  <input
-                    id="pt-invite-client-email"
-                    type="email"
-                    value={draftInviteEmail}
-                    onChange={(event) => setDraftInviteEmail(event.target.value)}
-                    placeholder="client@example.com"
-                    disabled={submittingInvitation}
-                  />
-                </div>
-                <div className="pt-roster-invite-actions">
-                  <button type="submit" disabled={submittingInvitation}>
-                    {submittingInvitation ? "Sending..." : "Send Invite"}
-                  </button>
-                  <button
-                    type="button"
-                    className="link-button"
-                    onClick={() => setShowInviteForm(false)}
-                    disabled={submittingInvitation}
+          <PortalStateCard
+            title="Unable to load the PT roster workspace"
+            message={errorMessage}
+            action={<ActionPill href="/pt">Back to dashboard</ActionPill>}
+          />
+        </MobileSection>
+      ) : null}
+
+      {showLoadingState ? (
+        <MobileSection
+          eyebrow="Syncing"
+          title="Loading your client portal"
+          description="Fetching PT roster categories and linked clients through the current protected PT routes."
+        >
+          <PortalStateCard
+            title="Refreshing client portal"
+            message="Your roster workspace is loading through the signed frontend-to-BFF path."
+          />
+        </MobileSection>
+      ) : (
+        <>
+          <MobileSection
+            eyebrow="Invitations"
+            title="Client Roster"
+            description="Keep the invite workflow and roster categories intact while moving the PT client portal into the mobile shell."
+            action={<ActionPill href="/pt/settings" tone="purple">Settings</ActionPill>}
+          >
+            {showInviteForm ? (
+              <MobileCard as="div" variant="action" className="mobile-pt-form-card">
+                <form className="mobile-pt-form-grid" onSubmit={handleInviteClient}>
+                  <div className="field">
+                    <label htmlFor="pt-invite-client-email">Client email</label>
+                    <input
+                      id="pt-invite-client-email"
+                      type="email"
+                      value={draftInviteEmail}
+                      onChange={(event) => setDraftInviteEmail(event.target.value)}
+                      placeholder="client@example.com"
+                      disabled={submittingInvitation}
+                    />
+                  </div>
+                  <div className="mobile-pt-actions">
+                    <button type="submit" className="mobile-pt-button mobile-pt-button--primary mobile-focus-ring" disabled={submittingInvitation}>
+                      {submittingInvitation ? "Sending..." : "Send invite"}
+                    </button>
+                    <button
+                      type="button"
+                      className="mobile-pt-button mobile-focus-ring"
+                      onClick={() => setShowInviteForm(false)}
+                      disabled={submittingInvitation}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </MobileCard>
+            ) : (
+              <PortalStateCard
+                title="Invite an existing client"
+                message="Open the invite panel to send a PT client invitation through the current protected BFF workflow."
+                action={
+                  <ActionPillButton
+                    onClick={() => setShowInviteForm(true)}
+                    expanded={showInviteForm}
                   >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </Card>
-          ) : (
-            <div className="pt-roster-invite-toggle">
-              <button type="button" onClick={() => setShowInviteForm(true)}>
-                Invite a Client
-              </button>
-            </div>
-          )}
+                    Invite a Client
+                  </ActionPillButton>
+                }
+              />
+            )}
+          </MobileSection>
 
-          <div className="pt-roster-folders" role="list" aria-label="PT roster folders">
-            <button
-              type="button"
-              className={[
-                "pt-roster-folder",
-                selectedCategoryId === null ? "pt-roster-folder--active" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() => {
-                setSelectedCategoryId(null);
-                setShowCategoryForm(false);
-              }}
-              aria-label="Open All Clients roster folder"
-            >
-              <span className="pt-roster-folder__body">
-                <span className="pt-roster-folder__title">All Clients</span>
-                <span className="pt-roster-folder__meta">{allClients.length} linked client{allClients.length === 1 ? "" : "s"}</span>
-              </span>
-            </button>
-
-            {categories.map((category) => (
+          <MobileSection
+            eyebrow="Roster categories"
+            title={selectedFolderName}
+            description="Folder chips stay backed by the current PT roster-category routes. Add a new category remains available as an existing PT-owned action."
+          >
+            <div className="mobile-pt-chip-grid" role="list" aria-label="PT roster folders">
               <button
-                key={category.id}
                 type="button"
                 className={[
-                  "pt-roster-folder",
-                  selectedCategoryId === category.id ? "pt-roster-folder--active" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
+                  "mobile-pt-chip-card",
+                  selectedCategoryId === null ? "mobile-pt-chip-card--active" : "",
+                ].filter(Boolean).join(" ")}
                 onClick={() => {
-                  setSelectedCategoryId(category.id);
+                  setSelectedCategoryId(null);
                   setShowCategoryForm(false);
                 }}
-                aria-label={`Open ${category.name} roster folder`}
+                aria-label="Open All Clients roster folder"
               >
-                <span className="pt-roster-folder__body">
-                  <span className="pt-roster-folder__title">{category.name}</span>
-                  <span className="pt-roster-folder__meta">
+                <span className="mobile-pt-chip-card__title">All Clients</span>
+                <span className="mobile-pt-chip-card__meta">{allClients.length} linked client{allClients.length === 1 ? "" : "s"}</span>
+              </button>
+
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  className={[
+                    "mobile-pt-chip-card",
+                    selectedCategoryId === category.id ? "mobile-pt-chip-card--active" : "",
+                  ].filter(Boolean).join(" ")}
+                  onClick={() => {
+                    setSelectedCategoryId(category.id);
+                    setShowCategoryForm(false);
+                  }}
+                  aria-label={`Open ${category.name} roster folder`}
+                >
+                  <span className="mobile-pt-chip-card__title">{category.name}</span>
+                  <span className="mobile-pt-chip-card__meta">
                     {categoryCounts.get(category.id) ?? 0} client{(categoryCounts.get(category.id) ?? 0) === 1 ? "" : "s"}
                   </span>
-                </span>
+                </button>
+              ))}
+
+              <button
+                type="button"
+                className={[
+                  "mobile-pt-chip-card",
+                  showCategoryForm ? "mobile-pt-chip-card--active" : "",
+                ].filter(Boolean).join(" ")}
+                onClick={() => setShowCategoryForm((current) => !current)}
+                aria-label="Add a new roster category"
+                aria-expanded={showCategoryForm}
+              >
+                <span className="mobile-pt-chip-card__title">Add a New Category</span>
+                <span className="mobile-pt-chip-card__meta">Create a PT-owned roster folder</span>
               </button>
-            ))}
-
-            <button
-              type="button"
-              className={[
-                "pt-roster-folder",
-                showCategoryForm ? "pt-roster-folder--active" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() => setShowCategoryForm((current) => !current)}
-              aria-label="Add a new roster category"
-            >
-              <span className="pt-roster-folder__body">
-                <span className="pt-roster-folder__title">Add a New Category</span>
-                <span className="pt-roster-folder__meta">Create a PT-owned roster folder</span>
-              </span>
-            </button>
-          </div>
-
-          {showCategoryForm ? (
-            <Card className="pt-roster-category-form" variant="soft">
-              <form className="pt-roster-category-form__layout" onSubmit={handleCreateCategory}>
-                <div className="field">
-                  <label htmlFor="pt-roster-category-name">Category name</label>
-                  <input
-                    id="pt-roster-category-name"
-                    value={draftCategoryName}
-                    onChange={(event) => setDraftCategoryName(event.target.value)}
-                    placeholder="Strength Focus"
-                    disabled={submittingCategory}
-                  />
-                </div>
-                <div className="action-row">
-                  <button type="submit" disabled={submittingCategory}>
-                    {submittingCategory ? "Creating..." : "Create Category"}
-                  </button>
-                  <button
-                    type="button"
-                    className="link-button"
-                    onClick={() => {
-                      setShowCategoryForm(false);
-                      setDraftCategoryName("");
-                    }}
-                    disabled={submittingCategory}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </Card>
-          ) : null}
-
-          <Card className="pt-roster-table-card" as="section">
-            <div className="pt-roster-table-card__header">
-              <div>
-                <p className="page-header__eyebrow">Selected folder</p>
-                <h3 className="page-header__title">{selectedFolderName}</h3>
-              </div>
             </div>
 
-            <div className="pt-roster-table-wrap">
-              <table className="pt-roster-table">
-                <thead>
-                  <tr>
-                    <th>Client Name</th>
-                    <th>Client Email</th>
-                    <th>Roster</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleClients.length > 0 ? (
-                    visibleClients.map((client) => (
-                      <tr key={client.id}>
-                        <td>
-                          <div className="stacked-list">
-                            <span>{client.client_name}</span>
-                            {client.status === "active" ? (
-                              <Link
-                                className="link-button"
-                                href={`/pt/clients/${client.client_user_id}/log-history?clientEmail=${encodeURIComponent(client.client_email)}`}
-                              >
-                                View Log History
-                              </Link>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td>{client.client_email}</td>
-                        <td>
-                          <label className="sr-only" htmlFor={`roster-category-${client.client_user_id}`}>
-                            Update roster category for {client.client_email}
-                          </label>
-                          <select
-                            id={`roster-category-${client.client_user_id}`}
-                            value={client.roster_category_id ?? ""}
-                            disabled={updatingClientId === client.client_user_id}
-                            onChange={(event) =>
-                              void handleRosterAssignment(
-                                client.client_user_id,
-                                event.target.value.length > 0 ? event.target.value : null,
-                              )
-                            }
-                          >
-                            <option value="">Uncategorized</option>
-                            {categories.map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.name}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={3} className="pt-roster-table__empty">
-                        No clients in this roster yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </SectionBlock>
-      ) : null}
-    </PageShell>
+            {showCategoryForm ? (
+              <MobileCard as="div" variant="soft" className="mobile-pt-form-card">
+                <form className="mobile-pt-form-grid" onSubmit={handleCreateCategory}>
+                  <div className="field">
+                    <label htmlFor="pt-roster-category-name">Category name</label>
+                    <input
+                      id="pt-roster-category-name"
+                      value={draftCategoryName}
+                      onChange={(event) => setDraftCategoryName(event.target.value)}
+                      placeholder="Strength Focus"
+                      disabled={submittingCategory}
+                    />
+                  </div>
+                  <div className="mobile-pt-actions">
+                    <button type="submit" className="mobile-pt-button mobile-pt-button--primary mobile-focus-ring" disabled={submittingCategory}>
+                      {submittingCategory ? "Creating..." : "Create category"}
+                    </button>
+                    <button
+                      type="button"
+                      className="mobile-pt-button mobile-focus-ring"
+                      onClick={() => {
+                        setShowCategoryForm(false);
+                        setDraftCategoryName("");
+                      }}
+                      disabled={submittingCategory}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </MobileCard>
+            ) : null}
+          </MobileSection>
+
+          <MobileSection
+            eyebrow="Client cards"
+            title="Roster clients"
+            description="Local search filters the already-fetched roster list only. Client actions continue to point at the existing PT detail, metrics, assignment, recommendation, and log-history routes."
+          >
+            {filteredClients.length > 0 ? (
+              filteredClients.map((client) => (
+                <MobileCard key={client.id} as="article" variant="action" className="mobile-pt-client-card">
+                  <div className="mobile-pt-client-card__header">
+                    <div className="mobile-section__copy">
+                      <p className="mobile-section__eyebrow">Client roster card</p>
+                      <h3 className="mobile-section__title">{client.client_name || client.client_email}</h3>
+                      <p className="mobile-section__description">{client.client_email}</p>
+                    </div>
+                    <span className="mobile-pill mobile-pill--purple">{client.status}</span>
+                  </div>
+
+                  <dl className="mobile-pt-fact-grid">
+                    <div>
+                      <dt>Roster</dt>
+                      <dd>{client.roster_name ?? "Uncategorized"}</dd>
+                    </div>
+                    <div>
+                      <dt>Client status</dt>
+                      <dd>{client.status}</dd>
+                    </div>
+                  </dl>
+
+                  <div className="field">
+                    <label htmlFor={`roster-category-${client.client_user_id}`}>Roster category</label>
+                    <select
+                      id={`roster-category-${client.client_user_id}`}
+                      value={client.roster_category_id ?? ""}
+                      disabled={updatingClientId === client.client_user_id}
+                      onChange={(event) =>
+                        void handleRosterAssignment(
+                          client.client_user_id,
+                          event.target.value.length > 0 ? event.target.value : null,
+                        )
+                      }
+                    >
+                      <option value="">Uncategorized</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="mobile-pt-actions">
+                    <ActionPill href={`/pt/clients/${client.client_user_id}`}>Client detail</ActionPill>
+                    <ActionPill href={`/pt/clients/${client.client_user_id}/metrics`} tone="purple">Metrics</ActionPill>
+                    <ActionPill href={`/pt/clients/${client.client_user_id}/assign`}>Training</ActionPill>
+                    <ActionPill href={`/pt/clients/${client.client_user_id}/recommend-meal-plan`} tone="purple">Meal plans</ActionPill>
+                    {client.status === "active" ? (
+                      <ActionPill href={`/pt/clients/${client.client_user_id}/log-history?clientEmail=${encodeURIComponent(client.client_email)}`}>
+                        Log history
+                      </ActionPill>
+                    ) : null}
+                  </div>
+                </MobileCard>
+              ))
+            ) : showSearchEmptyState ? (
+              <PortalStateCard
+                title="No roster clients match this search"
+                message={`No linked clients matched "${searchValue.trim()}". Adjust the local filter to see the current roster again.`}
+              />
+            ) : (
+              <PortalStateCard
+                title="No clients in this roster yet"
+                message="This roster selection does not currently contain any linked clients."
+                action={<ActionPill href="/pt">Back to dashboard</ActionPill>}
+              />
+            )}
+          </MobileSection>
+        </>
+      )}
+    </MobileAppShell>
   );
 }

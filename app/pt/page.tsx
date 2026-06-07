@@ -2,89 +2,96 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 
-import { PageShell } from "@/components/layout/PageShell";
-import { Card } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { ErrorBlock } from "@/components/ui/ErrorBlock";
+import { MobileAppShell } from "@/components/mobile/MobileAppShell";
+import { MobileCard } from "@/components/mobile/MobileCard";
+import { MobileSection } from "@/components/mobile/MobileSection";
+import { MobileStatCard } from "@/components/mobile/MobileStatCard";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { SectionBlock } from "@/components/ui/SectionBlock";
 import { useSessionBootstrap } from "@/lib/client/session";
-import type { ApiResponse, PTDashboardClientSummary, PTDashboardResponse } from "@/lib/types/api";
+import type { ApiResponse, PTDashboardResponse } from "@/lib/types/api";
+import { adaptPTDashboardView } from "@/lib/view-models/pt-dashboard";
+import { formatDisplayNameFromUser } from "@/lib/view-models/common";
 
 type PTDashboardApiResponse = ApiResponse<PTDashboardResponse>;
 
-function formatDateTime(value: string | null): string {
-  if (!value) {
-    return "No workout logs yet";
-  }
+type ActionPillProps = {
+  href: string;
+  children: string;
+  tone?: "purple" | "yellow";
+};
 
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
+type DashboardStateCardProps = {
+  title: string;
+  message: string;
+  action?: ReactNode;
+};
 
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(parsed);
-}
-
-function formatMetricValue(value: number | null): string {
-  return value === null ? "Not available" : `${value}`;
-}
-
-function PTDashboardClientCard({ client }: { client: PTDashboardClientSummary }) {
+function ActionPill({ href, children, tone = "yellow" }: ActionPillProps) {
   return (
-    <Card className="pt-dashboard-client-card" variant="soft">
-      <PageHeader
-        eyebrow="Client"
-        title={client.client.email}
-        description={
-          client.notes
-            ? `Link notes: ${client.notes}`
-            : "PT-linked client available through the protected dashboard route."
-        }
-        status={{ label: client.status, tone: "accent" }}
-      />
-
-      <dl className="pt-dashboard-client-card__facts">
-        <div>
-          <dt>Assignments</dt>
-          <dd>{client.assignment_count}</dd>
-        </div>
-        <div>
-          <dt>Workout logs</dt>
-          <dd>{client.workout_log_count}</dd>
-        </div>
-        <div>
-          <dt>Latest workout log</dt>
-          <dd>{formatDateTime(client.latest_workout_log_at)}</dd>
-        </div>
-        <div>
-          <dt>Intake ceiling</dt>
-          <dd>{formatMetricValue(client.metrics_snapshot?.current_intake_ceiling_calories ?? null)}</dd>
-        </div>
-        <div>
-          <dt>Expenditure floor</dt>
-          <dd>{formatMetricValue(client.metrics_snapshot?.current_expenditure_floor_calories ?? null)}</dd>
-        </div>
-      </dl>
-
-      <div className="action-row">
-        <Link className="link-button link-button--accent" href={`/pt/clients/${client.client_user_id}`}>
-          Open client
-        </Link>
-        <Link className="link-button" href={`/pt/clients/${client.client_user_id}/metrics`}>
-          Metrics
-        </Link>
-        <Link className="link-button" href={`/pt/clients/${client.client_user_id}/assign`}>
-          Training
-        </Link>
-      </div>
-    </Card>
+    <Link href={href} className={`mobile-pill mobile-pill--${tone} mobile-focus-ring`}>
+      {children}
+    </Link>
   );
+}
+
+function DashboardStateCard({ title, message, action }: DashboardStateCardProps) {
+  return (
+    <MobileCard as="div" variant="soft" className="mobile-pt-state-card">
+      <div className="mobile-section__copy">
+        <h3 className="mobile-section__title">{title}</h3>
+        <p className="mobile-section__description">{message}</p>
+      </div>
+      {action ? <div className="mobile-pt-actions">{action}</div> : null}
+    </MobileCard>
+  );
+}
+
+function getDashboardIcon(label: string) {
+  switch (label.toLowerCase()) {
+    case "linked clients":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7 1a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM4.5 19a4.5 4.5 0 0 1 9 0m2.5 0a3.5 3.5 0 0 1 4 0" />
+        </svg>
+      );
+    case "assignments":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 5h8a2 2 0 0 1 2 2v11l-4-2-4 2-4-2-4 2V7a2 2 0 0 1 2-2h4Z" />
+          <path d="M9 9h6m-6 3h5" />
+        </svg>
+      );
+    case "workout logs":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 5.5h7l3 3V18a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-12.5Zm2 5h6m-6 3h6" />
+        </svg>
+      );
+    case "latest activity":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 7v5l3 2" />
+          <circle cx="12" cy="12" r="8" />
+        </svg>
+      );
+    case "intake ceiling":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 4c2.4 2.8 4 5.1 4 7.7A4 4 0 0 1 8 11.7C8 9.1 9.6 6.8 12 4Z" />
+          <path d="M8.5 13.5A3.5 3.5 0 0 0 12 17a3.5 3.5 0 0 0 3.5-3.5" />
+        </svg>
+      );
+    case "expenditure floor":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M11 3c.4 2.8 2.7 3.6 2.7 6.2A2.7 2.7 0 0 1 11 11.9 3.9 3.9 0 0 1 7.5 8c-2 1.7-3.5 4.3-3.5 7a8 8 0 1 0 16 0c0-3.5-2-6.3-5-8.4" />
+        </svg>
+      );
+    default:
+      return null;
+  }
 }
 
 export default function PTDashboardPage() {
@@ -117,7 +124,7 @@ export default function PTDashboardPage() {
         }
 
         if (!payload.ok) {
-          setErrorMessage(payload.error.message);
+          setErrorMessage(payload.error.message ?? "Unable to load the PT dashboard.");
           setDashboardData(null);
           return;
         }
@@ -150,51 +157,126 @@ export default function PTDashboardPage() {
     return <LoadingBlock title="Redirecting" message="PT access requires an authenticated PT session." />;
   }
 
+  const view = adaptPTDashboardView(dashboardData);
+  const showLoadingState = loading && !dashboardData && !errorMessage;
+
   return (
-    <PageShell title="PT Dashboard" user={user}>
-      {loading ? <LoadingBlock title="Loading dashboard" message="Fetching real PT-linked client summaries." /> : null}
-      {errorMessage ? <ErrorBlock title="Unable to load PT dashboard" message={errorMessage} /> : null}
+    <MobileAppShell
+      user={user}
+      greeting={formatDisplayNameFromUser(user)}
+      title="PT Command"
+      subtitle="Client progress, activity, and nutrition snapshots through the existing protected PT dashboard route."
+      notificationSlot={<ActionPill href="/pt/settings" tone="purple">Settings</ActionPill>}
+      topHubAction={<ActionPill href="/pt/clients">Open clients</ActionPill>}
+      activePath="/pt"
+    >
+      {errorMessage ? (
+        <MobileSection
+          eyebrow="Dashboard sync"
+          title="PT dashboard unavailable"
+          description="This screen stays on the existing PT dashboard BFF route and does not fall back to direct backend calls."
+        >
+          <DashboardStateCard
+            title="Unable to load the PT dashboard"
+            message={errorMessage}
+            action={<ActionPill href="/pt/clients">Open clients</ActionPill>}
+          />
+        </MobileSection>
+      ) : null}
 
-      {!loading && !errorMessage ? (
+      {showLoadingState ? (
+        <MobileSection
+          eyebrow="Syncing"
+          title="Loading your PT command surface"
+          description="Fetching linked-client summaries through the current protected PT dashboard route."
+        >
+          <DashboardStateCard
+            title="Refreshing PT dashboard"
+            message="Your PT summary is loading through the signed frontend-to-BFF path."
+          />
+        </MobileSection>
+      ) : (
         <>
-          <Card className="pt-dashboard-header" variant="accent" as="section">
-            <PageHeader
-              eyebrow="PT workspace"
-              title="PT Dashboard"
-              description="Manage your linked clients from one place using real assignment, workout log, and metrics snapshot data already available inside MealMetric."
-              actions={
-                <>
-                  <Link className="link-button link-button--accent" href="/pt/clients">
-                    Client workspace
-                  </Link>
-                  <Link className="link-button" href="/pt/settings">
-                    Settings
-                  </Link>
-                </>
-              }
-            />
-          </Card>
-
-          <SectionBlock
-            eyebrow="Linked clients"
-            title="Client roster"
-            description="Each card shows only real PT-scoped summary data returned by the protected dashboard route."
+          <MobileSection
+            eyebrow="PT dashboard"
+            title="Summary"
+            description="These cards reflect only real linked-client, assignment, workout-log, and metrics snapshot data returned by the current PT dashboard response."
+            action={<ActionPill href="/pt/clients" tone="purple">Client portal</ActionPill>}
           >
-            {dashboardData && dashboardData.items.length > 0 ? (
-              <div className="pt-dashboard-client-list">
-                {dashboardData.items.map((client) => (
-                  <PTDashboardClientCard key={client.id} client={client} />
-                ))}
-              </div>
+            {view.stats.map((stat) => (
+              <MobileStatCard
+                key={stat.label}
+                label={stat.label}
+                value={stat.value}
+                unit={stat.unit}
+                progressText={stat.progressText}
+                icon={getDashboardIcon(stat.label)}
+              />
+            ))}
+          </MobileSection>
+
+          <MobileSection
+            eyebrow="Client progress"
+            title="Linked client cards"
+            description="Open the existing client detail, metrics, training, and recommendation routes from here without introducing new PT workflow endpoints."
+          >
+            {view.summaryCards.length > 0 ? (
+              view.summaryCards.map((client) => (
+                <MobileCard key={client.id} as="article" variant="action" className="mobile-pt-client-card">
+                  <div className="mobile-pt-client-card__header">
+                    <div className="mobile-section__copy">
+                      <p className="mobile-section__eyebrow">PT-linked client</p>
+                      <h3 className="mobile-section__title">{client.clientDisplayLabel}</h3>
+                      <p className="mobile-section__description">{client.clientEmail}</p>
+                    </div>
+                    <span className="mobile-pill mobile-pill--purple">{client.statusBadge}</span>
+                  </div>
+
+                  <dl className="mobile-pt-fact-grid">
+                    <div>
+                      <dt>Assignments</dt>
+                      <dd>{client.assignmentCountLabel}</dd>
+                    </div>
+                    <div>
+                      <dt>Workout logs</dt>
+                      <dd>{client.workoutLogCountLabel}</dd>
+                    </div>
+                    <div>
+                      <dt>Latest activity</dt>
+                      <dd>{client.latestWorkoutLabel}</dd>
+                    </div>
+                    <div>
+                      <dt>Intake ceiling</dt>
+                      <dd>{client.intakeCeilingLabel}</dd>
+                    </div>
+                    <div>
+                      <dt>Expenditure floor</dt>
+                      <dd>{client.expenditureFloorLabel}</dd>
+                    </div>
+                  </dl>
+
+                  {client.notesPreview ? (
+                    <p className="mobile-section__description">Link notes: {client.notesPreview}</p>
+                  ) : null}
+
+                  <div className="mobile-pt-actions">
+                    <ActionPill href={client.overviewHref}>Client detail</ActionPill>
+                    <ActionPill href={client.metricsHref} tone="purple">Metrics</ActionPill>
+                    <ActionPill href={client.trainingHref}>Training</ActionPill>
+                    <ActionPill href={client.recommendationHref} tone="purple">Meal plans</ActionPill>
+                  </div>
+                </MobileCard>
+              ))
             ) : (
-              <EmptyState
+              <DashboardStateCard
                 title="No linked clients yet"
                 message="This PT account does not currently have any linked clients to manage."
+                action={<ActionPill href="/pt/clients">Open client portal</ActionPill>}
               />
             )}
-          </SectionBlock>
+          </MobileSection>
         </>
-      ) : null}
-    </PageShell>
+      )}
+    </MobileAppShell>
   );
 }

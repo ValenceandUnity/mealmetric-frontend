@@ -55,7 +55,7 @@ describe("PTClientsPage", () => {
     vi.stubGlobal("fetch", fetchMock);
   });
 
-  it("renders Client Roster, keeps the invite form collapsed by default, and orders folders with Add a New Category last", async () => {
+  it("renders the mobile client portal surface, roster chips, and client cards from existing PT routes", async () => {
     fetchMock.mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
 
@@ -101,14 +101,21 @@ describe("PTClientsPage", () => {
     render(React.createElement(PTClientsPage));
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Client Roster" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Client Portal" })).toBeTruthy();
     });
 
-    expect(screen.queryByRole("heading", { name: "Your Roster" })).toBeNull();
+    expect(fetchMock).toHaveBeenCalledWith("/api/pt/roster-categories", { cache: "no-store" });
+    expect(fetchMock).toHaveBeenCalledWith("/api/pt/clients", { cache: "no-store" });
+    expect(screen.getByRole("heading", { name: "Client Roster" })).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "Search roster clients" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open invite" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Invite a Client" })).toBeTruthy();
     expect(screen.queryByLabelText("Client email")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Send Invite" })).toBeNull();
-    expect(screen.queryByText("Pending and recent roster invites")).toBeNull();
+    expect(screen.queryByRole("button", { name: /send invite/i })).toBeNull();
+    expect(screen.getAllByText("Goku").length).toBeGreaterThan(0);
+    expect(screen.getByText("goku@example.com")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Client detail" }).getAttribute("href")).toBe("/pt/clients/client-1");
+    expect(screen.getByRole("link", { name: "Log history" }).getAttribute("href")).toContain("/pt/clients/client-1/log-history");
 
     const folderList = screen.getByRole("list", { name: "PT roster folders" });
     const allClientsButton = within(folderList).getByRole("button", {
@@ -183,13 +190,12 @@ describe("PTClientsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Invite a Client" }));
 
     expect(screen.getByLabelText("Client email")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Send Invite" })).toBeTruthy();
-    expect(screen.queryByText("Pending and recent roster invites")).toBeNull();
+    expect(screen.getByRole("button", { name: /send invite/i })).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Client email"), {
       target: { value: "client@example.com" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Send Invite" }));
+    fireEvent.click(screen.getByRole("button", { name: /send invite/i }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith("/api/pt/client-invitations", {
@@ -205,5 +211,17 @@ describe("PTClientsPage", () => {
       expect(screen.getByRole("button", { name: "Invite a Client" })).toBeTruthy();
     });
     expect(screen.queryByLabelText("Client email")).toBeNull();
+  });
+
+  it("does not bypass PT session bootstrap before fetching roster data", () => {
+    useSessionBootstrapMock.mockReturnValue({
+      status: "loading",
+      user: null,
+    });
+
+    render(React.createElement(PTClientsPage));
+
+    expect(screen.getByText("Loading PT clients")).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
