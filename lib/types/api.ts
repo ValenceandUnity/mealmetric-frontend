@@ -102,6 +102,25 @@ export type PTRosterClientListResponse = {
   count: number;
 };
 
+export type PTClientInvitationStatus = "pending" | "accepted" | "declined" | "revoked";
+
+export type PTClientInvitation = {
+  id: string;
+  pt_user_id: string;
+  client_user_id: string;
+  pt_email: string;
+  client_email: string;
+  client_email_snapshot: string | null;
+  status: PTClientInvitationStatus;
+  created_at: string;
+  responded_at: string | null;
+};
+
+export type PTClientInvitationListResponse = {
+  items: PTClientInvitation[];
+  count: number;
+};
+
 export type OverviewMetricsPayload = {
   client_user_id: string;
   as_of_date: string;
@@ -145,7 +164,10 @@ export type PTDashboardClientSummary = {
 export type NotificationType =
   | "client_workout_logged"
   | "pt_workout_note_added"
-  | "pt_assignment_created";
+  | "pt_assignment_created"
+  | "pt_client_invitation_received"
+  | "pt_client_invitation_accepted"
+  | "pt_client_invitation_declined";
 
 export type NotificationItem = {
   id: string;

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
@@ -11,6 +12,8 @@ import { SectionBlock } from "@/components/ui/SectionBlock";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type {
   ApiResponse,
+  PTClientInvitation,
+  PTClientInvitationListResponse,
   PTRosterCategory,
   PTRosterCategoryListResponse,
   PTRosterClient,
@@ -19,6 +22,7 @@ import type {
 
 type PTRosterCategoriesApiResponse = ApiResponse<PTRosterCategoryListResponse>;
 type PTRosterClientsApiResponse = ApiResponse<PTRosterClientListResponse>;
+type PTClientInvitationsApiResponse = ApiResponse<PTClientInvitationListResponse>;
 
 export default function PTClientsPage() {
   const { status, user } = useSessionBootstrap({
@@ -30,11 +34,14 @@ export default function PTClientsPage() {
   const [allClients, setAllClients] = useState<PTRosterClient[]>([]);
   const [visibleClients, setVisibleClients] = useState<PTRosterClient[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [sentInvitations, setSentInvitations] = useState<PTClientInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [draftCategoryName, setDraftCategoryName] = useState("");
+  const [draftInviteEmail, setDraftInviteEmail] = useState("");
   const [submittingCategory, setSubmittingCategory] = useState(false);
+  const [submittingInvitation, setSubmittingInvitation] = useState(false);
   const [updatingClientId, setUpdatingClientId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error";
@@ -75,9 +82,15 @@ export default function PTClientsPage() {
       setErrorMessage(null);
 
       try {
-        const [categoriesResponse, allClientsResponse, filteredClientsResponse] = await Promise.all([
+        const [
+          categoriesResponse,
+          allClientsResponse,
+          invitationsResponse,
+          filteredClientsResponse,
+        ] = await Promise.all([
           fetch("/api/pt/roster-categories", { cache: "no-store" }),
           fetch("/api/pt/clients", { cache: "no-store" }),
+          fetch("/api/pt/client-invitations", { cache: "no-store" }),
           categoryId
             ? fetch(`/api/pt/clients?category_id=${encodeURIComponent(categoryId)}`, {
                 cache: "no-store",
@@ -87,6 +100,7 @@ export default function PTClientsPage() {
 
         const categoriesPayload = (await categoriesResponse.json()) as PTRosterCategoriesApiResponse;
         const allClientsPayload = (await allClientsResponse.json()) as PTRosterClientsApiResponse;
+        const invitationsPayload = (await invitationsResponse.json()) as PTClientInvitationsApiResponse;
         const filteredClientsPayload = filteredClientsResponse
           ? ((await filteredClientsResponse.json()) as PTRosterClientsApiResponse)
           : null;
@@ -105,6 +119,11 @@ export default function PTClientsPage() {
           return;
         }
 
+        if (!invitationsPayload.ok) {
+          setErrorMessage(invitationsPayload.error.message);
+          return;
+        }
+
         if (filteredClientsPayload && !filteredClientsPayload.ok) {
           setErrorMessage(filteredClientsPayload.error.message);
           return;
@@ -112,6 +131,7 @@ export default function PTClientsPage() {
 
         setCategories(categoriesPayload.data.items);
         setAllClients(allClientsPayload.data.items);
+        setSentInvitations(invitationsPayload.data.items);
         setVisibleClients(
           categoryId === null
             ? allClientsPayload.data.items
@@ -185,6 +205,48 @@ export default function PTClientsPage() {
       });
     } finally {
       setSubmittingCategory(false);
+    }
+  }
+
+  async function handleInviteClient(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmittingInvitation(true);
+    setFeedback(null);
+
+    try {
+      const response = await fetch("/api/pt/client-invitations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ client_email: draftInviteEmail }),
+      });
+      const payload = (await response.json()) as ApiResponse<PTClientInvitation>;
+
+      if (!payload.ok) {
+        setFeedback({
+          tone: "error",
+          title: "Unable To Send Invite",
+          message: payload.error.message,
+        });
+        return;
+      }
+
+      setDraftInviteEmail("");
+      setSentInvitations((current) => [payload.data, ...current.filter((item) => item.id !== payload.data.id)]);
+      setFeedback({
+        tone: "success",
+        title: "Invite Sent",
+        message: "The PT invite was sent through the protected BFF workflow.",
+      });
+    } catch {
+      setFeedback({
+        tone: "error",
+        title: "Unable To Send Invite",
+        message: "The PT invitation request could not be completed.",
+      });
+    } finally {
+      setSubmittingInvitation(false);
     }
   }
 
@@ -267,8 +329,49 @@ export default function PTClientsPage() {
         <SectionBlock
           eyebrow="Roster"
           title="Your Roster"
-          description="Open every linked client, create PT-owned roster categories, and keep each client mapped to the right roster folder through the protected BFF workflow."
         >
+          <Card className="pt-roster-category-form" variant="soft">
+            <form className="pt-roster-category-form__layout" onSubmit={handleInviteClient}>
+              <div>
+                <p className="page-header__eyebrow">Invite Client</p>
+                <h3 className="page-header__title">Invite an existing client</h3>
+              </div>
+              <div className="field">
+                <label htmlFor="pt-invite-client-email">Client email</label>
+                <input
+                  id="pt-invite-client-email"
+                  type="email"
+                  value={draftInviteEmail}
+                  onChange={(event) => setDraftInviteEmail(event.target.value)}
+                  placeholder="client@example.com"
+                  disabled={submittingInvitation}
+                />
+              </div>
+              <div className="action-row">
+                <button type="submit" disabled={submittingInvitation}>
+                  {submittingInvitation ? "Sending..." : "Send Invite"}
+                </button>
+              </div>
+            </form>
+          </Card>
+
+          {sentInvitations.length > 0 ? (
+            <Card className="pt-roster-category-form" variant="soft">
+              <div className="stacked-list">
+                <div>
+                  <p className="page-header__eyebrow">Sent invites</p>
+                  <h3 className="page-header__title">Pending and recent roster invites</h3>
+                </div>
+                {sentInvitations.map((invitation) => (
+                  <div key={invitation.id} className="record-card__meta">
+                    <span>{invitation.client_email}</span>
+                    <span>{invitation.status.replaceAll("_", " ")}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ) : null}
+
           <div className="pt-roster-folders" role="list" aria-label="PT roster folders">
             <button
               type="button"
@@ -390,7 +493,19 @@ export default function PTClientsPage() {
                   {visibleClients.length > 0 ? (
                     visibleClients.map((client) => (
                       <tr key={client.id}>
-                        <td>{client.client_name}</td>
+                        <td>
+                          <div className="stacked-list">
+                            <span>{client.client_name}</span>
+                            {client.status === "active" ? (
+                              <Link
+                                className="link-button"
+                                href={`/pt/clients/${client.client_user_id}/log-history?clientEmail=${encodeURIComponent(client.client_email)}`}
+                              >
+                                View Log History
+                              </Link>
+                            ) : null}
+                          </div>
+                        </td>
                         <td>{client.client_email}</td>
                         <td>
                           <label className="sr-only" htmlFor={`roster-category-${client.client_user_id}`}>

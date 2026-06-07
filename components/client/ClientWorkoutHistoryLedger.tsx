@@ -14,7 +14,7 @@ import {
   type WorkoutHistoryItemView,
 } from "@/lib/adapters/workout-history";
 import { useSessionBootstrap } from "@/lib/client/session";
-import type { ApiResponse, JsonValue } from "@/lib/types/api";
+import type { ApiResponse, JsonValue, UserRole } from "@/lib/types/api";
 import type { WorkoutLogMode } from "@/lib/types/training";
 
 type WorkoutHistoryResponse = ApiResponse<JsonValue>;
@@ -37,6 +37,11 @@ type ClientWorkoutHistoryLedgerProps = {
   backHref: string;
   backLabel: string;
   className?: string;
+  viewerRole?: Extract<UserRole, "client" | "pt">;
+  historyApiPath?: string;
+  pageTitle?: string;
+  pageSubtitle?: string;
+  sectionDescription?: string;
 };
 
 const PAGE_LIMIT = 30;
@@ -171,9 +176,14 @@ export function ClientWorkoutHistoryLedger({
   backHref,
   backLabel,
   className,
+  viewerRole = "client",
+  historyApiPath = "/api/client/training/workout-logs",
+  pageTitle = "Log History",
+  pageSubtitle = "Review and filter saved workout entries from newest to oldest.",
+  sectionDescription = "Review and filter saved workout entries from newest to oldest.",
 }: ClientWorkoutHistoryLedgerProps) {
   const { status, user } = useSessionBootstrap({
-    requiredRole: "client",
+    requiredRole: viewerRole,
     unauthenticatedRedirectTo: "/login",
   });
 
@@ -185,7 +195,7 @@ export function ClientWorkoutHistoryLedger({
   const [offset, setOffset] = useState(0);
 
   useEffect(() => {
-    if (status !== "authenticated" || !user || user.role !== "client") {
+    if (status !== "authenticated" || !user || user.role !== viewerRole) {
       return;
     }
 
@@ -211,7 +221,7 @@ export function ClientWorkoutHistoryLedger({
           params.set("search", normalizedSearch);
         }
 
-        const response = await fetch(`/api/client/training/workout-logs?${params.toString()}`, {
+        const response = await fetch(`${historyApiPath}?${params.toString()}`, {
           cache: "no-store",
           signal: controller.signal,
         });
@@ -248,7 +258,7 @@ export function ClientWorkoutHistoryLedger({
       active = false;
       controller.abort();
     };
-  }, [offset, searchValue, status, typeFilter, user]);
+  }, [historyApiPath, offset, searchValue, status, typeFilter, user, viewerRole]);
 
   const historyPage = useMemo(() => adaptWorkoutHistoryPage(historyData), [historyData]);
   const tableRows = useMemo(
@@ -279,21 +289,37 @@ export function ClientWorkoutHistoryLedger({
   };
 
   if (status === "loading") {
-    return <LoadingBlock title="Loading workout history" message="Validating your client session." />;
+    return (
+      <LoadingBlock
+        title="Loading workout history"
+        message={`Validating your ${viewerRole === "pt" ? "PT" : "client"} session.`}
+      />
+    );
   }
 
   if (status !== "authenticated" || !user) {
-    return <LoadingBlock title="Redirecting" message="Workout history requires an authenticated client session." />;
+    return (
+      <LoadingBlock
+        title="Redirecting"
+        message={`Workout history requires an authenticated ${viewerRole} session.`}
+      />
+    );
   }
 
   return (
     <PageShell
-      title="Log History"
+      title={pageTitle}
       user={user}
+      subtitle={pageSubtitle}
       className={className}
       navigation={<Link className="link-button" href={backHref}>{backLabel}</Link>}
     >
-      {loading ? <LoadingBlock title="Loading history" message="Fetching saved workout logs through the protected client route." /> : null}
+      {loading ? (
+        <LoadingBlock
+          title="Loading history"
+          message={`Fetching saved workout logs through the protected ${viewerRole} route.`}
+        />
+      ) : null}
       {errorMessage ? <ErrorBlock title="Unable to load workout history" message={errorMessage} /> : null}
 
       {!loading && !errorMessage ? (
@@ -301,7 +327,7 @@ export function ClientWorkoutHistoryLedger({
           <SectionBlock
             eyebrow="Log history"
             title="Log History"
-            description="Review and filter saved workout entries from newest to oldest."
+            description={sectionDescription}
           >
             <div className="client-add-log-context">
               <div

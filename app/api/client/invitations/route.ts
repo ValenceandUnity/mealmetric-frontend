@@ -1,0 +1,24 @@
+import { NextResponse } from "next/server";
+
+import { requireSession } from "@/lib/auth/session";
+import { backendFetch, toApiErrorResponse } from "@/lib/backend/client";
+import type {
+  ApiResponse,
+  PTClientInvitationListResponse,
+} from "@/lib/types/api";
+
+export async function GET() {
+  try {
+    const session = await requireSession("client");
+    const data = await backendFetch<PTClientInvitationListResponse>("/client/invitations", {
+      session,
+    });
+
+    return NextResponse.json<ApiResponse<PTClientInvitationListResponse>>({
+      ok: true,
+      data,
+    });
+  } catch (error) {
+    return toApiErrorResponse(error, "Unable to load client invitations.");
+  }
+}

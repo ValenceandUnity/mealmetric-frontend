@@ -13,6 +13,8 @@ import type {
   ApiResponse,
   NotificationItem,
   NotificationListPayload,
+  PTClientInvitation,
+  PTClientInvitationListResponse,
   UserRole,
 } from "@/lib/types/api";
 
@@ -24,6 +26,8 @@ type NotificationsPageProps = {
 
 type NotificationListApiResponse = ApiResponse<NotificationListPayload>;
 type NotificationItemApiResponse = ApiResponse<NotificationItem>;
+type InvitationListApiResponse = ApiResponse<PTClientInvitationListResponse>;
+type InvitationItemApiResponse = ApiResponse<PTClientInvitation>;
 
 function formatDateTime(value: string): string {
   const parsed = new Date(value);
@@ -44,9 +48,11 @@ export function NotificationsPage({ role, title, description }: NotificationsPag
   });
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<PTClientInvitation[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [updatingInvitationId, setUpdatingInvitationId] = useState<string | null>(null);
 
   useEffect(() => {
     if (status !== "authenticated" || !user || user.role !== role) {
@@ -60,8 +66,16 @@ export function NotificationsPage({ role, title, description }: NotificationsPag
       setErrorMessage(null);
 
       try {
-        const response = await fetch("/api/notifications", { cache: "no-store" });
-        const payload = (await response.json()) as NotificationListApiResponse;
+        const [notificationsResponse, invitationsResponse] = await Promise.all([
+          fetch("/api/notifications", { cache: "no-store" }),
+          role === "client"
+            ? fetch("/api/client/invitations", { cache: "no-store" })
+            : Promise.resolve(null),
+        ]);
+        const payload = (await notificationsResponse.json()) as NotificationListApiResponse;
+        const invitationsPayload = invitationsResponse
+          ? ((await invitationsResponse.json()) as InvitationListApiResponse)
+          : null;
 
         if (!active) {
           return;
@@ -70,14 +84,28 @@ export function NotificationsPage({ role, title, description }: NotificationsPag
         if (!payload.ok) {
           setErrorMessage(payload.error.message);
           setNotifications([]);
+          setPendingInvitations([]);
+          return;
+        }
+
+        if (invitationsPayload && !invitationsPayload.ok) {
+          setErrorMessage(invitationsPayload.error.message);
+          setNotifications([]);
+          setPendingInvitations([]);
           return;
         }
 
         setNotifications(payload.data.items);
+        setPendingInvitations(
+          invitationsPayload
+            ? invitationsPayload.data.items.filter((item) => item.status === "pending")
+            : [],
+        );
       } catch {
         if (active) {
           setErrorMessage("Unable to load notifications.");
           setNotifications([]);
+          setPendingInvitations([]);
         }
       } finally {
         if (active) {
@@ -116,6 +144,46 @@ export function NotificationsPage({ role, title, description }: NotificationsPag
     }
   }
 
+  async function respondToInvitation(invitationId: string, action: "accept" | "decline") {
+    setUpdatingInvitationId(invitationId);
+    try {
+      const response = await fetch(`/api/client/invitations/${invitationId}/${action}`, {
+        method: "POST",
+      });
+      const payload = (await response.json()) as InvitationItemApiResponse;
+
+      if (!payload.ok) {
+        setErrorMessage(payload.error.message);
+        return;
+      }
+
+      setPendingInvitations((current) => current.filter((item) => item.id !== invitationId));
+      setNotifications((current) =>
+        current.map((item) =>
+          item.related_entity_type === "pt_client_invitation" && item.related_entity_id === invitationId
+            ? { ...item, is_read: true }
+            : item,
+        ),
+      );
+    } catch {
+      setErrorMessage(
+        action === "accept" ? "Unable to accept invitation." : "Unable to decline invitation.",
+      );
+    } finally {
+      setUpdatingInvitationId(null);
+    }
+  }
+
+  const visibleNotifications = notifications.filter((notification) => {
+    if (
+      notification.type === "pt_client_invitation_received" &&
+      notification.related_entity_type === "pt_client_invitation"
+    ) {
+      return !pendingInvitations.some((invitation) => invitation.id === notification.related_entity_id);
+    }
+    return true;
+  });
+
   if (status === "loading") {
     return <LoadingBlock title="Loading notifications" message="Validating your BFF-managed session." />;
   }
@@ -130,9 +198,48 @@ export function NotificationsPage({ role, title, description }: NotificationsPag
       {errorMessage ? <ErrorBlock title="Unable to load notifications" message={errorMessage} /> : null}
 
       {!loading && !errorMessage ? (
-        notifications.length > 0 ? (
+        pendingInvitations.length > 0 || visibleNotifications.length > 0 ? (
           <div className="stacked-list">
-            {notifications.map((notification) => (
+            {pendingInvitations.map((invitation) => (
+              <Card
+                key={invitation.id}
+                className="notification-card"
+                variant="soft"
+              >
+                <PageHeader
+                  eyebrow="pending invite"
+                  title="PT roster invitation"
+                  description={`${invitation.pt_email} invited you to join their PT roster.`}
+                  status={{
+                    label: "Pending",
+                    tone: "accent",
+                  }}
+                />
+                <div className="notification-card__meta">
+                  <span>Created {formatDateTime(invitation.created_at)}</span>
+                  <span>Client: {invitation.client_email}</span>
+                </div>
+                <div className="action-row">
+                  <button
+                    type="button"
+                    onClick={() => void respondToInvitation(invitation.id, "accept")}
+                    disabled={updatingInvitationId === invitation.id}
+                  >
+                    {updatingInvitationId === invitation.id ? "Updating..." : "Accept"}
+                  </button>
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() => void respondToInvitation(invitation.id, "decline")}
+                    disabled={updatingInvitationId === invitation.id}
+                  >
+                    Decline
+                  </button>
+                </div>
+              </Card>
+            ))}
+
+            {visibleNotifications.map((notification) => (
               <Card
                 key={notification.id}
                 className="notification-card"

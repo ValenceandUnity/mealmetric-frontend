@@ -10,11 +10,29 @@ type RouteContext = {
   }>;
 };
 
-export async function GET(_: Request, context: RouteContext) {
+function getForwardedWorkoutLogSearchParams(request: Request): URLSearchParams {
+  const requestUrl = new URL(request.url);
+  const forwarded = new URLSearchParams();
+
+  for (const key of ["limit", "offset", "mode", "search"]) {
+    const value = requestUrl.searchParams.get(key);
+    if (value && value.trim().length > 0) {
+      forwarded.set(key, value);
+    }
+  }
+
+  return forwarded;
+}
+
+export async function GET(request: Request, context: RouteContext) {
   try {
     const session = await requireSession("pt");
     const { clientId } = await context.params;
-    const data = await backendFetch<JsonValue>(`/pt/clients/${clientId}/workout-logs`, { session });
+    const searchParams = getForwardedWorkoutLogSearchParams(request);
+    const data = await backendFetch<JsonValue>(`/pt/clients/${clientId}/workout-logs`, {
+      session,
+      searchParams,
+    });
 
     return NextResponse.json<ApiResponse<JsonValue>>({
       ok: true,
