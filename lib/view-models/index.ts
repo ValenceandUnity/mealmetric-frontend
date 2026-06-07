@@ -2,6 +2,7 @@ export { adaptClientHomeView } from "@/lib/view-models/client-home";
 export { adaptClientTrainingView } from "@/lib/view-models/client-training";
 export { adaptPTDashboardView } from "@/lib/view-models/pt-dashboard";
 export { adaptPTClientDetailView } from "@/lib/view-models/pt-client-detail";
+export { adaptPTClientMetricsView } from "@/lib/view-models/pt-client-metrics";
 export { adaptPTTrainingView } from "@/lib/view-models/pt-training";
 export {
   adaptMetricsView,
