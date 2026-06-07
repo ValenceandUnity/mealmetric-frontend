@@ -2996,6 +2996,16 @@ html[data-theme="light"] .client-settings-toggle__option {
   margin-top: 1rem;
 }
 
+.pt-roster-invite-toggle {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.pt-roster-invite-toggle > button {
+  min-width: min(100%, 16rem);
+}
+
 .pt-roster-category-form__layout {
   display: grid;
   gap: 1rem;

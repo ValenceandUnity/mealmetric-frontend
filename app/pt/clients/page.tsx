@@ -38,6 +38,7 @@ export default function PTClientsPage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [showInviteForm, setShowInviteForm] = useState(false);
   const [draftCategoryName, setDraftCategoryName] = useState("");
   const [draftInviteEmail, setDraftInviteEmail] = useState("");
   const [submittingCategory, setSubmittingCategory] = useState(false);
@@ -234,6 +235,7 @@ export default function PTClientsPage() {
 
       setDraftInviteEmail("");
       setSentInvitations((current) => [payload.data, ...current.filter((item) => item.id !== payload.data.id)]);
+      setShowInviteForm(false);
       setFeedback({
         tone: "success",
         title: "Invite Sent",
@@ -328,32 +330,48 @@ export default function PTClientsPage() {
       {!loading && !errorMessage ? (
         <SectionBlock
           eyebrow="Roster"
-          title="Your Roster"
+          title="Client Roster"
         >
-          <Card className="pt-roster-category-form" variant="soft">
-            <form className="pt-roster-category-form__layout" onSubmit={handleInviteClient}>
-              <div>
-                <p className="page-header__eyebrow">Invite Client</p>
-                <h3 className="page-header__title">Invite an existing client</h3>
-              </div>
-              <div className="field">
-                <label htmlFor="pt-invite-client-email">Client email</label>
-                <input
-                  id="pt-invite-client-email"
-                  type="email"
-                  value={draftInviteEmail}
-                  onChange={(event) => setDraftInviteEmail(event.target.value)}
-                  placeholder="client@example.com"
-                  disabled={submittingInvitation}
-                />
-              </div>
-              <div className="action-row">
-                <button type="submit" disabled={submittingInvitation}>
-                  {submittingInvitation ? "Sending..." : "Send Invite"}
-                </button>
-              </div>
-            </form>
-          </Card>
+          {showInviteForm ? (
+            <Card className="pt-roster-category-form" variant="soft">
+              <form className="pt-roster-category-form__layout" onSubmit={handleInviteClient}>
+                <div>
+                  <p className="page-header__eyebrow">Invite Client</p>
+                  <h3 className="page-header__title">Invite an existing client</h3>
+                </div>
+                <div className="field">
+                  <label htmlFor="pt-invite-client-email">Client email</label>
+                  <input
+                    id="pt-invite-client-email"
+                    type="email"
+                    value={draftInviteEmail}
+                    onChange={(event) => setDraftInviteEmail(event.target.value)}
+                    placeholder="client@example.com"
+                    disabled={submittingInvitation}
+                  />
+                </div>
+                <div className="action-row">
+                  <button type="submit" disabled={submittingInvitation}>
+                    {submittingInvitation ? "Sending..." : "Send Invite"}
+                  </button>
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() => setShowInviteForm(false)}
+                    disabled={submittingInvitation}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </Card>
+          ) : (
+            <div className="pt-roster-invite-toggle">
+              <button type="button" onClick={() => setShowInviteForm(true)}>
+                Invite a Client
+              </button>
+            </div>
+          )}
 
           {sentInvitations.length > 0 ? (
             <Card className="pt-roster-category-form" variant="soft">
@@ -393,23 +411,6 @@ export default function PTClientsPage() {
               </span>
             </button>
 
-            <button
-              type="button"
-              className={[
-                "pt-roster-folder",
-                showCategoryForm ? "pt-roster-folder--active" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() => setShowCategoryForm((current) => !current)}
-              aria-label="Add a new roster category"
-            >
-              <span className="pt-roster-folder__body">
-                <span className="pt-roster-folder__title">Add a New Category</span>
-                <span className="pt-roster-folder__meta">Create a PT-owned roster folder</span>
-              </span>
-            </button>
-
             {categories.map((category) => (
               <button
                 key={category.id}
@@ -434,6 +435,23 @@ export default function PTClientsPage() {
                 </span>
               </button>
             ))}
+
+            <button
+              type="button"
+              className={[
+                "pt-roster-folder",
+                showCategoryForm ? "pt-roster-folder--active" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              onClick={() => setShowCategoryForm((current) => !current)}
+              aria-label="Add a new roster category"
+            >
+              <span className="pt-roster-folder__body">
+                <span className="pt-roster-folder__title">Add a New Category</span>
+                <span className="pt-roster-folder__meta">Create a PT-owned roster folder</span>
+              </span>
+            </button>
           </div>
 
           {showCategoryForm ? (
