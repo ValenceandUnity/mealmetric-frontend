@@ -1731,9 +1731,26 @@ html[data-theme="light"] .mobile-training-form textarea {
 .mobile-pt-state-card,
 .mobile-pt-client-card,
 .mobile-pt-form-card,
-.mobile-pt-form-grid {
+.mobile-pt-form-grid,
+.mobile-pt-detail-hero,
+.mobile-pt-detail-action-card,
+.mobile-pt-detail-assignment-card,
+.mobile-pt-detail-log-card,
+.mobile-pt-note-block,
+.mobile-pt-note-form,
+.mobile-pt-detail-stack {
   display: grid;
   gap: var(--mobile-space-3);
+}
+
+.mobile-pt-detail-stat-grid,
+.mobile-pt-detail-action-grid {
+  display: grid;
+  gap: var(--mobile-space-3);
+}
+
+.mobile-pt-detail-action-grid {
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
 }
 
 .mobile-pt-chip-grid {
@@ -1783,6 +1800,54 @@ html[data-theme="light"] .mobile-pt-chip-card--active {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
   gap: var(--mobile-space-3);
+}
+
+.mobile-pt-detail-meta-list {
+  display: grid;
+  gap: var(--mobile-space-2);
+  margin: 0;
+}
+
+.mobile-pt-detail-meta-list div {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid var(--mobile-card-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mobile-pt-log-meta {
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+}
+
+.mobile-pt-detail-meta-list dt {
+  margin: 0;
+  color: var(--mobile-text-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mobile-pt-detail-meta-list dd,
+.mobile-pt-note-text {
+  margin: 0;
+  color: var(--mobile-text);
+  line-height: 1.5;
+}
+
+.mobile-pt-note-text {
+  white-space: pre-wrap;
+}
+
+.mobile-pt-note-feedback {
+  margin: 0;
+  color: var(--mobile-success);
+  font-size: 0.9rem;
+}
+
+.mobile-pt-note-feedback--error {
+  color: var(--mobile-error);
 }
 
 .mobile-pt-form-grid input,
@@ -1844,7 +1909,9 @@ html[data-theme="light"] .mobile-pt-form-grid textarea {
   }
 
   .mobile-pt-chip-grid,
-  .mobile-pt-fact-grid {
+  .mobile-pt-fact-grid,
+  .mobile-pt-detail-action-grid,
+  .mobile-pt-log-meta {
     grid-template-columns: 1fr;
   }
 
