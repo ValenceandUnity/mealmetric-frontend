@@ -1,51 +1,86 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
-import { AnalyticsCard } from "@/components/analytics/AnalyticsCard";
-import { PageShell } from "@/components/layout/PageShell";
-import { MealPlanCard } from "@/components/meal-plans/MealPlanCard";
-import { MealPlansTopNav } from "@/components/meal-plans/MealPlansTopNav";
-import { ActionRow } from "@/components/ui/ActionRow";
-import { Badge } from "@/components/ui/Badge";
-import { Card } from "@/components/ui/Card";
-import { Chip } from "@/components/ui/Chip";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { ErrorBlock } from "@/components/ui/ErrorBlock";
-import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
-import { LoadingBlock } from "@/components/ui/LoadingBlock";
-import { ListRow } from "@/components/ui/ListRow";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { SectionBlock } from "@/components/ui/SectionBlock";
-import { StatPill } from "@/components/ui/StatPill";
+import { MobileAppShell } from "@/components/mobile/MobileAppShell";
+import { MobileCard } from "@/components/mobile/MobileCard";
+import { MobileMealPlanRow } from "@/components/mobile/MobileMealPlanRow";
+import { MobileSection } from "@/components/mobile/MobileSection";
+import { MobileStatCard } from "@/components/mobile/MobileStatCard";
 import {
   readActiveMealPlanZipCodes,
   writeActiveMealPlanZipCodes,
 } from "@/lib/client/meal-plan-zip-tracker";
 import { useSessionBootstrap } from "@/lib/client/session";
+import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import type {
   ApiResponse,
   BookmarkFolder,
   BookmarkFolderListPayload,
-  MealPlanSummary,
+  MealPlanListPayload,
 } from "@/lib/types/api";
+import { formatDisplayNameFromUser } from "@/lib/view-models/common";
+import {
+  adaptClientMealPlansView,
+  type MealPlanTrackedLocationInput,
+  type MobileBookmarkFolderView,
+  type MobileMealPlanRowView,
+} from "@/lib/view-models/meal-plans";
 
-type MealPlansResponse = ApiResponse<{ items: MealPlanSummary[]; count: number }>;
-type BookmarksResponse = ApiResponse<BookmarkFolderListPayload>;
+type MealPlansApiResponse = ApiResponse<MealPlanListPayload>;
+type BookmarksApiResponse = ApiResponse<BookmarkFolderListPayload>;
 type CreateFolderResponse = ApiResponse<BookmarkFolder>;
-type ZipTrackerEntry = {
-  id: string;
-  label: string;
-  kind: "zip" | "city";
-  selected: boolean;
-};
 
 type FilterDraft = {
   zipCode: string;
   budgetMax: string;
   budgetDuration: string;
   customDuration: string;
+};
+
+type FeedbackState = {
+  tone: "info" | "success" | "warning" | "error";
+  title: string;
+  message: string;
+};
+
+type SectionErrors = {
+  mealPlans: string | null;
+  bookmarks: string | null;
+};
+
+type ActionPillProps = {
+  href: string;
+  children: string;
+  tone?: "purple" | "yellow";
+};
+
+type ActionPillButtonProps = {
+  onClick: () => void;
+  children: string;
+  tone?: "purple" | "yellow";
+  disabled?: boolean;
+  ariaLabel?: string;
+};
+
+type DirectoryStateCardProps = {
+  title: string;
+  message: string;
+  action?: ReactNode;
+};
+
+type DirectoryFeedbackCardProps = {
+  feedback: FeedbackState;
+};
+
+type MealPlanDirectoryCardProps = {
+  row: MobileMealPlanRowView;
+  eyebrow: string;
+  bookmarkBusy: boolean;
+  bookmarksAvailable: boolean;
+  onToggleBookmark: (row: MobileMealPlanRowView) => void;
 };
 
 const DEFAULT_FILTERS: FilterDraft = {
@@ -55,40 +90,163 @@ const DEFAULT_FILTERS: FilterDraft = {
   customDuration: "",
 };
 
-function getBookmarkedMealPlanIds(folders: BookmarkFolder[]): Set<string> {
-  return new Set(folders.flatMap((folder) => folder.items.map((item) => item.meal_plan_id)));
+const EMPTY_SECTION_ERRORS: SectionErrors = {
+  mealPlans: null,
+  bookmarks: null,
+};
+
+const DIRECTORY_LINKS: Array<{
+  href: string;
+  label: string;
+  tone: "purple" | "yellow";
+}> = [
+  { href: "/client/meal-plans", label: "Home", tone: "purple" },
+  { href: "/client/meal-plans/schedule", label: "Schedule", tone: "yellow" },
+  { href: "/client/meal-plans/search", label: "Search", tone: "yellow" },
+  { href: "/client/meal-plans/bookmark", label: "Bookmark", tone: "yellow" },
+];
+
+function ActionPill({ href, children, tone = "yellow" }: ActionPillProps) {
+  return (
+    <Link href={href} className={`mobile-pill mobile-pill--${tone} mobile-focus-ring`}>
+      {children}
+    </Link>
+  );
 }
 
-function findBookmarkMatch(
-  folders: BookmarkFolder[],
-  mealPlanId: string,
-): { folderId: string; itemId: string } | null {
-  for (const folder of folders) {
-    for (const item of folder.items) {
-      if (item.meal_plan_id === mealPlanId) {
-        return { folderId: folder.id, itemId: item.id };
-      }
-    }
+function ActionPillButton({
+  onClick,
+  children,
+  tone = "yellow",
+  disabled = false,
+  ariaLabel,
+}: ActionPillButtonProps) {
+  return (
+    <button
+      type="button"
+      className={`mobile-pill mobile-pill--${tone} mobile-focus-ring`}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel}
+    >
+      {children}
+    </button>
+  );
+}
+
+function DirectoryStateCard({ title, message, action }: DirectoryStateCardProps) {
+  return (
+    <MobileCard as="div" variant="soft" className="mobile-pt-state-card">
+      <div className="mobile-section__copy">
+        <h3 className="mobile-section__title">{title}</h3>
+        <p className="mobile-section__description">{message}</p>
+      </div>
+      {action ? <div className="mobile-pt-actions">{action}</div> : null}
+    </MobileCard>
+  );
+}
+
+function DirectoryFeedbackCard({ feedback }: DirectoryFeedbackCardProps) {
+  const tone = feedback.tone === "success" ? "yellow" : "purple";
+
+  return (
+    <MobileCard as="div" variant="soft" className="mobile-pt-state-card">
+      <div
+        className="mobile-pt-client-card__header"
+        role={feedback.tone === "error" ? "alert" : "status"}
+        aria-live="polite"
+      >
+        <div className="mobile-section__copy">
+          <p className="mobile-section__eyebrow">Bookmark status</p>
+          <h3 className="mobile-section__title">{feedback.title}</h3>
+          <p className="mobile-section__description">{feedback.message}</p>
+        </div>
+        <span className={`mobile-pill mobile-pill--${tone}`}>{feedback.tone}</span>
+      </div>
+    </MobileCard>
+  );
+}
+
+function MealPlanDirectoryCard({
+  row,
+  eyebrow,
+  bookmarkBusy,
+  bookmarksAvailable,
+  onToggleBookmark,
+}: MealPlanDirectoryCardProps) {
+  const bookmarkActionLabel = row.isBookmarked ? "Remove bookmark" : "Save plan";
+  const bookmarkButtonLabel = bookmarkBusy
+    ? row.isBookmarked
+      ? "Removing..."
+      : "Saving..."
+    : bookmarksAvailable
+      ? bookmarkActionLabel
+      : "Bookmarks unavailable";
+
+  return (
+    <MobileCard as="article" variant="action">
+      <div className="mobile-pt-client-card__header">
+        <div className="mobile-section__copy">
+          <p className="mobile-section__eyebrow">{eyebrow}</p>
+          <h3 className="mobile-section__title">{row.name}</h3>
+          <p className="mobile-section__description">{row.vendorName}</p>
+        </div>
+        <span className={`mobile-pill ${row.isBookmarked ? "mobile-pill--yellow" : "mobile-pill--purple"}`}>
+          {row.isBookmarked ? "Saved" : row.statusLabel}
+        </span>
+      </div>
+
+      <dl className="mobile-pt-fact-grid">
+        <div>
+          <dt>Vendor ZIP</dt>
+          <dd>{row.vendorZipLabel}</dd>
+        </div>
+        <div>
+          <dt>Calories</dt>
+          <dd>{row.caloriesLabel}</dd>
+        </div>
+        <div>
+          <dt>Price</dt>
+          <dd>{row.priceLabel}</dd>
+        </div>
+        <div>
+          <dt>Items</dt>
+          <dd>{row.itemCountLabel}</dd>
+        </div>
+        <div>
+          <dt>Availability</dt>
+          <dd>{row.availabilityLabel}</dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd>{row.statusLabel}</dd>
+        </div>
+      </dl>
+
+      <div className="mobile-pt-actions">
+        <ActionPill href={row.href} tone="purple">View plan</ActionPill>
+        <ActionPillButton
+          onClick={() => onToggleBookmark(row)}
+          tone={row.isBookmarked ? "yellow" : "purple"}
+          disabled={!bookmarksAvailable || bookmarkBusy}
+          ariaLabel={`${bookmarkActionLabel} for ${row.name}`}
+        >
+          {bookmarkButtonLabel}
+        </ActionPillButton>
+      </div>
+    </MobileCard>
+  );
+}
+
+function matchesQuery(query: string, fields: Array<string | null | undefined>): boolean {
+  if (!query) {
+    return true;
   }
 
-  return null;
+  return fields.some((field) => field?.toLowerCase().includes(query));
 }
 
-function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
-function getActiveFilterChips(filters: FilterDraft) {
-  const chips: string[] = [];
-
-  if (filters.budgetMax.trim()) {
-    chips.push(`Max $${filters.budgetMax.trim()}`);
-  }
-
-  return chips;
-}
-
-function getSelectedZipCodes(entries: ZipTrackerEntry[]): string[] {
+function getSelectedZipCodes(entries: MealPlanTrackedLocationInput[]): string[] {
   const selectedZipCodes: string[] = [];
   const seen = new Set<string>();
 
@@ -103,6 +261,70 @@ function getSelectedZipCodes(entries: ZipTrackerEntry[]): string[] {
   return selectedZipCodes;
 }
 
+function findBookmarkMatch(
+  folders: BookmarkFolderListPayload | null,
+  mealPlanId: string,
+): { folderId: string; itemId: string } | null {
+  for (const folder of folders?.items ?? []) {
+    for (const item of folder.items) {
+      if (item.meal_plan_id === mealPlanId) {
+        return {
+          folderId: folder.id,
+          itemId: item.id,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+function getSummaryIcon(label: string) {
+  switch (label.toLowerCase()) {
+    case "loaded plans":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 6h10l2 4-7 8-7-8 2-4Zm0 0 5 6 5-6" />
+        </svg>
+      );
+    case "saved plans":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 5h8a1 1 0 0 1 1 1v13l-5-3-5 3V6a1 1 0 0 1 1-1Z" />
+        </svg>
+      );
+    case "vendors":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 19V9l7-4 7 4v10m-9 0v-5h4v5" />
+        </svg>
+      );
+    case "active zips":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 20s6-4.35 6-9a6 6 0 1 0-12 0c0 4.65 6 9 6 9Z" />
+          <circle cx="12" cy="11" r="2.5" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
+function getMealPlanSearchFields(row: MobileMealPlanRowView): string[] {
+  return [
+    row.name,
+    row.vendorName,
+    row.vendorZipLabel,
+    row.statusLabel,
+    row.priceLabel,
+    row.caloriesLabel,
+    row.itemCountLabel,
+    row.availabilityLabel,
+    row.bookmarkLabel,
+  ];
+}
+
 export default function ClientMealPlansPage() {
   const { status, user } = useSessionBootstrap({
     requiredRole: "client",
@@ -111,22 +333,24 @@ export default function ClientMealPlansPage() {
 
   const [filters, setFilters] = useState<FilterDraft>(DEFAULT_FILTERS);
   const [draft, setDraft] = useState<FilterDraft>(DEFAULT_FILTERS);
-  const [mealPlans, setMealPlans] = useState<MealPlanSummary[]>([]);
-  const [bookmarks, setBookmarks] = useState<BookmarkFolder[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [actionFeedback, setActionFeedback] = useState<{
-    tone: "info" | "success" | "warning" | "error";
-    title: string;
-    message: string;
-  } | null>(null);
+  const [mealPlansData, setMealPlansData] = useState<MealPlanListPayload | null>(null);
+  const [bookmarksData, setBookmarksData] = useState<BookmarkFolderListPayload | null>(null);
+  const [sectionErrors, setSectionErrors] = useState<SectionErrors>(EMPTY_SECTION_ERRORS);
+  const [actionFeedback, setActionFeedback] = useState<FeedbackState | null>(null);
   const [loading, setLoading] = useState(true);
   const [bookmarkBusyId, setBookmarkBusyId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [trackedLocations, setTrackedLocations] = useState<ZipTrackerEntry[]>([]);
-  const [draftTrackedLocations, setDraftTrackedLocations] = useState<ZipTrackerEntry[]>([]);
+  const [trackedLocations, setTrackedLocations] = useState<MealPlanTrackedLocationInput[]>([]);
+  const [draftTrackedLocations, setDraftTrackedLocations] = useState<MealPlanTrackedLocationInput[]>([]);
   const [trackerInput, setTrackerInput] = useState("");
   const [trackerStorageReady, setTrackerStorageReady] = useState(false);
-  const activeTrackedZipCodes = useMemo(() => getSelectedZipCodes(trackedLocations), [trackedLocations]);
+  const [searchValue, setSearchValue] = useState("");
+  const deferredSearch = useDeferredValue(searchValue);
+
+  const activeTrackedZipCodes = useMemo(
+    () => getSelectedZipCodes(trackedLocations),
+    [trackedLocations],
+  );
 
   useEffect(() => {
     const activeZipCodes = readActiveMealPlanZipCodes();
@@ -135,7 +359,7 @@ export default function ClientMealPlansPage() {
       return;
     }
 
-    const persistedTrackedLocations: ZipTrackerEntry[] = activeZipCodes.map((zipCode) => ({
+    const persistedTrackedLocations: MealPlanTrackedLocationInput[] = activeZipCodes.map((zipCode) => ({
       id: `zip-${zipCode}-persisted`,
       label: zipCode,
       kind: "zip",
@@ -159,6 +383,7 @@ export default function ClientMealPlansPage() {
     if (!trackerStorageReady) {
       return;
     }
+
     writeActiveMealPlanZipCodes(activeTrackedZipCodes);
   }, [activeTrackedZipCodes, trackerStorageReady]);
 
@@ -174,7 +399,7 @@ export default function ClientMealPlansPage() {
 
     async function load() {
       setLoading(true);
-      setLoadError(null);
+      setSectionErrors(EMPTY_SECTION_ERRORS);
 
       const searchParams = new URLSearchParams();
       if (activeTrackedZipCodes.length > 0) {
@@ -186,43 +411,51 @@ export default function ClientMealPlansPage() {
         searchParams.set("budget_max_cents", String(Number(filters.budgetMax) * 100));
       }
 
+      const mealPlanUrl = searchParams.toString()
+        ? `/api/client/meal-plans?${searchParams.toString()}`
+        : "/api/client/meal-plans";
+
       try {
-        const mealPlanUrl = searchParams.toString()
-          ? `/api/client/meal-plans?${searchParams.toString()}`
-          : "/api/client/meal-plans";
-
-        const [mealPlanResponse, bookmarkResponse] = await Promise.all([
-          fetch(mealPlanUrl, { cache: "no-store" }),
-          fetch("/api/client/bookmarks", { cache: "no-store" }),
+        const [mealPlansResult, bookmarksResult] = await Promise.allSettled([
+          fetch(mealPlanUrl, { cache: "no-store" }).then(
+            (response) => response.json() as Promise<MealPlansApiResponse>,
+          ),
+          fetch("/api/client/bookmarks", { cache: "no-store" }).then(
+            (response) => response.json() as Promise<BookmarksApiResponse>,
+          ),
         ]);
-
-        const mealPlanPayload = (await mealPlanResponse.json()) as MealPlansResponse;
-        const bookmarkPayload = (await bookmarkResponse.json()) as BookmarksResponse;
 
         if (!active) {
           return;
         }
 
-        if (!mealPlanPayload.ok) {
-          setLoadError(mealPlanPayload.error.message);
-          setMealPlans([]);
-          return;
+        const nextErrors: SectionErrors = { ...EMPTY_SECTION_ERRORS };
+
+        if (mealPlansResult.status === "fulfilled") {
+          if (mealPlansResult.value.ok) {
+            setMealPlansData(mealPlansResult.value.data);
+          } else {
+            nextErrors.mealPlans = mealPlansResult.value.error.message ?? "Unable to load meal plans.";
+            setMealPlansData(null);
+          }
+        } else {
+          nextErrors.mealPlans = "Unable to load meal plans.";
+          setMealPlansData(null);
         }
 
-        if (!bookmarkPayload.ok) {
-          setLoadError(bookmarkPayload.error.message);
-          setBookmarks([]);
-          return;
+        if (bookmarksResult.status === "fulfilled") {
+          if (bookmarksResult.value.ok) {
+            setBookmarksData(bookmarksResult.value.data);
+          } else {
+            nextErrors.bookmarks = bookmarksResult.value.error.message ?? "Unable to load bookmarks.";
+            setBookmarksData(null);
+          }
+        } else {
+          nextErrors.bookmarks = "Unable to load bookmarks.";
+          setBookmarksData(null);
         }
 
-        setMealPlans(mealPlanPayload.data.items);
-        setBookmarks(bookmarkPayload.data.items);
-      } catch {
-        if (active) {
-          setLoadError("Unable to load meal plans.");
-          setMealPlans([]);
-          setBookmarks([]);
-        }
+        setSectionErrors(nextErrors);
       } finally {
         if (active) {
           setLoading(false);
@@ -235,51 +468,139 @@ export default function ClientMealPlansPage() {
     return () => {
       active = false;
     };
-  }, [activeTrackedZipCodes, filters, status, trackerStorageReady, user]);
+  }, [
+    activeTrackedZipCodes,
+    filters.budgetMax,
+    filters.zipCode,
+    status,
+    trackerStorageReady,
+    user,
+  ]);
 
-  const bookmarkedIds = useMemo(() => getBookmarkedMealPlanIds(bookmarks), [bookmarks]);
-  const activeFilterChips = useMemo(() => getActiveFilterChips(filters), [filters]);
-
-  const vendorCount = useMemo(
-    () => new Set(mealPlans.map((mealPlan) => mealPlan.vendor_id)).size,
-    [mealPlans],
-  );
-  const totalMeals = useMemo(
-    () => mealPlans.reduce((sum, mealPlan) => sum + mealPlan.item_count, 0),
-    [mealPlans],
-  );
-  const priceRange = useMemo(() => {
-    if (mealPlans.length === 0) {
-      return "Unavailable";
+  async function refreshBookmarks() {
+    const response = await fetch("/api/client/bookmarks", { cache: "no-store" });
+    const payload = (await response.json()) as BookmarksApiResponse;
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
     }
 
-    const values = mealPlans.map((mealPlan) => mealPlan.total_price_cents);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
+    setBookmarksData(payload.data);
+    setSectionErrors((current) => ({
+      ...current,
+      bookmarks: null,
+    }));
+  }
 
-    return min === max ? formatPrice(min) : `${formatPrice(min)} to ${formatPrice(max)}`;
-  }, [mealPlans]);
-
-  const highlightedPlan = useMemo(() => {
-    const bookmarkedPlan = mealPlans.find((mealPlan) => bookmarkedIds.has(mealPlan.id));
-    return bookmarkedPlan ?? mealPlans[0] ?? null;
-  }, [bookmarkedIds, mealPlans]);
-  const resolvedBudget = useMemo(() => Number(filters.budgetMax) || 0, [filters.budgetMax]);
-  const resolvedDurationLabel = useMemo(() => {
-    if (filters.budgetDuration === "custom duration") {
-      return filters.customDuration.trim() || "Custom duration";
+  async function ensureDefaultFolder(): Promise<BookmarkFolder | null> {
+    if (bookmarksData?.items?.length) {
+      return bookmarksData.items[0] ?? null;
     }
 
-    return filters.budgetDuration;
-  }, [filters.budgetDuration, filters.customDuration]);
-  const activeZipCount = useMemo(
-    () => trackedLocations.filter((entry) => entry.kind === "zip" && entry.selected).length,
-    [trackedLocations],
-  );
-  const draftActiveZipCount = useMemo(
-    () => draftTrackedLocations.filter((entry) => entry.kind === "zip" && entry.selected).length,
-    [draftTrackedLocations],
-  );
+    const response = await fetch("/api/client/bookmarks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Favorites" }),
+    });
+    const payload = (await response.json()) as CreateFolderResponse;
+
+    if (!payload.ok) {
+      setActionFeedback({
+        tone: "error",
+        title: "Bookmark update failed",
+        message: payload.error.message,
+      });
+      return null;
+    }
+
+    setBookmarksData({
+      items: [payload.data],
+      count: 1,
+    });
+    setSectionErrors((current) => ({
+      ...current,
+      bookmarks: null,
+    }));
+
+    return payload.data;
+  }
+
+  async function handleToggleBookmark(row: MobileMealPlanRowView) {
+    if (!row.id) {
+      setActionFeedback({
+        tone: "error",
+        title: "Bookmark update failed",
+        message: "This meal plan is missing an identifier.",
+      });
+      return;
+    }
+
+    if (!bookmarksData) {
+      setActionFeedback({
+        tone: "error",
+        title: "Bookmarks unavailable",
+        message: "Bookmark folders are unavailable right now, so saved-state updates are disabled.",
+      });
+      return;
+    }
+
+    const existing = findBookmarkMatch(bookmarksData, row.id);
+    const removing = Boolean(existing);
+
+    setBookmarkBusyId(row.id);
+    setActionFeedback({
+      tone: "info",
+      title: removing ? "Removing bookmark" : "Saving bookmark",
+      message: removing
+        ? `${row.name} is being removed from your saved plans.`
+        : `${row.name} is being added to your saved plans.`,
+    });
+
+    try {
+      if (existing) {
+        const response = await fetch(
+          `/api/client/bookmarks/${existing.folderId}/items/${existing.itemId}`,
+          { method: "DELETE" },
+        );
+        const payload = (await response.json()) as ApiResponse<{ deleted: true }>;
+        if (!payload.ok) {
+          throw new Error(payload.error.message);
+        }
+      } else {
+        const folder = await ensureDefaultFolder();
+        if (!folder) {
+          return;
+        }
+
+        const response = await fetch(`/api/client/bookmarks/${folder.id}/items`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ meal_plan_id: row.id }),
+        });
+        const payload = (await response.json()) as ApiResponse<unknown>;
+        if (!payload.ok) {
+          throw new Error(payload.error.message);
+        }
+      }
+
+      await refreshBookmarks();
+
+      setActionFeedback({
+        tone: "success",
+        title: removing ? "Bookmark removed" : "Bookmark saved",
+        message: removing
+          ? `${row.name} was removed from your saved plans.`
+          : `${row.name} was added to your saved plans.`,
+      });
+    } catch (error) {
+      setActionFeedback({
+        tone: "error",
+        title: "Bookmark update failed",
+        message: error instanceof Error ? error.message : "Unable to update bookmark.",
+      });
+    } finally {
+      setBookmarkBusyId(null);
+    }
+  }
 
   function openBudgetMarkerEditor() {
     setDraft(filters);
@@ -304,21 +625,17 @@ export default function ClientMealPlansPage() {
         return current;
       }
 
-      const nextEntry: ZipTrackerEntry = {
+      const nextEntry: MealPlanTrackedLocationInput = {
         id: `${isZip ? "zip" : "city"}-${value}-${Date.now()}`,
         label: value,
         kind: isZip ? "zip" : "city",
         selected: isZip,
       };
 
-      if (!isZip) {
-        return [...current, nextEntry];
-      }
-
       return [...current, nextEntry];
     });
 
-    if (/^\d{5}$/.test(value)) {
+    if (isZip) {
       setDraft((current) => ({
         ...current,
         zipCode: current.zipCode.trim() ? current.zipCode : value,
@@ -366,107 +683,41 @@ export default function ClientMealPlansPage() {
     });
   }
 
-  async function ensureDefaultFolder(): Promise<BookmarkFolder | null> {
-    if (bookmarks.length > 0) {
-      return bookmarks[0];
-    }
+  const view = useMemo(
+    () => adaptClientMealPlansView({
+      mealPlans: mealPlansData,
+      bookmarks: bookmarksData,
+      budgetMax: filters.budgetMax,
+      budgetDuration: filters.budgetDuration,
+      customDuration: filters.customDuration,
+      zipCode: filters.zipCode,
+      trackedLocations,
+    }),
+    [bookmarksData, filters.budgetDuration, filters.budgetMax, filters.customDuration, filters.zipCode, mealPlansData, trackedLocations],
+  );
 
-    const response = await fetch("/api/client/bookmarks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Favorites" }),
-    });
-    const payload = (await response.json()) as CreateFolderResponse;
-    if (!payload.ok) {
-      setActionFeedback({
-        tone: "error",
-        title: "Bookmark update failed",
-        message: payload.error.message,
-      });
-      return null;
-    }
-
-    const nextFolders = [payload.data];
-    setBookmarks(nextFolders);
-    return payload.data;
-  }
-
-  async function refreshBookmarks() {
-    const response = await fetch("/api/client/bookmarks", { cache: "no-store" });
-    const payload = (await response.json()) as BookmarksResponse;
-    if (!payload.ok) {
-      throw new Error(payload.error.message);
-    }
-
-    setBookmarks(payload.data.items);
-  }
-
-  async function handleToggleBookmark(mealPlan: MealPlanSummary) {
-    setBookmarkBusyId(mealPlan.id);
-    const existing = findBookmarkMatch(bookmarks, mealPlan.id);
-    const removing = Boolean(existing);
-    setActionFeedback({
-      tone: "info",
-      title: removing ? "Removing bookmark" : "Saving bookmark",
-      message: removing
-        ? `${mealPlan.name} is being removed from your saved plans.`
-        : `${mealPlan.name} is being added to your saved plans.`,
-    });
-
-    try {
-      if (existing) {
-        const response = await fetch(
-          `/api/client/bookmarks/${existing.folderId}/items/${existing.itemId}`,
-          { method: "DELETE" },
-        );
-        const payload = (await response.json()) as ApiResponse<{ deleted: true }>;
-        if (!payload.ok) {
-          setActionFeedback({
-            tone: "error",
-            title: "Bookmark update failed",
-            message: payload.error.message,
-          });
-          return;
-        }
-      } else {
-        const folder = await ensureDefaultFolder();
-        if (!folder) {
-          return;
-        }
-        const response = await fetch(`/api/client/bookmarks/${folder.id}/items`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ meal_plan_id: mealPlan.id }),
-        });
-        const payload = (await response.json()) as ApiResponse<unknown>;
-        if (!payload.ok) {
-          setActionFeedback({
-            tone: "error",
-            title: "Bookmark update failed",
-            message: payload.error.message,
-          });
-          return;
-        }
-      }
-
-      await refreshBookmarks();
-      setActionFeedback({
-        tone: "success",
-        title: removing ? "Bookmark removed" : "Bookmark saved",
-        message: removing
-          ? `${mealPlan.name} was removed from your saved plans.`
-          : `${mealPlan.name} was added to your saved plans.`,
-      });
-    } catch {
-      setActionFeedback({
-        tone: "error",
-        title: "Bookmark update failed",
-        message: "Unable to update bookmark.",
-      });
-    } finally {
-      setBookmarkBusyId(null);
-    }
-  }
+  const query = deferredSearch.trim().toLowerCase();
+  const visibleRows = useMemo(
+    () =>
+      view.rows.filter((row) =>
+        matchesQuery(query, getMealPlanSearchFields(row)),
+      ),
+    [query, view.rows],
+  );
+  const visibleRecommendations = useMemo(
+    () => visibleRows.slice(0, 3),
+    [visibleRows],
+  );
+  const visibleBookmarkFolders = useMemo(
+    () =>
+      view.bookmarkFolders
+        .map((folder): MobileBookmarkFolderView => ({
+          ...folder,
+          items: folder.items.filter((row) => matchesQuery(query, getMealPlanSearchFields(row))),
+        }))
+        .filter((folder) => query.length === 0 || folder.items.length > 0),
+    [query, view.bookmarkFolders],
+  );
 
   if (status === "loading") {
     return <LoadingBlock title="Loading meal plans" message="Validating your client session." />;
@@ -481,555 +732,571 @@ export default function ClientMealPlansPage() {
     );
   }
 
+  const errorMessages = Object.values(sectionErrors).filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+  const allSectionsFailed = !loading && !view.hasAnyData && errorMessages.length > 0;
+  const showLoadingState = loading && !view.hasAnyData && errorMessages.length === 0;
+  const bookmarksAvailable = bookmarksData !== null;
+  const searchEmptyStateActive = query.length > 0 && visibleRows.length === 0;
+
   return (
-    <PageShell
-      title="Meal plans"
+    <MobileAppShell
       user={user}
-      className="app-shell--client-meal-plans"
-      hideTopHub
+      greeting={formatDisplayNameFromUser(user)}
+      title="MP Directory"
+      subtitle="Budget-aware meal-plan discovery stays inside the existing client BFF marketplace routes."
+      searchLabel="Filter loaded meal plans"
+      searchPlaceholder="Filter visible plans locally"
+      searchValue={searchValue}
+      onSearchChange={(nextValue) => {
+        startTransition(() => {
+          setSearchValue(nextValue);
+        });
+      }}
+      notificationSlot={<ActionPill href="/client" tone="purple">Client home</ActionPill>}
+      topHubAction={
+        <ActionPillButton
+          onClick={() => {
+            if (filtersOpen) {
+              setFiltersOpen(false);
+              return;
+            }
+            openBudgetMarkerEditor();
+          }}
+          tone="yellow"
+          ariaLabel={filtersOpen ? "Close budget marker editor" : "Open budget marker editor"}
+        >
+          {filtersOpen ? "Close filters" : "Edit budget"}
+        </ActionPillButton>
+      }
+      activePath="/client/meal-plans"
     >
-      {loading ? (
-        <LoadingBlock title="Loading plans" message="Fetching meal-plan discovery data." />
-      ) : null}
-      {loadError ? (
-        <ErrorBlock title="Unable to load meal plans" message={loadError} />
-      ) : null}
-      {actionFeedback ? (
-        <FeedbackBanner
-          tone={actionFeedback.tone}
-          title={actionFeedback.title}
-          message={actionFeedback.message}
-        />
+      {allSectionsFailed ? (
+        <MobileSection
+          eyebrow="Marketplace sync"
+          title="Meal plans unavailable"
+          description="This landing page stays on protected client BFF routes and does not fall back to direct backend calls."
+        >
+          <DirectoryStateCard
+            title="Unable to load meal-plan data"
+            message={errorMessages.join(" ")}
+            action={<ActionPill href="/client" tone="purple">Back home</ActionPill>}
+          />
+        </MobileSection>
       ) : null}
 
-      {!loading && !loadError ? (
+      {showLoadingState ? (
+        <MobileSection
+          eyebrow="Syncing"
+          title="Loading MP Directory"
+          description="Fetching meal plans and bookmark folders through the existing protected client routes."
+        >
+          <DirectoryStateCard
+            title="Refreshing meal-plan discovery"
+            message="This mobile marketplace surface is loading through the signed frontend-to-BFF path."
+          />
+        </MobileSection>
+      ) : null}
+
+      {!showLoadingState && !allSectionsFailed ? (
         <>
-          <div className="client-meal-plans-sticky-controls">
-            <Card className="client-meal-plans-budget-marker" variant="accent" as="section">
-              <div className="client-meal-plans-budget-marker__header">
-                <div className="client-meal-plans-budget-marker__heading">
-                  <p className="client-meal-plans-budget-marker__eyebrow">Client meal plans</p>
-                  <h2 className="client-meal-plans-budget-marker__title">Budget Marker</h2>
-                </div>
-                <div className="client-meal-plans-budget-marker__meta">
-                  <Chip tone="muted">{resolvedDurationLabel}</Chip>
-                </div>
-              </div>
-              <div className="client-meal-plans-budget-marker__row">
-                <div className="client-meal-plans-budget-marker__value-group">
-                  <p className="client-meal-plans-budget-marker__value">{`$${resolvedBudget}`}</p>
-                  <p className="client-meal-plans-budget-marker__caption">
-                    Use the current supported ZIP and budget controls without leaving the top discovery marker open.
-                  </p>
-                </div>
-              </div>
-              <div className="client-meal-plans-budget-marker__actions">
-                <ActionRow>
-                  <button
-                    type="button"
-                    aria-expanded={filtersOpen}
-                    aria-controls="budget-marker-controls"
-                    onClick={() => {
-                      if (filtersOpen) {
-                        setFiltersOpen(false);
-                        return;
-                      }
-                      openBudgetMarkerEditor();
-                    }}
-                  >
-                    {filtersOpen ? "Close edit" : "Edit Budget Marker"}
-                  </button>
-                </ActionRow>
-              </div>
-            </Card>
+          {errorMessages.length > 0 && view.hasAnyData ? (
+            <MobileSection
+              eyebrow="Partial data"
+              title="Some marketplace sources are unavailable"
+              description="The page keeps the client routes that succeeded instead of inventing missing marketplace or bookmark state."
+            >
+              <DirectoryStateCard
+                title="Partial meal-plan data"
+                message={errorMessages.join(" ")}
+              />
+            </MobileSection>
+          ) : null}
 
-            <MealPlansTopNav />
-          </div>
+          {actionFeedback ? (
+            <MobileSection
+              eyebrow="Action"
+              title="Bookmark update"
+              description="Bookmark actions continue to use the existing bookmark folder routes only."
+            >
+              <DirectoryFeedbackCard feedback={actionFeedback} />
+            </MobileSection>
+          ) : null}
+
+          <MobileSection
+            eyebrow="Workspace"
+            title="Marketplace links"
+            description="These links preserve the existing meal-plan home, schedule, search, and bookmark subpages."
+          >
+            <div className="mobile-pt-actions">
+              {DIRECTORY_LINKS.map((item) => (
+                <ActionPill key={item.href} href={item.href} tone={item.tone}>
+                  {item.label}
+                </ActionPill>
+              ))}
+            </div>
+          </MobileSection>
+
+          <MobileSection
+            eyebrow="Budget Marker"
+            title="Budget-aware discovery"
+            description="Budget duration and city notes stay local here. Only the current ZIP and budget-max filters shape meal-plan requests."
+            action={
+              <ActionPillButton
+                onClick={() => {
+                  if (filtersOpen) {
+                    setFiltersOpen(false);
+                    return;
+                  }
+                  openBudgetMarkerEditor();
+                }}
+                tone="purple"
+                ariaLabel={filtersOpen ? "Close budget marker controls" : "Open budget marker controls"}
+              >
+                {filtersOpen ? "Close editor" : "Open editor"}
+              </ActionPillButton>
+            }
+          >
+            <MobileCard as="article" variant="accent">
+              <div className="mobile-pt-client-card__header">
+                <div className="mobile-section__copy">
+                  <p className="mobile-section__eyebrow">Current budget marker</p>
+                  <h3 className="mobile-section__title">{view.budgetMarker.amountLabel}</h3>
+                  <p className="mobile-section__description">{view.budgetMarker.note}</p>
+                </div>
+                <span className="mobile-pill mobile-pill--yellow">{view.budgetMarker.durationLabel}</span>
+              </div>
+
+              <dl className="mobile-pt-fact-grid">
+                <div>
+                  <dt>ZIP filter</dt>
+                  <dd>{view.budgetMarker.zipSummaryLabel}</dd>
+                </div>
+                <div>
+                  <dt>Saved plans</dt>
+                  <dd>{view.bookmarkState.savedPlanCountLabel}</dd>
+                </div>
+                <div>
+                  <dt>Folders</dt>
+                  <dd>{view.bookmarkState.folderCountLabel}</dd>
+                </div>
+                <div>
+                  <dt>Primary folder</dt>
+                  <dd>{view.bookmarkState.latestFolderLabel}</dd>
+                </div>
+              </dl>
+
+              <div className="mobile-pt-actions">
+                {view.budgetMarker.activeChips.length > 0 ? (
+                  view.budgetMarker.activeChips.map((chip) => (
+                    <span
+                      key={chip.id}
+                      className={[
+                        "mobile-pill",
+                        chip.tone === "purple"
+                          ? "mobile-pill--purple"
+                          : chip.tone === "yellow"
+                            ? "mobile-pill--yellow"
+                            : "",
+                      ].filter(Boolean).join(" ")}
+                    >
+                      {chip.label}
+                    </span>
+                  ))
+                ) : (
+                  <span className="mobile-pill">No active filter chips</span>
+                )}
+              </div>
+            </MobileCard>
+          </MobileSection>
 
           {filtersOpen ? (
-            <section className="client-meal-plans-filter-panel" id="budget-marker-controls">
-              <Card className="client-meal-plans-filters" variant="soft">
-                <div className="client-meal-plans-edit-section">
-                  <PageHeader
-                    eyebrow="Budget Marker edit"
-                    title="Plan your spend"
-                    description="Set your budget, choose how long it should last, then pick the ZIP you want to browse around."
+            <MobileSection
+              eyebrow="Filter editor"
+              title="Edit budget and ZIP filters"
+              description="The current page keeps budget duration and city entries local, while ZIP selection and budget max continue to drive the existing meal-plan request."
+            >
+              <form
+                className="mobile-pt-form-grid"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setFilters(draft);
+                  setTrackedLocations(draftTrackedLocations);
+                  setFiltersOpen(false);
+                }}
+              >
+                <div className="field">
+                  <label htmlFor="meal-plan-budget-max">Budget max ($)</label>
+                  <input
+                    id="meal-plan-budget-max"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={draft.budgetMax}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, budgetMax: event.target.value }))
+                    }
+                    placeholder="25"
                   />
                 </div>
 
-                <form
-                  className="client-meal-plans-edit-form"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    setFilters(draft);
-                    setTrackedLocations(draftTrackedLocations);
-                    setFiltersOpen(false);
-                  }}
-                >
-                  <div className="client-meal-plans-edit-section">
-                    <div className="client-meal-plans-edit-section__header">
-                      <h3>Budget filters</h3>
-                    </div>
-                    <div className="form-grid grid--2">
-                      <div className="field">
-                        <label htmlFor="budget-max">Budget max ($)</label>
-                        <input
-                          id="budget-max"
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={draft.budgetMax}
-                          onChange={(event) =>
-                            setDraft((current) => ({ ...current, budgetMax: event.target.value }))
-                          }
-                          placeholder="25"
-                        />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="budget-duration">Budget Duration</label>
-                        <select
-                          id="budget-duration"
-                          value={draft.budgetDuration}
-                          onChange={(event) =>
-                            setDraft((current) => ({ ...current, budgetDuration: event.target.value }))
-                          }
-                        >
-                          <option value="one day">one day</option>
-                          <option value="one week">one week</option>
-                          <option value="bi weekly">bi weekly</option>
-                          <option value="month">month</option>
-                          <option value="custom duration">custom duration</option>
-                        </select>
-                      </div>
-                    </div>
-                    {draft.budgetDuration === "custom duration" ? (
-                      <div className="field">
-                        <label htmlFor="custom-duration">Custom duration</label>
-                        <input
-                          id="custom-duration"
-                          value={draft.customDuration}
-                          onChange={(event) =>
-                            setDraft((current) => ({ ...current, customDuration: event.target.value }))
-                          }
-                          placeholder="Enter duration"
-                        />
-                      </div>
-                    ) : null}
-                  </div>
+                <div className="field">
+                  <label htmlFor="meal-plan-budget-duration">Budget duration</label>
+                  <select
+                    id="meal-plan-budget-duration"
+                    value={draft.budgetDuration}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, budgetDuration: event.target.value }))
+                    }
+                  >
+                    <option value="one day">one day</option>
+                    <option value="one week">one week</option>
+                    <option value="bi weekly">bi weekly</option>
+                    <option value="month">month</option>
+                    <option value="custom duration">custom duration</option>
+                  </select>
+                </div>
 
-                  <div className="client-meal-plans-edit-section client-meal-plans-zip-tracker">
-                    <div className="client-meal-plans-edit-section__header">
-                      <h3>ZIP Code Tracker</h3>
-                      <Badge
-                        label={
-                          draftActiveZipCount === 1
-                            ? "1 Active Zip Code"
-                            : `${draftActiveZipCount} Active Zip Codes`
-                        }
-                        tone="accent"
-                      />
-                    </div>
-                    <p className="client-meal-plans-zip-tracker__copy">
-                      Add ZIPs you want to use for browsing. City names stay local as notes until you add a ZIP.
-                    </p>
-                    <div className="client-meal-plans-zip-tracker__add">
-                      <input
-                        aria-label="Add ZIP code or city"
-                        value={trackerInput}
-                        onChange={(event) => setTrackerInput(event.target.value)}
-                        placeholder="10001 or Boston"
-                      />
-                      <button type="button" onClick={handleAddTrackerEntry}>
-                        Add
-                      </button>
-                    </div>
-                    {draftTrackedLocations.length > 0 ? (
-                      <div className="client-meal-plans-zip-tracker__list">
-                        {draftTrackedLocations.map((entry) => (
-                          <div
-                            key={entry.id}
-                            className={[
-                              "client-meal-plans-zip-entry",
-                              entry.selected ? "client-meal-plans-zip-entry--active" : "",
-                              entry.kind === "city" ? "client-meal-plans-zip-entry--city" : "",
-                            ].filter(Boolean).join(" ")}
-                          >
-                            <button
-                              type="button"
-                              className="client-meal-plans-zip-entry__select"
-                              onClick={() => {
-                                if (entry.kind === "zip") {
-                                  handleToggleZipEntry(entry.id);
-                                }
-                              }}
-                              aria-pressed={entry.kind === "zip" ? entry.selected : undefined}
-                              disabled={entry.kind !== "zip"}
-                            >
-                              <span className="client-meal-plans-zip-entry__label">{entry.label}</span>
-                              <span className="client-meal-plans-zip-entry__meta">
-                                {entry.kind === "zip"
-                                  ? entry.selected
-                                    ? "Active"
-                                    : "Tracking Off"
-                                  : "City note only"}
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              className="client-meal-plans-zip-entry__delete"
-                              aria-label={`Delete ${entry.label}`}
-                              onClick={() => handleDeleteTrackerEntry(entry.id)}
-                            >
-                              <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M9 4.5h6m-8 3h10m-8 0v9m3-9v9m3-9v9M8 7.5l.5 11a1 1 0 0 0 1 .95h5a1 1 0 0 0 1-.95l.5-11" />
-                              </svg>
-                            </button>
+                {draft.budgetDuration === "custom duration" ? (
+                  <div className="field">
+                    <label htmlFor="meal-plan-custom-duration">Custom duration</label>
+                    <input
+                      id="meal-plan-custom-duration"
+                      value={draft.customDuration}
+                      onChange={(event) =>
+                        setDraft((current) => ({ ...current, customDuration: event.target.value }))
+                      }
+                      placeholder="Enter duration"
+                    />
+                  </div>
+                ) : null}
+
+                <div className="field">
+                  <label htmlFor="meal-plan-zip-or-city">Add ZIP code or city</label>
+                  <input
+                    id="meal-plan-zip-or-city"
+                    value={trackerInput}
+                    onChange={(event) => setTrackerInput(event.target.value)}
+                    placeholder="10001 or Boston"
+                    aria-label="Add ZIP code or city"
+                  />
+                </div>
+
+                <div className="mobile-pt-actions">
+                  <ActionPillButton
+                    onClick={handleAddTrackerEntry}
+                    tone="yellow"
+                    ariaLabel="Add ZIP code or city to the local tracker"
+                  >
+                    Add location
+                  </ActionPillButton>
+                  <span className="mobile-pill mobile-pill--purple">{view.zipFilter.activeZipCountLabel}</span>
+                </div>
+
+                {draftTrackedLocations.length > 0 ? (
+                  <div className="mobile-pt-detail-stack">
+                    {draftTrackedLocations.map((entry) => (
+                      <MobileCard
+                        key={entry.id}
+                        as="article"
+                        variant={entry.selected ? "action" : "soft"}
+                      >
+                        <div className="mobile-pt-client-card__header">
+                          <div className="mobile-section__copy">
+                            <p className="mobile-section__eyebrow">
+                              {entry.kind === "zip" ? "Tracked ZIP" : "City note"}
+                            </p>
+                            <h3 className="mobile-section__title">{entry.label}</h3>
+                            <p className="mobile-section__description">
+                              {entry.kind === "zip"
+                                ? entry.selected
+                                  ? "This ZIP is currently active in the meal-plan request."
+                                  : "This ZIP is tracked locally but not currently active."
+                                : "City entries stay local until you add a ZIP."}
+                            </p>
                           </div>
+                          <span className={`mobile-pill ${entry.selected ? "mobile-pill--yellow" : "mobile-pill--purple"}`}>
+                            {entry.kind === "zip"
+                              ? entry.selected
+                                ? "Active ZIP"
+                                : "Tracking off"
+                              : "City note"}
+                          </span>
+                        </div>
+
+                        <div className="mobile-pt-actions">
+                          {entry.kind === "zip" ? (
+                            <ActionPillButton
+                              onClick={() => handleToggleZipEntry(entry.id)}
+                              tone={entry.selected ? "yellow" : "purple"}
+                              ariaLabel={`${entry.selected ? "Deactivate" : "Activate"} ZIP ${entry.label}`}
+                            >
+                              {entry.selected ? "Deactivate ZIP" : "Activate ZIP"}
+                            </ActionPillButton>
+                          ) : (
+                            <span className="mobile-pill">City note only</span>
+                          )}
+                          <ActionPillButton
+                            onClick={() => handleDeleteTrackerEntry(entry.id)}
+                            tone="purple"
+                            ariaLabel={`Delete ${entry.label}`}
+                          >
+                            Delete
+                          </ActionPillButton>
+                        </div>
+                      </MobileCard>
+                    ))}
+                  </div>
+                ) : (
+                  <DirectoryStateCard
+                    title="No ZIPs tracked yet"
+                    message={view.zipFilter.emptyMessage}
+                  />
+                )}
+
+                <div className="mobile-pt-actions">
+                  <ActionPillButton
+                    onClick={() => {
+                      setFilters(draft);
+                      setTrackedLocations(draftTrackedLocations);
+                      setFiltersOpen(false);
+                    }}
+                    tone="yellow"
+                    ariaLabel="Apply meal-plan filters"
+                  >
+                    Apply filters
+                  </ActionPillButton>
+                  <ActionPillButton
+                    onClick={() => {
+                      setDraft(filters);
+                      setDraftTrackedLocations(trackedLocations);
+                      setTrackerInput("");
+                      setFiltersOpen(false);
+                    }}
+                    tone="purple"
+                    ariaLabel="Cancel budget marker editing"
+                  >
+                    Cancel
+                  </ActionPillButton>
+                </div>
+              </form>
+            </MobileSection>
+          ) : null}
+
+          <MobileSection
+            eyebrow="Directory summary"
+            title="Marketplace overview"
+            description="These cards summarize the currently loaded meal-plan catalog and bookmark state without inventing unsupported recommendation or checkout behavior."
+          >
+            {view.summaryCards.map((card) => (
+              <MobileStatCard
+                key={card.label}
+                label={card.label}
+                value={card.value}
+                progressText={card.progressText}
+                icon={getSummaryIcon(card.label)}
+              />
+            ))}
+          </MobileSection>
+
+          {query.length > 0 ? (
+            <MobileSection
+              eyebrow="Local filter"
+              title="Filtered view"
+              description="This search narrows the already-loaded meal plans locally and does not send new backend queries."
+            >
+              <DirectoryStateCard
+                title={visibleRows.length > 0 ? "Local meal-plan filter active" : "No meal plans match this search"}
+                message={
+                  visibleRows.length > 0
+                    ? `${visibleRows.length} loaded meal plans currently match "${searchValue.trim()}".`
+                    : `No loaded meal plans currently match "${searchValue.trim()}".`
+                }
+                action={
+                  <ActionPillButton
+                    onClick={() => {
+                      setSearchValue("");
+                    }}
+                    tone="yellow"
+                    ariaLabel="Clear local meal-plan search"
+                  >
+                    Clear search
+                  </ActionPillButton>
+                }
+              />
+            </MobileSection>
+          ) : null}
+
+          <MobileSection
+            eyebrow="Recommended now"
+            title="Quick browse"
+            description="These rows come directly from the current client meal-plan catalog and keep the discovery pass light on mobile."
+            action={<ActionPill href="/client/meal-plans/search" tone="purple">Search page</ActionPill>}
+          >
+            {visibleRecommendations.length > 0 ? (
+              visibleRecommendations.map((row) => (
+                <MobileMealPlanRow
+                  key={row.id ?? row.name}
+                  name={row.name}
+                  vendorName={`${row.vendorName} | ${row.vendorZipLabel}`}
+                  calories={row.caloriesLabel.replace(/\s*cal$/i, "")}
+                  price={row.priceLabel}
+                  status={row.isBookmarked ? "saved" : row.statusLabel}
+                  action={<ActionPill href={row.href}>View plan</ActionPill>}
+                />
+              ))
+            ) : searchEmptyStateActive ? (
+              <DirectoryStateCard
+                title="No meal plans match this search"
+                message={`No quick-browse rows match "${searchValue.trim()}".`}
+                action={
+                  <ActionPillButton
+                    onClick={() => {
+                      setSearchValue("");
+                    }}
+                    tone="yellow"
+                    ariaLabel="Clear local meal-plan search"
+                  >
+                    Clear search
+                  </ActionPillButton>
+                }
+              />
+            ) : sectionErrors.mealPlans ? (
+              <DirectoryStateCard
+                title="Meal plans unavailable"
+                message={sectionErrors.mealPlans}
+              />
+            ) : (
+              <DirectoryStateCard
+                title={view.emptyState?.title ?? "No meal plans returned"}
+                message={view.emptyState?.message ?? "Meal plans will appear here when the existing client route returns browse-ready data."}
+              />
+            )}
+          </MobileSection>
+
+          <MobileSection
+            eyebrow="Available plans"
+            title="Catalog cards"
+            description="These cards expose only the plan, vendor, ZIP, calorie, price, item-count, availability, status, and bookmark fields already available on the current payload."
+            action={<ActionPill href="/client/meal-plans/schedule" tone="purple">Schedule</ActionPill>}
+          >
+            {visibleRows.length > 0 ? (
+              <div className="mobile-pt-detail-stack">
+                {visibleRows.map((row) => (
+                  <MealPlanDirectoryCard
+                    key={row.id ?? row.name}
+                    row={row}
+                    eyebrow="Available meal plan"
+                    bookmarkBusy={bookmarkBusyId === row.id}
+                    bookmarksAvailable={bookmarksAvailable}
+                    onToggleBookmark={(nextRow) => {
+                      void handleToggleBookmark(nextRow);
+                    }}
+                  />
+                ))}
+              </div>
+            ) : searchEmptyStateActive ? (
+              <DirectoryStateCard
+                title="No meal plans match this search"
+                message={`No catalog cards match "${searchValue.trim()}".`}
+                action={
+                  <ActionPillButton
+                    onClick={() => {
+                      setSearchValue("");
+                    }}
+                    tone="yellow"
+                    ariaLabel="Clear local meal-plan search"
+                  >
+                    Clear search
+                  </ActionPillButton>
+                }
+              />
+            ) : sectionErrors.mealPlans ? (
+              <DirectoryStateCard
+                title="Meal plans unavailable"
+                message={sectionErrors.mealPlans}
+              />
+            ) : (
+              <DirectoryStateCard
+                title={view.emptyState?.title ?? "No meal plans returned"}
+                message={view.emptyState?.message ?? "The current client marketplace request did not return any meal plans."}
+              />
+            )}
+          </MobileSection>
+
+          <MobileSection
+            eyebrow="Saved state"
+            title="Bookmarks"
+            description="Saved plans stay on the existing bookmark folder routes, and saved state is shown here without inventing new bookmark-folder UX."
+            action={<ActionPill href="/client/meal-plans/bookmark" tone="purple">Bookmark page</ActionPill>}
+          >
+            {visibleBookmarkFolders.length > 0 ? (
+              <div className="mobile-pt-detail-stack">
+                {visibleBookmarkFolders.map((folder) => (
+                  <MobileCard key={folder.id} as="article" variant="soft">
+                    <div className="mobile-pt-client-card__header">
+                      <div className="mobile-section__copy">
+                        <p className="mobile-section__eyebrow">Bookmark folder</p>
+                        <h3 className="mobile-section__title">{folder.name}</h3>
+                        <p className="mobile-section__description">{folder.itemCountLabel}</p>
+                      </div>
+                      <span className="mobile-pill mobile-pill--yellow">Saved</span>
+                    </div>
+
+                    {folder.items.length > 0 ? (
+                      <div className="mobile-pt-detail-stack">
+                        {folder.items.map((row) => (
+                          <MobileMealPlanRow
+                            key={`${folder.id}-${row.id ?? row.name}`}
+                            name={row.name}
+                            vendorName={`${row.vendorName} | ${row.vendorZipLabel}`}
+                            calories={row.caloriesLabel.replace(/\s*cal$/i, "")}
+                            price={row.priceLabel}
+                            status={row.statusLabel}
+                            action={<ActionPill href={row.href}>View plan</ActionPill>}
+                          />
                         ))}
                       </div>
                     ) : (
-                      <EmptyState
-                        title="No ZIPs tracked yet"
-                        message="Add a ZIP to keep it ready for browsing, or save a city note locally until you have a ZIP."
+                      <DirectoryStateCard
+                        title="No saved plans in this folder"
+                        message="This folder exists, but it does not currently contain any saved meal plans."
                       />
                     )}
-                  </div>
-
-                  <div className="client-meal-plans-filters__actions">
-                    <ActionRow>
-                      <button type="submit">Apply filters</button>
-                    </ActionRow>
-                  </div>
-                </form>
-              </Card>
-            </section>
-          ) : null}
-
-          <SectionBlock
-            eyebrow="Discover"
-            title="Recommended Meal Plans"
-            description="A quick visual pass across meal plans already available in your current browsing set."
-            actions={
-              <button
-                type="button"
-                className="link-button client-meal-plans-section-link"
-                onClick={() => {
-                  const catalogSection = document.getElementById("meal-plan-catalog");
-                  catalogSection?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
-              >
-                See All
-              </button>
-            }
-          >
-            {mealPlans.length > 0 ? (
-              <div className="client-meal-plans-recommended">
-                {mealPlans.slice(0, 6).map((mealPlan, index) => (
-                  <article
-                    key={`recommended-${mealPlan.id}`}
-                    className={[
-                      "client-meal-plans-recommended-card",
-                      index === 0 ? "client-meal-plans-recommended-card--highlighted" : "",
-                    ].filter(Boolean).join(" ")}
-                  >
-                    <div className="client-meal-plans-recommended-card__top">
-                      {index === 0 ? <Badge label="Trainer's Choice" tone="accent" /> : null}
-                    </div>
-                    <div className="client-meal-plans-recommended-card__body">
-                      <h3 className="client-meal-plans-recommended-card__title">{mealPlan.name}</h3>
-                    </div>
-                    <div className="client-meal-plans-recommended-card__meta">
-                      <span>{`${mealPlan.total_calories} Calories`}</span>
-                      <span>{formatPrice(mealPlan.total_price_cents)}</span>
-                    </div>
-                  </article>
+                  </MobileCard>
                 ))}
               </div>
-            ) : (
-              <EmptyState
-                title="No meal plans ready"
-                message="Recommended meal plans will appear here when the current browsing set has available plans."
+            ) : sectionErrors.bookmarks ? (
+              <DirectoryStateCard
+                title="Bookmarks unavailable"
+                message={sectionErrors.bookmarks}
               />
-            )}
-          </SectionBlock>
-
-          <SectionBlock
-            eyebrow="Browse Next"
-            title="Upcoming Meals"
-            description="A quick-scan list built from the meal plans already visible on this page."
-            actions={
-              <button
-                type="button"
-                className="link-button client-meal-plans-section-link"
-                onClick={() => {
-                  const catalogSection = document.getElementById("meal-plan-catalog");
-                  catalogSection?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
-              >
-                See All
-              </button>
-            }
-          >
-            {mealPlans.length > 0 ? (
-              <div className="client-meal-plans-upcoming">
-                {mealPlans.slice(0, 5).map((mealPlan) => (
-                  <article key={`upcoming-${mealPlan.id}`} className="client-meal-plans-upcoming-row">
-                    <div className="client-meal-plans-upcoming-row__main">
-                      <h3 className="client-meal-plans-upcoming-row__title">{mealPlan.name}</h3>
-                      <p className="client-meal-plans-upcoming-row__vendor">{mealPlan.vendor_name}</p>
-                    </div>
-                    <div className="client-meal-plans-upcoming-row__meta">
-                      <span>{formatPrice(mealPlan.total_price_cents)}</span>
-                      <span>{`${mealPlan.total_calories} Calories`}</span>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title="No meals ready"
-                message="Upcoming Meals will appear here when the current meal plan set has available items."
-              />
-            )}
-          </SectionBlock>
-
-          <Card className="client-meal-plans-hero" variant="accent" as="section">
-            <div className="client-meal-plans-hero__layout">
-              <div className="client-meal-plans-hero__lead">
-                <PageHeader
-                  eyebrow="Client meal plans"
-                  title="Discovery workspace"
-                  description="Browse the live catalog, keep track of saved options, and move from quick comparison into plan detail without leaving the protected client shell."
-                  chips={
-                    activeFilterChips.length > 0
-                      ? activeFilterChips
-                      : ["All ZIPs", "Budget max open", "Live catalog"]
-                  }
-                  actions={
-                    <ActionRow>
-                      <Link className="link-button" href="/client/metrics">
-                        Review metrics
-                      </Link>
-                      <button type="button" onClick={() => setFiltersOpen(true)}>
-                        Edit Budget Marker
-                      </button>
-                    </ActionRow>
-                  }
-                />
-                <div className="client-meal-plans-hero__stats">
-                  <StatPill
-                    label="Available plans"
-                    value={`${mealPlans.length}`}
-                    hint="Returned through the current client meal-plan BFF route."
-                    active
-                  />
-                  <StatPill
-                    label="Saved plans"
-                    value={`${bookmarkedIds.size}`}
-                    hint="Plans currently saved into client bookmark folders."
-                  />
-                  <StatPill
-                    label="Vendors"
-                    value={`${vendorCount}`}
-                    hint="Distinct vendors represented in the current results."
-                  />
-                  <StatPill
-                    label="Meals surfaced"
-                    value={`${totalMeals}`}
-                    hint="Total item count across the currently visible meal plans."
-                  />
-                </div>
-              </div>
-
-              <Card className="client-meal-plans-hero__focus" variant="soft">
-                <ListRow
-                  eyebrow="Current browse state"
-                  title={
-                    activeFilterChips.length > 0
-                      ? "Focused catalog window"
-                      : "Open discovery window"
-                  }
-                  description={
-                    mealPlans.length > 0
-                      ? "The current screen is showing live catalog results with saved-state integration, not recommendation scoring or editorial ranking."
-                      : "The current filter state did not return any meal plans, so the discovery surface is narrowed to an empty catalog."
-                  }
-                  metadata={[
-                    { label: "Price range", value: priceRange },
-                    { label: "Filters", value: `${activeFilterChips.length}` },
-                    { label: "Bookmarks", value: `${bookmarkedIds.size}` },
-                  ]}
-                  status={{
-                    label: mealPlans.length > 0 ? "Catalog live" : "No results",
-                    tone: mealPlans.length > 0 ? "success" : "warning",
-                  }}
-                />
-                <div className="client-meal-plans-hero__chips">
-                  <Chip tone="accent">
-                    {highlightedPlan ? highlightedPlan.vendor_name : "Awaiting results"}
-                  </Chip>
-                  <Chip tone="muted">
-                    {highlightedPlan ? `${highlightedPlan.item_count} meals in focus` : "No plan in focus"}
-                  </Chip>
-                </div>
-              </Card>
-            </div>
-          </Card>
-
-          <SectionBlock
-            eyebrow="Summary"
-            title="Catalog framing"
-            description="High-level context derived from the current result set."
-          >
-            <div className="client-meal-plans-analytics">
-              <AnalyticsCard
-                eyebrow="Current results"
-                title="Catalog summary"
-                description="This summary reflects the exact meal plans currently returned in the protected discovery route."
-                stats={[
-                  { label: "Plans", value: `${mealPlans.length}` },
-                  { label: "Saved", value: `${bookmarkedIds.size}` },
-                  { label: "Vendors", value: `${vendorCount}` },
-                  { label: "Price range", value: priceRange },
-                ]}
-              />
-              <Card className="client-meal-plans-context" variant="soft">
-                <ListRow
-                  eyebrow="Browse context"
-                  title={mealPlans.length > 0 ? "Current browse window" : "Catalog not populated"}
-                  description={
-                    mealPlans.length > 0
-                      ? "Use the featured plan as the visual entry point, then scan the catalog stack below."
-                      : "No meal plans were returned for the current filter combination."
-                  }
-                  metadata={[
-                    { label: "Meals surfaced", value: `${totalMeals}` },
-                    { label: "Filters", value: activeFilterChips.length > 0 ? `${activeFilterChips.length}` : "0" },
-                    { label: "Bookmarks", value: `${bookmarkedIds.size}` },
-                  ]}
-                />
-              </Card>
-            </div>
-          </SectionBlock>
-
-          <SectionBlock
-            eyebrow="Highlight"
-            title="Featured plan"
-            description="This spotlight gives the current catalog a stronger visual entry point without implying recommendation logic the payload does not provide."
-          >
-            {highlightedPlan ? (
-              <div className="client-meal-plans-featured-layout">
-                <Card className="client-meal-plans-featured" variant="soft">
-                  <PageHeader
-                    eyebrow={bookmarkedIds.has(highlightedPlan.id) ? "Saved highlight" : "Catalog highlight"}
-                    title={highlightedPlan.name}
-                    description={highlightedPlan.description ?? "Meal-plan detail is available from the current protected route."}
-                    status={{
-                      label: bookmarkedIds.has(highlightedPlan.id) ? "Saved" : highlightedPlan.status,
-                      tone: bookmarkedIds.has(highlightedPlan.id) ? "success" : "accent",
+            ) : query.length > 0 && view.hasBookmarks ? (
+              <DirectoryStateCard
+                title="No saved plans match this search"
+                message={`No bookmarked meal plans currently match "${searchValue.trim()}".`}
+                action={
+                  <ActionPillButton
+                    onClick={() => {
+                      setSearchValue("");
                     }}
-                  />
-                  <div className="client-meal-plans-featured__chips">
-                    <Chip tone="accent">{formatPrice(highlightedPlan.total_price_cents)}</Chip>
-                    <Chip tone="muted">{`${highlightedPlan.item_count} meals`}</Chip>
-                    <Chip tone="muted">{highlightedPlan.vendor_name}</Chip>
-                    <Chip tone="muted">{highlightedPlan.vendor_zip_code ?? "ZIP unavailable"}</Chip>
-                  </div>
-                  <div className="client-meal-plans-featured__stats">
-                    <StatPill label="Availability windows" value={`${highlightedPlan.availability_count}`} />
-                    <StatPill label="Calories" value={`${highlightedPlan.total_calories}`} />
-                    <StatPill label="Status" value={highlightedPlan.status} />
-                    <StatPill
-                      label="Bookmark state"
-                      value={bookmarkedIds.has(highlightedPlan.id) ? "Saved" : "Not saved"}
-                    />
-                  </div>
-                  <ActionRow>
-                    <Link className="link-button" href={`/client/meal-plans/${highlightedPlan.id}`}>
-                      View plan
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => void handleToggleBookmark(highlightedPlan)}
-                      disabled={bookmarkBusyId === highlightedPlan.id}
-                    >
-                      {bookmarkBusyId === highlightedPlan.id
-                        ? "Saving..."
-                        : bookmarkedIds.has(highlightedPlan.id)
-                          ? "Remove bookmark"
-                          : "Bookmark"}
-                    </button>
-                  </ActionRow>
-                </Card>
-
-                <Card className="client-meal-plans-spotlight" variant="ghost">
-                  <ListRow
-                    eyebrow="Spotlight note"
-                    title="Featured is a curated presentation layer"
-                    description="The spotlight uses the current visible catalog window and saved state to create a stronger entry point, while staying honest about the absence of recommendation scoring."
-                    metadata={[
-                      { label: "Visible plans", value: `${mealPlans.length}` },
-                      { label: "Saved plans", value: `${bookmarkedIds.size}` },
-                      { label: "Vendors", value: `${vendorCount}` },
-                    ]}
-                  />
-                </Card>
-              </div>
+                    tone="yellow"
+                    ariaLabel="Clear local meal-plan search"
+                  >
+                    Clear search
+                  </ActionPillButton>
+                }
+              />
             ) : (
-              <EmptyState
-                title="No featured plan yet"
-                message="As soon as the catalog returns meal plans, one plan will be highlighted here for quick scanning."
+              <DirectoryStateCard
+                title="No bookmarks yet"
+                message={view.bookmarkState.emptyMessage}
               />
             )}
-          </SectionBlock>
-
-          <div id="meal-plan-catalog">
-            <SectionBlock
-              eyebrow="Browse"
-              title="Meal-plan catalog"
-              description="Browse the current meal-plan results and open detail pages through the existing route structure."
-            >
-              {mealPlans.length > 0 ? (
-                <div className="client-meal-plans-catalog">
-                  <Card className="client-meal-plans-catalog-note" variant="ghost">
-                    <ListRow
-                      eyebrow="Catalog scan"
-                      title="Start with the first visible plans"
-                      description="The catalog remains a live result stack. The first visible plans are surfaced as the easiest scan point, then the full stack continues below."
-                    />
-                  </Card>
-                  {mealPlans.map((mealPlan, index) => (
-                    <MealPlanCard
-                      key={mealPlan.id}
-                      mealPlan={mealPlan}
-                      bookmarked={bookmarkedIds.has(mealPlan.id)}
-                      bookmarkBusy={bookmarkBusyId === mealPlan.id}
-                      onToggleBookmark={handleToggleBookmark}
-                      footer={
-                        index < 3 ? (
-                          <Badge
-                            label={index === 0 ? "Top visible plan" : "Visible now"}
-                            tone="accent"
-                          />
-                        ) : undefined
-                      }
-                    />
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  title="No meal plans returned"
-                  message={
-                    activeFilterChips.length > 0
-                      ? "Try broadening the current ZIP or budget filters."
-                      : "The meal-plan catalog is currently empty for this client session."
-                  }
-                />
-              )}
-            </SectionBlock>
-          </div>
+          </MobileSection>
         </>
       ) : null}
-    </PageShell>
+    </MobileAppShell>
   );
 }

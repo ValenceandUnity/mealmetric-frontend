@@ -11,6 +11,7 @@ export {
   formatMetricPercentage,
 } from "@/lib/view-models/metrics";
 export {
+  adaptClientMealPlansView,
   adaptMealPlanDiscoveryView,
   formatMealPlanCalories,
   formatMealPlanPrice,
