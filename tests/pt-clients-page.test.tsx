@@ -95,16 +95,6 @@ describe("PTClientsPage", () => {
         });
       }
 
-      if (url === "/api/pt/client-invitations") {
-        return jsonResponse({
-          ok: true,
-          data: {
-            items: [],
-            count: 0,
-          },
-        });
-      }
-
       throw new Error(`Unexpected fetch: ${url}`);
     });
 
@@ -114,9 +104,11 @@ describe("PTClientsPage", () => {
       expect(screen.getByRole("heading", { name: "Client Roster" })).toBeTruthy();
     });
 
+    expect(screen.queryByRole("heading", { name: "Your Roster" })).toBeNull();
     expect(screen.getByRole("button", { name: "Invite a Client" })).toBeTruthy();
     expect(screen.queryByLabelText("Client email")).toBeNull();
     expect(screen.queryByRole("button", { name: "Send Invite" })).toBeNull();
+    expect(screen.queryByText("Pending and recent roster invites")).toBeNull();
 
     const folderList = screen.getByRole("list", { name: "PT roster folders" });
     const allClientsButton = within(folderList).getByRole("button", {
@@ -162,16 +154,6 @@ describe("PTClientsPage", () => {
         });
       }
 
-      if (url === "/api/pt/client-invitations" && method === "GET") {
-        return jsonResponse({
-          ok: true,
-          data: {
-            items: [],
-            count: 0,
-          },
-        });
-      }
-
       if (url === "/api/pt/client-invitations" && method === "POST") {
         return jsonResponse({
           ok: true,
@@ -202,6 +184,7 @@ describe("PTClientsPage", () => {
 
     expect(screen.getByLabelText("Client email")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Send Invite" })).toBeTruthy();
+    expect(screen.queryByText("Pending and recent roster invites")).toBeNull();
 
     fireEvent.change(screen.getByLabelText("Client email"), {
       target: { value: "client@example.com" },

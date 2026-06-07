@@ -3011,6 +3011,16 @@ html[data-theme="light"] .client-settings-toggle__option {
   gap: 1rem;
 }
 
+.pt-roster-invite-actions {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+}
+
+.pt-roster-invite-actions > button:first-child {
+  min-width: min(100%, 16rem);
+}
+
 .pt-roster-table-card__header {
   display: flex;
   justify-content: space-between;

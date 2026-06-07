@@ -13,7 +13,6 @@ import { useSessionBootstrap } from "@/lib/client/session";
 import type {
   ApiResponse,
   PTClientInvitation,
-  PTClientInvitationListResponse,
   PTRosterCategory,
   PTRosterCategoryListResponse,
   PTRosterClient,
@@ -22,7 +21,6 @@ import type {
 
 type PTRosterCategoriesApiResponse = ApiResponse<PTRosterCategoryListResponse>;
 type PTRosterClientsApiResponse = ApiResponse<PTRosterClientListResponse>;
-type PTClientInvitationsApiResponse = ApiResponse<PTClientInvitationListResponse>;
 
 export default function PTClientsPage() {
   const { status, user } = useSessionBootstrap({
@@ -34,7 +32,6 @@ export default function PTClientsPage() {
   const [allClients, setAllClients] = useState<PTRosterClient[]>([]);
   const [visibleClients, setVisibleClients] = useState<PTRosterClient[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [sentInvitations, setSentInvitations] = useState<PTClientInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
@@ -86,12 +83,10 @@ export default function PTClientsPage() {
         const [
           categoriesResponse,
           allClientsResponse,
-          invitationsResponse,
           filteredClientsResponse,
         ] = await Promise.all([
           fetch("/api/pt/roster-categories", { cache: "no-store" }),
           fetch("/api/pt/clients", { cache: "no-store" }),
-          fetch("/api/pt/client-invitations", { cache: "no-store" }),
           categoryId
             ? fetch(`/api/pt/clients?category_id=${encodeURIComponent(categoryId)}`, {
                 cache: "no-store",
@@ -101,7 +96,6 @@ export default function PTClientsPage() {
 
         const categoriesPayload = (await categoriesResponse.json()) as PTRosterCategoriesApiResponse;
         const allClientsPayload = (await allClientsResponse.json()) as PTRosterClientsApiResponse;
-        const invitationsPayload = (await invitationsResponse.json()) as PTClientInvitationsApiResponse;
         const filteredClientsPayload = filteredClientsResponse
           ? ((await filteredClientsResponse.json()) as PTRosterClientsApiResponse)
           : null;
@@ -120,11 +114,6 @@ export default function PTClientsPage() {
           return;
         }
 
-        if (!invitationsPayload.ok) {
-          setErrorMessage(invitationsPayload.error.message);
-          return;
-        }
-
         if (filteredClientsPayload && !filteredClientsPayload.ok) {
           setErrorMessage(filteredClientsPayload.error.message);
           return;
@@ -132,7 +121,6 @@ export default function PTClientsPage() {
 
         setCategories(categoriesPayload.data.items);
         setAllClients(allClientsPayload.data.items);
-        setSentInvitations(invitationsPayload.data.items);
         setVisibleClients(
           categoryId === null
             ? allClientsPayload.data.items
@@ -234,7 +222,6 @@ export default function PTClientsPage() {
       }
 
       setDraftInviteEmail("");
-      setSentInvitations((current) => [payload.data, ...current.filter((item) => item.id !== payload.data.id)]);
       setShowInviteForm(false);
       setFeedback({
         tone: "success",
@@ -350,7 +337,7 @@ export default function PTClientsPage() {
                     disabled={submittingInvitation}
                   />
                 </div>
-                <div className="action-row">
+                <div className="pt-roster-invite-actions">
                   <button type="submit" disabled={submittingInvitation}>
                     {submittingInvitation ? "Sending..." : "Send Invite"}
                   </button>
@@ -372,23 +359,6 @@ export default function PTClientsPage() {
               </button>
             </div>
           )}
-
-          {sentInvitations.length > 0 ? (
-            <Card className="pt-roster-category-form" variant="soft">
-              <div className="stacked-list">
-                <div>
-                  <p className="page-header__eyebrow">Sent invites</p>
-                  <h3 className="page-header__title">Pending and recent roster invites</h3>
-                </div>
-                {sentInvitations.map((invitation) => (
-                  <div key={invitation.id} className="record-card__meta">
-                    <span>{invitation.client_email}</span>
-                    <span>{invitation.status.replaceAll("_", " ")}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          ) : null}
 
           <div className="pt-roster-folders" role="list" aria-label="PT roster folders">
             <button
