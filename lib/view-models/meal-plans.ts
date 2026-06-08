@@ -10,9 +10,11 @@ import { getArray, isObject, pickOptionalText } from "@/lib/adapters/common";
 import {
   formatCalories,
   formatCountLabel,
+  formatDateTimeLabel,
   formatNumber,
   formatPriceCents,
   getNumberLike,
+  getNestedArray,
 } from "@/lib/view-models/common";
 
 export type MobileMealPlanRowView = {
@@ -126,8 +128,75 @@ export type MobileClientMealPlansView = {
   hasAnyData: boolean;
 };
 
+export type MobileMealPlanDetailFieldView = {
+  label: string;
+  value: string;
+};
+
+export type MobileMealPlanDetailHeroView = {
+  id: string | null;
+  title: string;
+  vendorName: string;
+  vendorZipLabel: string;
+  description: string;
+  priceLabel: string;
+  caloriesLabel: string;
+  itemCountLabel: string;
+  availabilityLabel: string;
+  statusLabel: string;
+  heroImageUrl: string | null;
+};
+
+export type MobileMealPlanItemView = {
+  key: string;
+  name: string;
+  quantityLabel: string | null;
+  caloriesLabel: string | null;
+  priceLabel: string | null;
+  noteLabel: string | null;
+  metadata: MobileMealPlanDetailFieldView[];
+};
+
+export type MobileMealPlanAvailabilityView = {
+  key: string;
+  title: string;
+  statusLabel: string | null;
+  windowLabel: string | null;
+  inventoryLabel: string | null;
+  locationLabel: string | null;
+  noteLabel: string | null;
+  metadata: MobileMealPlanDetailFieldView[];
+};
+
+export type MobileMealPlanCheckoutView = {
+  mealPlanId: string | null;
+  canCheckout: boolean;
+  disabledReason: string | null;
+};
+
+export type MobileMealPlanBookmarkView = {
+  isBookmarked: boolean;
+  label: string;
+};
+
+export type MobileMealPlanDetailView = {
+  hero: MobileMealPlanDetailHeroView;
+  macros: MobileMealPlanDetailFieldView[];
+  meals: MobileMealPlanItemView[];
+  availability: MobileMealPlanAvailabilityView[];
+  vendorDetails: MobileMealPlanDetailFieldView[];
+  bookmark: MobileMealPlanBookmarkView;
+  checkout: MobileMealPlanCheckoutView;
+  hasMeals: boolean;
+  hasAvailability: boolean;
+  hasVendorDetails: boolean;
+};
+
 const NO_VENDOR_ZIP = "ZIP unavailable";
 const NO_STATUS = "Status unavailable";
+const NO_MEAL_COUNT = "Meal count unavailable";
+const NO_AVAILABILITY = "Availability unavailable";
+const NO_DESCRIPTION = "Meal-plan configuration available through the signed BFF flow.";
 
 export function formatMealPlanPrice(value: number | null | undefined): string {
   return formatPriceCents(value);
@@ -546,5 +615,322 @@ export function adaptClientMealPlansView(args: {
     hasMealPlans: discovery.rows.length > 0,
     hasBookmarks: countSavedPlans(folders) > 0,
     hasAnyData: discovery.rows.length > 0 || folders.length > 0,
+  };
+}
+
+function getFirstText(value: JsonValue | null | undefined, keys: string[]): string | null {
+  for (const key of keys) {
+    if (!isObject(value)) {
+      continue;
+    }
+
+    const candidate = value[key];
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function getMealPlanHeroImageUrl(value: JsonValue | null): string | null {
+  const directImage = getFirstText(value, ["image_url", "image", "hero_image_url"]);
+  if (directImage) {
+    return directImage;
+  }
+
+  for (const item of getNestedArray(value, ["images"])) {
+    if (typeof item === "string" && item.trim().length > 0) {
+      return item;
+    }
+
+    const imageUrl = getFirstText(item, ["url", "src", "image_url"]);
+    if (imageUrl) {
+      return imageUrl;
+    }
+  }
+
+  return null;
+}
+
+function formatOptionalCountLabel(
+  value: number | null | undefined,
+  singular: string,
+  plural: string,
+  fallback: string,
+): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return formatCountLabel(value, singular, plural);
+}
+
+function buildMacroFields(value: JsonValue | null): MobileMealPlanDetailFieldView[] {
+  const macroCandidates = [
+    {
+      label: "Protein",
+      value: getNumberLike(value, ["protein_grams", "protein", "total_protein"]),
+    },
+    {
+      label: "Carbs",
+      value: getNumberLike(value, ["carbs_grams", "carbs", "carbohydrates", "total_carbs"]),
+    },
+    {
+      label: "Fat",
+      value: getNumberLike(value, ["fat_grams", "fat", "total_fat"]),
+    },
+  ];
+
+  return macroCandidates
+    .filter((entry) => typeof entry.value === "number")
+    .map((entry) => ({
+      label: entry.label,
+      value: `${formatNumber(entry.value)}g`,
+    }));
+}
+
+function buildMealMetadata(item: JsonValue | null | undefined): MobileMealPlanDetailFieldView[] {
+  const metadata: MobileMealPlanDetailFieldView[] = [];
+
+  const category = pickOptionalText(item, ["category", "meal_type", "type"]);
+  const portion = pickOptionalText(item, ["portion_size", "size"]);
+  const servings = getNumberLike(item, ["servings", "serving_count"]);
+
+  if (category) {
+    metadata.push({ label: "Type", value: category });
+  }
+
+  if (portion) {
+    metadata.push({ label: "Portion", value: portion });
+  }
+
+  if (typeof servings === "number") {
+    metadata.push({ label: "Servings", value: formatNumber(servings) });
+  }
+
+  return metadata;
+}
+
+function readMealPlanItems(value: JsonValue | null): MobileMealPlanItemView[] {
+  const candidates = getNestedArray(value, ["meals", "items", "meal_items", "included_meals"]);
+
+  return candidates.flatMap((item, index) => {
+    if (typeof item === "string" && item.trim().length > 0) {
+      return [{
+        key: `meal-${index}-${item}`,
+        name: item,
+        quantityLabel: null,
+        caloriesLabel: null,
+        priceLabel: null,
+        noteLabel: null,
+        metadata: [],
+      }];
+    }
+
+    const name = pickOptionalText(item, ["name", "title"]) ?? `Meal ${index + 1}`;
+    const quantity = getNumberLike(item, ["quantity"]);
+    const calories = getNumberLike(item, ["calories", "total_calories"]);
+    const priceCents = getNumberLike(item, ["total_price_cents", "price_cents", "unit_price_cents"]);
+    const note = pickOptionalText(item, ["description", "summary", "note"]);
+
+    return [{
+      key: `meal-${index}-${name}`,
+      name,
+      quantityLabel: typeof quantity === "number" ? formatNumber(quantity) : null,
+      caloriesLabel: typeof calories === "number" ? formatCalories(calories) : null,
+      priceLabel: typeof priceCents === "number" ? formatPriceCents(priceCents) : null,
+      noteLabel: note,
+      metadata: buildMealMetadata(item),
+    }];
+  });
+}
+
+function readVendorDetails(
+  value: JsonValue | null,
+  fallbackVendorName: string | null,
+): MobileMealPlanDetailFieldView[] {
+  const details: MobileMealPlanDetailFieldView[] = [];
+
+  const vendorName = pickOptionalText(value, ["vendor_name", "vendor"]) ?? fallbackVendorName;
+  const zipCode = pickOptionalText(value, ["vendor_zip_code", "zip_code"]);
+  const pickupLocation = pickOptionalText(value, ["pickup_location", "location"]);
+  const pickupNotes = pickOptionalText(value, ["pickup_notes", "fulfillment_notes"]);
+
+  if (vendorName) {
+    details.push({ label: "Vendor", value: vendorName });
+  }
+
+  if (zipCode) {
+    details.push({ label: "ZIP", value: zipCode });
+  }
+
+  if (pickupLocation) {
+    details.push({ label: "Location", value: pickupLocation });
+  }
+
+  if (pickupNotes) {
+    details.push({ label: "Notes", value: pickupNotes });
+  }
+
+  return details;
+}
+
+function buildAvailabilityWindowLabel(item: JsonValue | null | undefined): string | null {
+  const directLabel = pickOptionalText(item, ["window_label", "label", "title", "name"]);
+  if (directLabel) {
+    return directLabel;
+  }
+
+  const start = pickOptionalText(item, ["pickup_start_at", "start_at", "starts_at"]);
+  const end = pickOptionalText(item, ["pickup_end_at", "end_at", "ends_at"]);
+
+  if (start && end) {
+    return `${formatDateTimeLabel(start)} - ${formatDateTimeLabel(end)}`;
+  }
+
+  if (start) {
+    return formatDateTimeLabel(start);
+  }
+
+  if (end) {
+    return formatDateTimeLabel(end);
+  }
+
+  return null;
+}
+
+function buildAvailabilityMetadata(item: JsonValue | null | undefined): MobileMealPlanDetailFieldView[] {
+  const metadata: MobileMealPlanDetailFieldView[] = [];
+
+  const status = pickOptionalText(item, ["status"]);
+  const windowLabel = buildAvailabilityWindowLabel(item);
+  const inventory = getNumberLike(item, ["remaining_inventory", "inventory", "available_quantity", "capacity"]);
+  const location = pickOptionalText(item, ["pickup_location", "location"]);
+  const note = pickOptionalText(item, ["pickup_notes", "fulfillment_notes", "notes"]);
+
+  if (status) {
+    metadata.push({ label: "Status", value: status });
+  }
+
+  if (windowLabel) {
+    metadata.push({ label: "Window", value: windowLabel });
+  }
+
+  if (typeof inventory === "number") {
+    metadata.push({ label: "Inventory", value: formatNumber(inventory) });
+  }
+
+  if (location) {
+    metadata.push({ label: "Location", value: location });
+  }
+
+  if (note) {
+    metadata.push({ label: "Notes", value: note });
+  }
+
+  return metadata;
+}
+
+function readAvailabilityEntries(value: JsonValue | null): MobileMealPlanAvailabilityView[] {
+  const candidates = getNestedArray(value, [
+    "availability",
+    "availability_windows",
+    "pickup_windows",
+    "pickup_slots",
+  ]);
+
+  return candidates.flatMap((item, index) => {
+    if (typeof item === "string" && item.trim().length > 0) {
+      return [{
+        key: `availability-${index}-${item}`,
+        title: item,
+        statusLabel: null,
+        windowLabel: null,
+        inventoryLabel: null,
+        locationLabel: null,
+        noteLabel: null,
+        metadata: [],
+      }];
+    }
+
+    const title =
+      pickOptionalText(item, ["name", "title", "label", "window_label"]) ?? `Availability ${index + 1}`;
+    const status = pickOptionalText(item, ["status"]);
+    const windowLabel = buildAvailabilityWindowLabel(item);
+    const inventory = getNumberLike(item, ["remaining_inventory", "inventory", "available_quantity", "capacity"]);
+    const location = pickOptionalText(item, ["pickup_location", "location"]);
+    const note = pickOptionalText(item, ["pickup_notes", "fulfillment_notes", "notes"]);
+
+    return [{
+      key: `availability-${index}-${title}`,
+      title,
+      statusLabel: status,
+      windowLabel,
+      inventoryLabel: typeof inventory === "number" ? formatNumber(inventory) : null,
+      locationLabel: location,
+      noteLabel: note,
+      metadata: buildAvailabilityMetadata(item),
+    }];
+  });
+}
+
+export function adaptMealPlanDetailView(args: {
+  mealPlan: JsonValue | null;
+  mealPlanId?: string | null;
+  bookmarks?: BookmarkFolderListPayload | BookmarkFolder[] | null;
+}): MobileMealPlanDetailView {
+  const mealPlanId =
+    pickOptionalText(args.mealPlan, ["id", "meal_plan_id"]) ??
+    (typeof args.mealPlanId === "string" && args.mealPlanId.trim().length > 0 ? args.mealPlanId : null);
+  const vendorName = pickOptionalText(args.mealPlan, ["vendor_name", "vendor"]);
+  const meals = readMealPlanItems(args.mealPlan);
+  const availability = readAvailabilityEntries(args.mealPlan);
+  const itemCount = getNumberLike(args.mealPlan, ["item_count"]) ?? (meals.length > 0 ? meals.length : null);
+  const availabilityCount =
+    getNumberLike(args.mealPlan, ["availability_count"]) ??
+    (availability.length > 0 ? availability.length : null);
+  const folders = readBookmarkFolders(args.bookmarks);
+  const bookmarkedIds = buildBookmarkedIdSet(folders);
+  const vendorDetails = readVendorDetails(args.mealPlan, vendorName);
+
+  return {
+    hero: {
+      id: mealPlanId,
+      title: pickOptionalText(args.mealPlan, ["name", "title"]) ?? "Meal plan detail",
+      vendorName: formatMealPlanVendor(vendorName),
+      vendorZipLabel: formatMealPlanVendorZip(pickOptionalText(args.mealPlan, ["vendor_zip_code", "zip_code"])),
+      description: pickOptionalText(args.mealPlan, ["description", "summary"]) ?? NO_DESCRIPTION,
+      priceLabel: formatMealPlanPrice(getNumberLike(args.mealPlan, ["total_price_cents", "price_cents"])),
+      caloriesLabel: formatMealPlanCalories(getNumberLike(args.mealPlan, ["total_calories", "calories"])),
+      itemCountLabel: formatOptionalCountLabel(itemCount, "meal", "meals", NO_MEAL_COUNT),
+      availabilityLabel: formatOptionalCountLabel(
+        availabilityCount,
+        "availability window",
+        "availability windows",
+        NO_AVAILABILITY,
+      ),
+      statusLabel:
+        pickOptionalText(args.mealPlan, ["status"])?.trim().length
+          ? pickOptionalText(args.mealPlan, ["status"]) ?? NO_STATUS
+          : NO_STATUS,
+      heroImageUrl: getMealPlanHeroImageUrl(args.mealPlan),
+    },
+    macros: buildMacroFields(args.mealPlan),
+    meals,
+    availability,
+    vendorDetails,
+    bookmark: {
+      isBookmarked: mealPlanId ? bookmarkedIds.has(mealPlanId) : false,
+      label: mealPlanId && bookmarkedIds.has(mealPlanId) ? "Saved" : "Not saved",
+    },
+    checkout: {
+      mealPlanId,
+      canCheckout: Boolean(mealPlanId),
+      disabledReason: mealPlanId ? null : "Meal plan identifier unavailable.",
+    },
+    hasMeals: meals.length > 0,
+    hasAvailability: availability.length > 0,
+    hasVendorDetails: vendorDetails.length > 0,
   };
 }
