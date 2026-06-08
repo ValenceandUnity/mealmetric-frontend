@@ -221,6 +221,34 @@ export type MobileMealPlanSearchView = {
   hasResults: boolean;
 };
 
+export type MobilePTMealPlanResultView = {
+  id: string | null;
+  name: string;
+  vendorName: string;
+  vendorZipLabel: string;
+  caloriesLabel: string;
+  priceLabel: string;
+  statusLabel: string;
+  itemCountLabel: string;
+  availabilityLabel: string;
+};
+
+export type MobilePTMealPlanSearchView = {
+  queryLabel: string;
+  note: string;
+  stateLabel: string;
+};
+
+export type MobilePTMealPlansView = {
+  summaryCards: MobileMealPlanDirectorySummaryCardView[];
+  search: MobilePTMealPlanSearchView;
+  rows: MobilePTMealPlanResultView[];
+  emptyState: MobileMealPlanEmptyStateView | null;
+  hasQuery: boolean;
+  hasResults: boolean;
+  hasAnyMealPlans: boolean;
+};
+
 const NO_VENDOR_ZIP = "ZIP unavailable";
 const NO_STATUS = "Status unavailable";
 const NO_MEAL_COUNT = "Meal count unavailable";
@@ -255,7 +283,7 @@ function readMealPlans(value: MealPlanListPayload | JsonValue | null | undefined
     const name = pickOptionalText(item, ["name", "title"]);
     const vendorId = pickOptionalText(item, ["vendor_id"]);
     const vendorName = pickOptionalText(item, ["vendor_name", "vendor"]);
-    const slug = pickOptionalText(item, ["slug"]);
+    const slug = pickOptionalText(item, ["slug"]) ?? id;
 
     if (!id || !name || !vendorId || !vendorName || !slug) {
       return [];
@@ -761,6 +789,129 @@ export function adaptClientMealPlanSearchView(args: {
       : null,
     hasQuery: Boolean(normalizedQuery),
     hasResults: rows.length > 0,
+  };
+}
+
+function buildPTMealPlanResultRows(
+  value: MealPlanListPayload | JsonValue | null,
+): MobilePTMealPlanResultView[] {
+  const items = isObject(value) && Array.isArray(value.items) ? value.items : getArray(value);
+
+  return items.flatMap((item, index) => {
+    if (!isObject(item)) {
+      return [];
+    }
+
+    const id = pickOptionalText(item, ["id", "meal_plan_id"]);
+    const name = pickOptionalText(item, ["name", "title"]) ?? `Meal plan ${index + 1}`;
+    const vendorName = formatMealPlanVendor(pickOptionalText(item, ["vendor_name", "vendor"]));
+    const vendorZipLabel = formatMealPlanVendorZip(pickOptionalText(item, ["vendor_zip_code"]));
+    const totalCalories = getNumberLike(item, ["total_calories", "calories"]);
+    const totalPriceCents = getNumberLike(item, ["total_price_cents"]);
+    const itemCount = getNumberLike(item, ["item_count"]);
+    const availabilityCount = getNumberLike(item, ["availability_count"]);
+    const status = pickOptionalText(item, ["status"]) ?? "available";
+
+    return [{
+      id,
+      name,
+      vendorName,
+      vendorZipLabel,
+      caloriesLabel: formatMealPlanCalories(totalCalories),
+      priceLabel: formatMealPlanPrice(totalPriceCents),
+      statusLabel: status.trim().length > 0 ? status : NO_STATUS,
+      itemCountLabel: formatOptionalCountLabel(itemCount, "meal", "meals", NO_MEAL_COUNT),
+      availabilityLabel: formatOptionalCountLabel(
+        availabilityCount,
+        "availability window",
+        "availability windows",
+        NO_AVAILABILITY,
+      ),
+    }];
+  });
+}
+
+function matchesPTMealPlanQuery(query: string, row: MobilePTMealPlanResultView): boolean {
+  if (!query) {
+    return true;
+  }
+
+  const fields = [
+    row.name,
+    row.vendorName,
+    row.vendorZipLabel,
+    row.caloriesLabel,
+    row.priceLabel,
+    row.statusLabel,
+    row.itemCountLabel,
+    row.availabilityLabel,
+  ];
+
+  return fields.some((field) => field.toLowerCase().includes(query));
+}
+
+export function adaptPTMealPlansView(args: {
+  mealPlans: MealPlanListPayload | JsonValue | null;
+  query?: string | null;
+}): MobilePTMealPlansView {
+  const allRows = buildPTMealPlanResultRows(args.mealPlans);
+  const normalizedQuery = args.query?.trim() ?? "";
+  const loweredQuery = normalizedQuery.toLowerCase();
+  const rows = loweredQuery
+    ? allRows.filter((row) => matchesPTMealPlanQuery(loweredQuery, row))
+    : allRows;
+  const visibleVendorCount = new Set(rows.map((row) => row.vendorName)).size;
+
+  return {
+    summaryCards: [
+      {
+        label: "Loaded plans",
+        value: formatNumber(allRows.length),
+        progressText:
+          allRows.length > 0
+            ? "Loaded from the protected PT meal-plan search route."
+            : "No PT meal plans are currently loaded.",
+      },
+      {
+        label: "Visible plans",
+        value: formatNumber(rows.length),
+        progressText:
+          normalizedQuery
+            ? "Filtered locally from the currently loaded PT meal-plan catalog."
+            : "All currently loaded PT meal plans are visible.",
+      },
+      {
+        label: "Vendors",
+        value: formatNumber(visibleVendorCount),
+        progressText:
+          visibleVendorCount > 0
+            ? "Distinct vendors represented in the current visible PT results."
+            : "Vendor coverage appears after PT meal plans load.",
+      },
+    ],
+    search: {
+      queryLabel: normalizedQuery || "All loaded plans",
+      note:
+        normalizedQuery
+          ? "This local filter narrows the already loaded PT meal-plan catalog and does not change the protected PT request shape."
+          : "This page loads the current PT meal-plan catalog once and keeps filtering local on mobile.",
+      stateLabel: normalizedQuery ? "Local filter active" : "All loaded plans",
+    },
+    rows,
+    emptyState: rows.length === 0
+      ? normalizedQuery
+        ? {
+            title: "No PT meal plans match this search",
+            message: "Adjust the local search to revisit the currently loaded PT meal-plan results.",
+          }
+        : {
+            title: "No PT meal plans are available",
+            message: "The PT meal-plan search route did not return any discoverable meal plans.",
+          }
+      : null,
+    hasQuery: Boolean(normalizedQuery),
+    hasResults: rows.length > 0,
+    hasAnyMealPlans: allRows.length > 0,
   };
 }
 
