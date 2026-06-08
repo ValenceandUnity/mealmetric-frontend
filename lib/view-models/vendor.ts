@@ -74,6 +74,13 @@ export type MobileVendorMetricsSummaryView = {
   unavailableMessage: string;
 };
 
+export type MobileVendorMetricsHealthCardView = {
+  label: string;
+  value: string;
+  target?: string;
+  progressText: string;
+};
+
 export type MobileVendorActionView = {
   title: string;
   description: string;
@@ -107,6 +114,25 @@ export type MobileVendorMealPlansView = {
   highlightEmptyTitle: string;
   highlightEmptyMessage: string;
   readOnlyNote: string;
+};
+
+export type MobileVendorMetricsView = {
+  title: string;
+  subtitle: string;
+  vendorName: string;
+  vendorZipLabel: string;
+  heroDescription: string;
+  summaryCards: MobileVendorSummaryCardView[];
+  healthCards: MobileVendorMetricsHealthCardView[];
+  actions: MobileVendorActionView[];
+  totalMealPlansLabel: string;
+  publishedMealPlansLabel: string;
+  draftMealPlansLabel: string;
+  availabilityEntriesLabel: string;
+  openPickupWindowsLabel: string;
+  hasMetrics: boolean;
+  unavailableTitle: string;
+  unavailableMessage: string;
 };
 
 type VendorIdentityRecord = {
@@ -335,6 +361,102 @@ function buildMetricsCards(args: {
   ];
 }
 
+function buildVendorMetricsSummaryCards(metrics: VendorMetricsRecord): MobileVendorSummaryCardView[] {
+  return [
+    {
+      label: "Total meal plans",
+      value: formatNumber(metrics.totalMealPlans, "Unavailable"),
+      progressText: "Total catalog size returned by the vendor metrics route.",
+    },
+    {
+      label: "Published meal plans",
+      value: formatNumber(metrics.publishedMealPlans, "Unavailable"),
+      progressText: "Published catalog entries returned by the vendor metrics route.",
+    },
+    {
+      label: "Draft meal plans",
+      value: formatNumber(metrics.draftMealPlans, "Unavailable"),
+      progressText: "Draft catalog entries returned by the vendor metrics route.",
+    },
+    {
+      label: "Availability entries",
+      value: formatNumber(metrics.totalAvailabilityEntries, "Unavailable"),
+      progressText: "Availability rows returned by the vendor metrics route.",
+    },
+    {
+      label: "Open pickup windows",
+      value: formatNumber(metrics.openPickupWindows, "Unavailable"),
+      progressText: "Pickup windows currently marked open by the vendor metrics route.",
+    },
+    {
+      label: "Vendor ZIP",
+      value: metrics.zipCode ?? ZIP_FALLBACK,
+      progressText: "ZIP value returned by the vendor metrics route.",
+    },
+  ];
+}
+
+function buildVendorMetricsHealthCards(metrics: VendorMetricsRecord): MobileVendorMetricsHealthCardView[] {
+  const totalMealPlans =
+    typeof metrics.totalMealPlans === "number" && Number.isFinite(metrics.totalMealPlans)
+      ? metrics.totalMealPlans
+      : null;
+  const publishedMealPlans =
+    typeof metrics.publishedMealPlans === "number" && Number.isFinite(metrics.publishedMealPlans)
+      ? metrics.publishedMealPlans
+      : null;
+  const draftMealPlans =
+    typeof metrics.draftMealPlans === "number" && Number.isFinite(metrics.draftMealPlans)
+      ? metrics.draftMealPlans
+      : null;
+  const totalAvailabilityEntries =
+    typeof metrics.totalAvailabilityEntries === "number" && Number.isFinite(metrics.totalAvailabilityEntries)
+      ? metrics.totalAvailabilityEntries
+      : null;
+  const openPickupWindows =
+    typeof metrics.openPickupWindows === "number" && Number.isFinite(metrics.openPickupWindows)
+      ? metrics.openPickupWindows
+      : null;
+  const publishedTarget = totalMealPlans !== null && totalMealPlans > 0 ? formatNumber(totalMealPlans) : undefined;
+
+  return [
+    {
+      label: "Published coverage",
+      value: formatNumber(publishedMealPlans, "Unavailable"),
+      target: publishedTarget,
+      progressText:
+        totalMealPlans !== null && publishedMealPlans !== null
+          ? `${formatNumber(publishedMealPlans)} of ${formatNumber(totalMealPlans)} returned meal plans are published.`
+          : "Published coverage is unavailable from the current vendor metrics payload.",
+    },
+    {
+      label: "Draft coverage",
+      value: formatNumber(draftMealPlans, "Unavailable"),
+      target: publishedTarget,
+      progressText:
+        totalMealPlans !== null && draftMealPlans !== null
+          ? `${formatNumber(draftMealPlans)} of ${formatNumber(totalMealPlans)} returned meal plans remain draft.`
+          : "Draft coverage is unavailable from the current vendor metrics payload.",
+    },
+    {
+      label: "Availability entries",
+      value: formatNumber(totalAvailabilityEntries, "Unavailable"),
+      progressText:
+        totalAvailabilityEntries !== null
+          ? `${formatCountLabel(totalAvailabilityEntries, "availability entry", "availability entries")} are currently tracked for the vendor catalog.`
+          : "Availability entry coverage is unavailable from the current vendor metrics payload.",
+    },
+    {
+      label: "Open pickup windows",
+      value: formatNumber(openPickupWindows, "Unavailable"),
+      progressText:
+        openPickupWindows !== null
+          ? `${formatCountLabel(openPickupWindows, "open pickup window")} are currently active.`
+          : "Open pickup window coverage is unavailable from the current vendor metrics payload.",
+    },
+  ];
+}
+
 function buildCatalogCards(args: {
   mealPlanCount: number;
   publishedCount: number;
@@ -382,6 +504,47 @@ function buildActionCards(): MobileVendorActionView[] {
       href: "/vendor/metrics",
       ctaLabel: "Open metrics",
       badgeLabel: "Metrics",
+      tone: "purple",
+      isPlaceholder: false,
+    },
+    {
+      title: "Account",
+      description: "Open the existing vendor account shell without changing auth or profile-edit behavior.",
+      href: "/vendor/account",
+      ctaLabel: "Open account",
+      badgeLabel: "Account",
+      tone: "yellow",
+      isPlaceholder: false,
+    },
+    {
+      title: "Operations placeholder",
+      description: "Open the existing placeholder route only. No live vendor operations workflow is added here.",
+      href: "/vendor/operations",
+      ctaLabel: "Open operations placeholder",
+      badgeLabel: "Placeholder",
+      tone: "purple",
+      isPlaceholder: true,
+    },
+  ];
+}
+
+function buildVendorMetricsActionCards(): MobileVendorActionView[] {
+  return [
+    {
+      title: "Vendor dashboard",
+      description: "Open the existing vendor dashboard overview route without changing its current BFF behavior.",
+      href: "/vendor",
+      ctaLabel: "Open dashboard",
+      badgeLabel: "Overview",
+      tone: "yellow",
+      isPlaceholder: false,
+    },
+    {
+      title: "Meal plans",
+      description: "Open the existing vendor catalog workspace for the full meal-plan inventory.",
+      href: "/vendor/meal-plans",
+      ctaLabel: "Open meal plans",
+      badgeLabel: "Catalog",
       tone: "purple",
       isPlaceholder: false,
     },
@@ -539,5 +702,34 @@ export function adaptVendorMealPlansView(args: {
       "The spotlight remains empty until the vendor meal-plan route returns at least one plan.",
     readOnlyNote:
       "This catalog stays read-only. No create, edit, publish, archive, or delete workflow is introduced because the current vendor surface does not support those mutations here.",
+  };
+}
+
+export function adaptVendorMetricsView(args: {
+  metrics: VendorMetricsPayload | JsonValue | null;
+}): MobileVendorMetricsView {
+  const metrics = readVendorMetrics(args.metrics);
+  const vendorName = metrics.vendorName ?? VENDOR_NAME_FALLBACK;
+  const vendorZipLabel = metrics.zipCode ?? ZIP_FALLBACK;
+
+  return {
+    title: "Vendor Metrics",
+    subtitle: `${vendorName} | ${vendorZipLabel}`,
+    vendorName,
+    vendorZipLabel,
+    heroDescription: metrics.hasMetrics
+      ? "This read-only mobile metrics view preserves the existing vendor metrics BFF route and avoids unsupported performance summaries."
+      : "The vendor metrics route did not return summary-ready data, so this mobile view falls back to safe labels without inventing unsupported summaries.",
+    summaryCards: buildVendorMetricsSummaryCards(metrics),
+    healthCards: buildVendorMetricsHealthCards(metrics),
+    actions: buildVendorMetricsActionCards(),
+    totalMealPlansLabel: formatNumber(metrics.totalMealPlans, "Unavailable"),
+    publishedMealPlansLabel: formatNumber(metrics.publishedMealPlans, "Unavailable"),
+    draftMealPlansLabel: formatNumber(metrics.draftMealPlans, "Unavailable"),
+    availabilityEntriesLabel: formatNumber(metrics.totalAvailabilityEntries, "Unavailable"),
+    openPickupWindowsLabel: formatNumber(metrics.openPickupWindows, "Unavailable"),
+    hasMetrics: metrics.hasMetrics,
+    unavailableTitle: "Vendor metrics unavailable",
+    unavailableMessage: "The vendor metrics route did not return mobile summary data for this account.",
   };
 }
