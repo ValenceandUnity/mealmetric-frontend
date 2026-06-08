@@ -249,6 +249,52 @@ export type MobilePTMealPlansView = {
   hasAnyMealPlans: boolean;
 };
 
+export type MobilePTRecommendationClientView = {
+  clientId: string;
+  clientDisplayLabel: string;
+  clientEmailLabel: string;
+  contextNote: string;
+};
+
+export type MobilePTRecommendationMealPlanView = MobilePTMealPlanResultView & {
+  description: string;
+  isSelected: boolean;
+  selectActionLabel: string;
+  canSelect: boolean;
+};
+
+export type MobilePTRecommendationHistoryView = {
+  id: string | null;
+  eyebrow: string;
+  title: string;
+  description: string;
+  metadata: MobileMealPlanDetailFieldView[];
+};
+
+export type MobilePTRecommendationActionView = {
+  selectedMealPlanId: string;
+  selectedMealPlanLabel: string;
+  canSubmit: boolean;
+  disabledReason: string | null;
+  submitLabel: string;
+  hasSelectablePlans: boolean;
+};
+
+export type MobilePTRecommendationPageView = {
+  client: MobilePTRecommendationClientView;
+  summaryCards: MobileMealPlanDirectorySummaryCardView[];
+  search: MobilePTMealPlanSearchView;
+  mealPlans: MobilePTRecommendationMealPlanView[];
+  mealPlanEmptyState: MobileMealPlanEmptyStateView | null;
+  recommendations: MobilePTRecommendationHistoryView[];
+  recommendationEmptyState: MobileMealPlanEmptyStateView | null;
+  action: MobilePTRecommendationActionView;
+  hasQuery: boolean;
+  hasMealPlans: boolean;
+  hasRecommendations: boolean;
+  historyDebugData: JsonValue | null;
+};
+
 const NO_VENDOR_ZIP = "ZIP unavailable";
 const NO_STATUS = "Status unavailable";
 const NO_MEAL_COUNT = "Meal count unavailable";
@@ -850,11 +896,76 @@ function matchesPTMealPlanQuery(query: string, row: MobilePTMealPlanResultView):
   return fields.some((field) => field.toLowerCase().includes(query));
 }
 
+type PTMealPlanRecord = {
+  id: string | null;
+  name: string;
+  vendorName: string;
+  vendorZipLabel: string;
+  caloriesLabel: string;
+  priceLabel: string;
+  statusLabel: string;
+  itemCountLabel: string;
+  availabilityLabel: string;
+  description: string;
+};
+
+function readPTMealPlanRecords(
+  value: MealPlanListPayload | JsonValue | null,
+): PTMealPlanRecord[] {
+  const items = isObject(value) && Array.isArray(value.items) ? value.items : getArray(value);
+
+  return items.flatMap((item, index) => {
+    if (!isObject(item)) {
+      return [];
+    }
+
+    const id = pickOptionalText(item, ["id", "meal_plan_id"]);
+    const name = pickOptionalText(item, ["name", "title"]) ?? `Meal plan ${index + 1}`;
+    const vendorName = formatMealPlanVendor(pickOptionalText(item, ["vendor_name", "vendor"]));
+    const vendorZipLabel = formatMealPlanVendorZip(pickOptionalText(item, ["vendor_zip_code"]));
+    const totalCalories = getNumberLike(item, ["total_calories", "calories"]);
+    const totalPriceCents = getNumberLike(item, ["total_price_cents"]);
+    const itemCount = getNumberLike(item, ["item_count"]);
+    const availabilityCount = getNumberLike(item, ["availability_count"]);
+    const status = pickOptionalText(item, ["status"]) ?? "available";
+
+    return [{
+      id,
+      name,
+      vendorName,
+      vendorZipLabel,
+      caloriesLabel: formatMealPlanCalories(totalCalories),
+      priceLabel: formatMealPlanPrice(totalPriceCents),
+      statusLabel: status.trim().length > 0 ? status : NO_STATUS,
+      itemCountLabel: formatOptionalCountLabel(itemCount, "meal", "meals", NO_MEAL_COUNT),
+      availabilityLabel: formatOptionalCountLabel(
+        availabilityCount,
+        "availability window",
+        "availability windows",
+        NO_AVAILABILITY,
+      ),
+      description:
+        pickOptionalText(item, ["description", "summary"]) ??
+        "Meal plan available for PT recommendation through the protected BFF route.",
+    }];
+  });
+}
+
 export function adaptPTMealPlansView(args: {
   mealPlans: MealPlanListPayload | JsonValue | null;
   query?: string | null;
 }): MobilePTMealPlansView {
-  const allRows = buildPTMealPlanResultRows(args.mealPlans);
+  const allRows = readPTMealPlanRecords(args.mealPlans).map((row) => ({
+    id: row.id,
+    name: row.name,
+    vendorName: row.vendorName,
+    vendorZipLabel: row.vendorZipLabel,
+    caloriesLabel: row.caloriesLabel,
+    priceLabel: row.priceLabel,
+    statusLabel: row.statusLabel,
+    itemCountLabel: row.itemCountLabel,
+    availabilityLabel: row.availabilityLabel,
+  }));
   const normalizedQuery = args.query?.trim() ?? "";
   const loweredQuery = normalizedQuery.toLowerCase();
   const rows = loweredQuery
@@ -912,6 +1023,162 @@ export function adaptPTMealPlansView(args: {
     hasQuery: Boolean(normalizedQuery),
     hasResults: rows.length > 0,
     hasAnyMealPlans: allRows.length > 0,
+  };
+}
+
+function buildPTRecommendationHistory(
+  value: JsonValue | null,
+): MobilePTRecommendationHistoryView[] {
+  return getArray(value).map((item, index) => {
+    const recommendationId = isObject(item)
+      ? pickOptionalText(item, ["id", "recommendation_id"])
+      : null;
+    const status = pickOptionalText(item, ["status"]) ?? "Recommendation";
+    const mealPlanId = pickOptionalText(item, ["meal_plan_id"]) ?? `Recommendation ${index + 1}`;
+    const recommendedAt = pickOptionalText(item, ["recommended_at"]);
+    const expiresAt = pickOptionalText(item, ["expires_at"]);
+    const rationale = pickOptionalText(item, ["rationale", "notes"]);
+
+    return {
+      id: recommendationId,
+      eyebrow: status,
+      title: mealPlanId,
+      description:
+        rationale ?? "Recommendation delivered through the protected PT BFF route.",
+      metadata: [
+        ...(recommendationId ? [{ label: "Recommendation ID", value: recommendationId }] : []),
+        { label: "Meal plan", value: mealPlanId },
+        ...(recommendedAt ? [{ label: "Recommended", value: recommendedAt }] : []),
+        ...(expiresAt ? [{ label: "Expires", value: expiresAt }] : []),
+      ],
+    };
+  });
+}
+
+function findSelectedPTMealPlanLabel(
+  mealPlans: PTMealPlanRecord[],
+  mealPlanId: string,
+): string {
+  if (!mealPlanId.trim()) {
+    return "No meal plan selected";
+  }
+
+  const match = mealPlans.find((mealPlan) => mealPlan.id === mealPlanId);
+  return match?.name ?? mealPlanId;
+}
+
+export function adaptPTRecommendationPageView(args: {
+  clientId: string;
+  mealPlans: MealPlanListPayload | JsonValue | null;
+  recommendations: JsonValue | null;
+  query?: string | null;
+  selectedMealPlanId?: string | null;
+  submitting?: boolean;
+}): MobilePTRecommendationPageView {
+  const mealPlans = readPTMealPlanRecords(args.mealPlans);
+  const normalizedQuery = args.query?.trim() ?? "";
+  const loweredQuery = normalizedQuery.toLowerCase();
+  const selectedMealPlanId = args.selectedMealPlanId?.trim() ?? "";
+  const filteredMealPlans = loweredQuery
+    ? mealPlans.filter((mealPlan) => matchesPTMealPlanQuery(loweredQuery, mealPlan))
+    : mealPlans;
+  const recommendations = buildPTRecommendationHistory(args.recommendations);
+  const selectablePlanCount = mealPlans.filter((mealPlan) => Boolean(mealPlan.id)).length;
+  const selectedMealPlanLabel = findSelectedPTMealPlanLabel(mealPlans, selectedMealPlanId);
+
+  return {
+    client: {
+      clientId: args.clientId,
+      clientDisplayLabel: `Client ${args.clientId}`,
+      clientEmailLabel: "Email unavailable",
+      contextNote:
+        "This workflow preserves the existing route-param client context and does not introduce an extra client-detail fetch.",
+    },
+    summaryCards: [
+      {
+        label: "Meal plans",
+        value: formatNumber(mealPlans.length),
+        progressText:
+          mealPlans.length > 0
+            ? "Recommendable plans returned by the protected PT meal-plan search route."
+            : "No recommendable meal plans are currently loaded.",
+      },
+      {
+        label: "Recommendations",
+        value: formatNumber(recommendations.length),
+        progressText:
+          recommendations.length > 0
+            ? "Existing client recommendations returned by the protected PT history route."
+            : "No recommendations currently exist for this client.",
+      },
+      {
+        label: "Selected plan",
+        value: selectedMealPlanLabel,
+        progressText:
+          selectedMealPlanId
+            ? "This meal plan will be submitted through the existing PT create route."
+            : "Select or enter a meal plan ID to use the current PT recommendation contract.",
+      },
+    ],
+    search: {
+      queryLabel: normalizedQuery || "All loaded plans",
+      note:
+        normalizedQuery
+          ? "This local filter narrows the already loaded meal-plan catalog and does not change the protected PT request shape."
+          : "The page keeps the current PT meal-plan request on initial load and filters locally on mobile.",
+      stateLabel: normalizedQuery ? "Local filter active" : "All loaded plans",
+    },
+    mealPlans: filteredMealPlans.map((mealPlan) => ({
+      id: mealPlan.id,
+      name: mealPlan.name,
+      vendorName: mealPlan.vendorName,
+      vendorZipLabel: mealPlan.vendorZipLabel,
+      caloriesLabel: mealPlan.caloriesLabel,
+      priceLabel: mealPlan.priceLabel,
+      statusLabel: mealPlan.statusLabel,
+      itemCountLabel: mealPlan.itemCountLabel,
+      availabilityLabel: mealPlan.availabilityLabel,
+      description: mealPlan.description,
+      isSelected: Boolean(mealPlan.id) && mealPlan.id === selectedMealPlanId,
+      selectActionLabel:
+        Boolean(mealPlan.id) && mealPlan.id === selectedMealPlanId
+          ? `Selected ${mealPlan.name}`
+          : `Select ${mealPlan.name}`,
+      canSelect: Boolean(mealPlan.id),
+    })),
+    mealPlanEmptyState: filteredMealPlans.length === 0
+      ? normalizedQuery
+        ? {
+            title: "No meal plans match this search",
+            message: "Adjust the local search to revisit the currently loaded PT meal-plan results.",
+          }
+        : {
+            title: "No meal plans returned",
+            message: "The PT meal-plan search route did not return recommendable plans.",
+          }
+      : null,
+    recommendations,
+    recommendationEmptyState: recommendations.length === 0
+      ? {
+          title: "No recommendations returned",
+          message: "This client does not yet have meal-plan recommendations from the PT endpoints.",
+        }
+      : null,
+    action: {
+      selectedMealPlanId,
+      selectedMealPlanLabel,
+      canSubmit: selectedMealPlanId.length > 0 && !args.submitting,
+      disabledReason:
+        selectedMealPlanId.length > 0
+          ? null
+          : "A meal plan ID is required before the existing recommendation route can be submitted.",
+      submitLabel: args.submitting ? "Creating recommendation..." : "Create recommendation",
+      hasSelectablePlans: selectablePlanCount > 0,
+    },
+    hasQuery: normalizedQuery.length > 0,
+    hasMealPlans: mealPlans.length > 0,
+    hasRecommendations: recommendations.length > 0,
+    historyDebugData: recommendations.length === 0 ? args.recommendations : null,
   };
 }
 

@@ -2,20 +2,19 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { type FormEvent, useEffect, useState } from "react";
+import { startTransition, type FormEvent, type ReactNode, useDeferredValue, useEffect, useState } from "react";
 
-import { RecordCard } from "@/components/cards/RecordCard";
-import { SummaryCard } from "@/components/cards/SummaryCard";
-import { PageShell } from "@/components/layout/PageShell";
 import { DebugPreview } from "@/components/ui/DebugPreview";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { ErrorBlock } from "@/components/ui/ErrorBlock";
-import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
+import { MobileAppShell } from "@/components/mobile/MobileAppShell";
+import { MobileCard } from "@/components/mobile/MobileCard";
+import { MobileMealPlanRow } from "@/components/mobile/MobileMealPlanRow";
+import { MobileSection } from "@/components/mobile/MobileSection";
+import { MobileStatCard } from "@/components/mobile/MobileStatCard";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
-import { Section } from "@/components/ui/Section";
-import { adaptPTMealRecommendationWorkspace } from "@/lib/adapters/client-records";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
+import { formatDisplayNameFromUser } from "@/lib/view-models/common";
+import { adaptPTRecommendationPageView, type MobilePTRecommendationHistoryView, type MobilePTRecommendationMealPlanView } from "@/lib/view-models/meal-plans";
 
 type JsonApiResponse = ApiResponse<JsonValue>;
 
@@ -24,6 +23,28 @@ type MealRecommendationFormState = {
   rationale: string;
   recommended_at: string;
   expires_at: string;
+};
+
+type ActionPillProps = {
+  href: string;
+  children: string;
+  tone?: "purple" | "yellow";
+};
+
+type RecommendationStateCardProps = {
+  title: string;
+  message: string;
+  action?: ReactNode;
+  role?: "status" | "alert";
+};
+
+type RecommendationMealPlanCardProps = {
+  mealPlan: MobilePTRecommendationMealPlanView;
+  onSelect: (mealPlanId: string) => void;
+};
+
+type RecommendationHistoryCardProps = {
+  recommendation: MobilePTRecommendationHistoryView;
 };
 
 function normalizeOptionalText(value: string): string | null {
@@ -39,6 +60,123 @@ function normalizeOptionalDatetime(value: string): string | null {
 
   const parsed = new Date(trimmed);
   return Number.isNaN(parsed.getTime()) ? trimmed : parsed.toISOString();
+}
+
+function ActionPill({ href, children, tone = "yellow" }: ActionPillProps) {
+  return (
+    <Link href={href} className={`mobile-pill mobile-pill--${tone} mobile-focus-ring`}>
+      {children}
+    </Link>
+  );
+}
+
+function RecommendationStateCard({
+  title,
+  message,
+  action,
+  role = "status",
+}: RecommendationStateCardProps) {
+  return (
+    <MobileCard as="div" variant="soft" className="mobile-pt-state-card">
+      <div className="mobile-section__copy" role={role} aria-live="polite">
+        <h3 className="mobile-section__title">{title}</h3>
+        <p className="mobile-section__description">{message}</p>
+      </div>
+      {action ? <div className="mobile-pt-actions">{action}</div> : null}
+    </MobileCard>
+  );
+}
+
+function RecommendationMealPlanCard({
+  mealPlan,
+  onSelect,
+}: RecommendationMealPlanCardProps) {
+  return (
+    <MobileCard as="article" variant="action" className="mobile-pt-detail-action-card">
+      <MobileMealPlanRow
+        name={mealPlan.name}
+        vendorName={`${mealPlan.vendorName} | ${mealPlan.vendorZipLabel}`}
+        calories={mealPlan.caloriesLabel.replace(/\s*cal$/i, "")}
+        price={mealPlan.priceLabel}
+        badge={
+          <span className={`mobile-pill ${mealPlan.isSelected ? "mobile-pill--yellow" : "mobile-pill--purple"}`}>
+            {mealPlan.isSelected ? "Selected" : mealPlan.statusLabel}
+          </span>
+        }
+        action={mealPlan.canSelect ? (
+          <button
+            type="button"
+            className={`mobile-pill ${mealPlan.isSelected ? "mobile-pill--yellow" : "mobile-pill--purple"} mobile-focus-ring`}
+            aria-label={mealPlan.selectActionLabel}
+            onClick={() => {
+              if (mealPlan.id) {
+                onSelect(mealPlan.id);
+              }
+            }}
+          >
+            {mealPlan.isSelected ? "Selected" : "Select plan"}
+          </button>
+        ) : (
+          <span className="mobile-pill">ID unavailable</span>
+        )}
+      />
+
+      <p className="mobile-section__description">{mealPlan.description}</p>
+
+      <dl className="mobile-pt-fact-grid">
+        <div>
+          <dt>Vendor ZIP</dt>
+          <dd>{mealPlan.vendorZipLabel}</dd>
+        </div>
+        <div>
+          <dt>Calories</dt>
+          <dd>{mealPlan.caloriesLabel}</dd>
+        </div>
+        <div>
+          <dt>Price</dt>
+          <dd>{mealPlan.priceLabel}</dd>
+        </div>
+        <div>
+          <dt>Items</dt>
+          <dd>{mealPlan.itemCountLabel}</dd>
+        </div>
+        <div>
+          <dt>Availability</dt>
+          <dd>{mealPlan.availabilityLabel}</dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd>{mealPlan.statusLabel}</dd>
+        </div>
+      </dl>
+    </MobileCard>
+  );
+}
+
+function RecommendationHistoryCard({
+  recommendation,
+}: RecommendationHistoryCardProps) {
+  return (
+    <MobileCard as="article" variant="soft" className="mobile-pt-detail-action-card">
+      <div className="mobile-pt-client-card__header">
+        <div className="mobile-section__copy">
+          <p className="mobile-section__eyebrow">{recommendation.eyebrow}</p>
+          <h3 className="mobile-section__title">{recommendation.title}</h3>
+          <p className="mobile-section__description">{recommendation.description}</p>
+        </div>
+        <span className="mobile-pill mobile-pill--purple">{recommendation.eyebrow}</span>
+      </div>
+
+      <dl className="mobile-pt-training-meta-grid">
+        {recommendation.metadata.map((item) => (
+          <div key={`${recommendation.id ?? recommendation.title}-${item.label}`}>
+            <dt>{item.label}</dt>
+            <dd>{item.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </MobileCard>
+  );
 }
 
 export default function PTRecommendMealPlanPage() {
@@ -57,6 +195,8 @@ export default function PTRecommendMealPlanPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const deferredSearch = useDeferredValue(searchValue);
   const [formState, setFormState] = useState<MealRecommendationFormState>({
     meal_plan_id: "",
     rationale: "",
@@ -120,7 +260,14 @@ export default function PTRecommendMealPlanPage() {
     };
   }, [clientId, status, user]);
 
-  const view = adaptPTMealRecommendationWorkspace(mealPlansData, recommendationsData);
+  const view = adaptPTRecommendationPageView({
+    clientId,
+    mealPlans: mealPlansData,
+    recommendations: recommendationsData,
+    query: deferredSearch,
+    selectedMealPlanId: formState.meal_plan_id,
+    submitting,
+  });
 
   useEffect(() => {
     if (formState.meal_plan_id || view.mealPlans.length === 0) {
@@ -203,164 +350,281 @@ export default function PTRecommendMealPlanPage() {
   }
 
   return (
-    <PageShell
-      title="Recommend meal plan"
+    <MobileAppShell
       user={user}
-      navigation={
-        <>
-          <Link className="link-button" href={`/pt/clients/${clientId}`}>
-            Client overview
-          </Link>
-          <Link className="link-button" href="/pt/clients">
-            Back to clients
-          </Link>
-        </>
-      }
+      greeting={formatDisplayNameFromUser(user)}
+      title="Recommend meal plan"
+      subtitle={`${view.client.clientDisplayLabel} | ${view.client.clientEmailLabel}`}
+      searchLabel="Filter recommendable meal plans"
+      searchPlaceholder="Filter loaded meal plans"
+      searchValue={searchValue}
+      onSearchChange={(nextValue) => {
+        startTransition(() => {
+          setSearchValue(nextValue);
+        });
+      }}
+      notificationSlot={<ActionPill href={`/pt/clients/${clientId}`} tone="purple">Client overview</ActionPill>}
+      topHubAction={<ActionPill href="/pt/clients">Back to clients</ActionPill>}
+      activePath="/pt/meal-plans"
     >
-      {loading ? <LoadingBlock title="Loading recommendation data" message="Fetching PT meal plans and client recommendations." /> : null}
-      {loadError ? <ErrorBlock title="Unable to load recommendation data" message={loadError} /> : null}
+      {loading ? (
+        <MobileSection
+          eyebrow="Syncing"
+          title="Loading recommendation data"
+          description="Fetching PT meal plans and existing client recommendations through the protected PT BFF routes."
+        >
+          <RecommendationStateCard
+            title="Loading recommendation data"
+            message="Fetching PT meal plans and client recommendations."
+          />
+        </MobileSection>
+      ) : null}
+
+      {loadError ? (
+        <MobileSection
+          eyebrow="Unavailable"
+          title="Unable to load recommendation data"
+          description="This workflow stays on protected PT routes and does not fall back to direct backend calls."
+        >
+          <RecommendationStateCard
+            title="Recommendation data unavailable"
+            message={loadError}
+            action={<ActionPill href={`/pt/clients/${clientId}`} tone="purple">Client overview</ActionPill>}
+            role="alert"
+          />
+        </MobileSection>
+      ) : null}
 
       {!loading && !loadError ? (
         <>
-          <Section title="Recommendation workspace">
-            <div className="grid grid--2">
-              {view.summary.map((item) => (
-                <SummaryCard key={item.label} label={item.label} value={item.value} hint={item.hint} />
-              ))}
-            </div>
-            <p className="section__copy">
-              Guide the client with a plan, rationale, and timing without stepping outside the PT BFF routes.
-            </p>
-          </Section>
+          <MobileSection
+            eyebrow="Client context"
+            title="Recommendation workspace"
+            description="Guide the client with a plan, rationale, and timing without stepping outside the PT BFF routes."
+          >
+            <MobileCard as="article" variant="accent" className="mobile-pt-detail-action-card">
+              <div className="mobile-pt-client-card__header">
+                <div className="mobile-section__copy">
+                  <p className="mobile-section__eyebrow">Linked client</p>
+                  <h3 className="mobile-section__title">{view.client.clientDisplayLabel}</h3>
+                  <p className="mobile-section__description">{view.client.contextNote}</p>
+                </div>
+                <span className="mobile-pill mobile-pill--yellow">{view.client.clientEmailLabel}</span>
+              </div>
 
-          <Section title="Create recommendation">
-            <form className="form-grid" onSubmit={handleSubmit}>
-              <div className="field">
-                <label htmlFor="meal_plan_id">Meal plan</label>
-                {view.mealPlans.some((mealPlan) => Boolean(mealPlan.id)) ? (
-                  <select
-                    id="meal_plan_id"
-                    value={formState.meal_plan_id}
-                    onChange={(event) => setFormState((current) => ({ ...current, meal_plan_id: event.target.value }))}
-                    disabled={submitting}
-                  >
-                    {view.mealPlans.map((mealPlan) =>
-                      mealPlan.id ? (
-                        <option key={mealPlan.id} value={mealPlan.id}>
-                          {mealPlan.title}
-                        </option>
-                      ) : null,
-                    )}
-                  </select>
-                ) : (
-                  <input
-                    id="meal_plan_id"
-                    value={formState.meal_plan_id}
-                    onChange={(event) => setFormState((current) => ({ ...current, meal_plan_id: event.target.value }))}
+              <dl className="mobile-pt-training-meta-grid">
+                <div>
+                  <dt>Client ID</dt>
+                  <dd>{view.client.clientId}</dd>
+                </div>
+                <div>
+                  <dt>Email</dt>
+                  <dd>{view.client.clientEmailLabel}</dd>
+                </div>
+              </dl>
+            </MobileCard>
+
+            {view.summaryCards.map((item) => (
+              <MobileStatCard
+                key={item.label}
+                label={item.label}
+                value={item.value}
+                progressText={item.progressText}
+              />
+            ))}
+          </MobileSection>
+
+          <MobileSection
+            eyebrow="Create"
+            title="Create recommendation"
+            description="This action preserves the current PT create route, payload shape, and recommendation feedback."
+          >
+            <MobileCard as="article" variant="accent" className="mobile-pt-detail-action-card">
+              <div className="mobile-pt-client-card__header">
+                <div className="mobile-section__copy">
+                  <p className="mobile-section__eyebrow">Selected meal plan</p>
+                  <h3 className="mobile-section__title">{view.action.selectedMealPlanLabel}</h3>
+                  <p className="mobile-section__description">
+                    {view.action.disabledReason ?? "The current selection will be sent to the protected PT recommendation route."}
+                  </p>
+                </div>
+                <span className="mobile-pill mobile-pill--yellow">
+                  {view.action.selectedMealPlanId || "ID required"}
+                </span>
+              </div>
+
+              <form className="mobile-pt-form-grid" onSubmit={handleSubmit}>
+                <div className="field">
+                  <label htmlFor="meal_plan_id">Meal plan</label>
+                  {view.action.hasSelectablePlans ? (
+                    <select
+                      id="meal_plan_id"
+                      value={formState.meal_plan_id}
+                      onChange={(event) =>
+                        setFormState((current) => ({ ...current, meal_plan_id: event.target.value }))
+                      }
+                      disabled={submitting}
+                    >
+                      {view.mealPlans
+                        .filter((mealPlan) => Boolean(mealPlan.id))
+                        .map((mealPlan) =>
+                          mealPlan.id ? (
+                            <option key={mealPlan.id} value={mealPlan.id}>
+                              {mealPlan.name}
+                            </option>
+                          ) : null,
+                        )}
+                    </select>
+                  ) : (
+                    <input
+                      id="meal_plan_id"
+                      value={formState.meal_plan_id}
+                      onChange={(event) =>
+                        setFormState((current) => ({ ...current, meal_plan_id: event.target.value }))
+                      }
+                      disabled={submitting}
+                    />
+                  )}
+                </div>
+
+                <div className="field">
+                  <label htmlFor="rationale">Recommendation rationale</label>
+                  <textarea
+                    id="rationale"
+                    rows={4}
+                    value={formState.rationale}
+                    onChange={(event) =>
+                      setFormState((current) => ({ ...current, rationale: event.target.value }))
+                    }
                     disabled={submitting}
                   />
-                )}
-              </div>
-              <div className="field">
-                <label htmlFor="rationale">Recommendation rationale</label>
-                <textarea
-                  id="rationale"
-                  rows={4}
-                  value={formState.rationale}
-                  onChange={(event) => setFormState((current) => ({ ...current, rationale: event.target.value }))}
-                  disabled={submitting}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="recommended_at">Recommended at</label>
-                <input
-                  id="recommended_at"
-                  type="datetime-local"
-                  value={formState.recommended_at}
-                  onChange={(event) =>
-                    setFormState((current) => ({ ...current, recommended_at: event.target.value }))
-                  }
-                  disabled={submitting}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="expires_at">Expires at</label>
-                <input
-                  id="expires_at"
-                  type="datetime-local"
-                  value={formState.expires_at}
-                  onChange={(event) => setFormState((current) => ({ ...current, expires_at: event.target.value }))}
-                  disabled={submitting}
-                />
-              </div>
-              <button type="submit" disabled={submitting}>
-                {submitting ? "Creating recommendation..." : "Create recommendation"}
-              </button>
-            </form>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="recommended_at">Recommended at</label>
+                  <input
+                    id="recommended_at"
+                    type="datetime-local"
+                    value={formState.recommended_at}
+                    onChange={(event) =>
+                      setFormState((current) => ({ ...current, recommended_at: event.target.value }))
+                    }
+                    disabled={submitting}
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="expires_at">Expires at</label>
+                  <input
+                    id="expires_at"
+                    type="datetime-local"
+                    value={formState.expires_at}
+                    onChange={(event) =>
+                      setFormState((current) => ({ ...current, expires_at: event.target.value }))
+                    }
+                    disabled={submitting}
+                  />
+                </div>
+
+                <div className="mobile-pt-actions">
+                  <button
+                    type="submit"
+                    className="mobile-pt-button mobile-focus-ring"
+                    disabled={!view.action.canSubmit}
+                  >
+                    {view.action.submitLabel}
+                  </button>
+                  <ActionPill href={`/pt/clients/${clientId}`} tone="purple">Client overview</ActionPill>
+                </div>
+              </form>
+            </MobileCard>
+
             {submitSuccess ? (
-              <FeedbackBanner
-                tone="success"
+              <RecommendationStateCard
                 title="Meal recommendation created"
                 message={submitSuccess}
               />
             ) : null}
+
             {submitError ? (
-              <FeedbackBanner
-                tone="error"
+              <RecommendationStateCard
                 title="Meal recommendation failed"
                 message={submitError}
+                role="alert"
               />
             ) : null}
-          </Section>
+          </MobileSection>
 
-          <Section title="Recommendable plans">
+          <MobileSection
+            eyebrow="Discovery"
+            title="Recommendable plans"
+            description="The PT meal-plan route still loads on page entry, and this mobile filter stays local without changing the request shape."
+          >
+            <MobileCard as="article" variant="soft" className="mobile-pt-detail-action-card">
+              <div className="mobile-pt-client-card__header">
+                <div className="mobile-section__copy">
+                  <p className="mobile-section__eyebrow">Current filter</p>
+                  <h3 className="mobile-section__title">{view.search.queryLabel}</h3>
+                  <p className="mobile-section__description">{view.search.note}</p>
+                </div>
+                <span className="mobile-pill mobile-pill--yellow">{view.search.stateLabel}</span>
+              </div>
+            </MobileCard>
+
             {view.mealPlans.length > 0 ? (
-              <div className="stacked-list">
-                {view.mealPlans.map((mealPlan, index) => (
-                  <RecordCard
-                    key={mealPlan.id ?? `${mealPlan.title}-${index}`}
-                    eyebrow={mealPlan.vendor ?? "Meal plan"}
-                    title={mealPlan.title}
-                    description={mealPlan.description}
-                    metadata={mealPlan.id ? [{ label: "Meal plan ID", value: mealPlan.id }] : []}
+              <div className="mobile-pt-detail-stack">
+                {view.mealPlans.map((mealPlan) => (
+                  <RecommendationMealPlanCard
+                    key={mealPlan.id ?? mealPlan.name}
+                    mealPlan={mealPlan}
+                    onSelect={(mealPlanId) => {
+                      setFormState((current) => ({ ...current, meal_plan_id: mealPlanId }));
+                    }}
                   />
                 ))}
               </div>
             ) : (
-              <EmptyState
-                title="No meal plans returned"
-                message="The PT meal-plan search route did not return recommendable plans."
+              <RecommendationStateCard
+                title={view.mealPlanEmptyState?.title ?? "No meal plans returned"}
+                message={
+                  view.mealPlanEmptyState?.message ??
+                  "The PT meal-plan search route did not return recommendable plans."
+                }
               />
             )}
-          </Section>
+          </MobileSection>
 
-          <Section title="Recommendation history">
-            {view.recommendations.length > 0 ? (
-              <div className="stacked-list">
-                {view.recommendations.map((recommendation, index) => (
-                  <RecordCard
-                    key={recommendation.id ?? `${recommendation.title}-${index}`}
-                    eyebrow={recommendation.eyebrow}
-                    title={recommendation.title}
-                    description={recommendation.description}
-                    metadata={recommendation.metadata}
+          <MobileSection
+            eyebrow="History"
+            title="Recommendation history"
+            description="Existing recommendations stay visible through the current PT history route."
+          >
+            {view.hasRecommendations ? (
+              <div className="mobile-pt-detail-stack">
+                {view.recommendations.map((recommendation) => (
+                  <RecommendationHistoryCard
+                    key={recommendation.id ?? recommendation.title}
+                    recommendation={recommendation}
                   />
                 ))}
               </div>
             ) : (
               <>
-                <EmptyState
-                  title="No recommendations returned"
-                  message="This client does not yet have meal-plan recommendations from the PT endpoints."
+                <RecommendationStateCard
+                  title={view.recommendationEmptyState?.title ?? "No recommendations returned"}
+                  message={
+                    view.recommendationEmptyState?.message ??
+                    "This client does not yet have meal-plan recommendations from the PT endpoints."
+                  }
                 />
-                {view.debugData ? (
-                  <DebugPreview value={view.debugData} label="Meal recommendations payload fallback" />
+                {view.historyDebugData ? (
+                  <DebugPreview value={view.historyDebugData} label="Meal recommendations payload fallback" />
                 ) : null}
               </>
             )}
-          </Section>
+          </MobileSection>
         </>
       ) : null}
-    </PageShell>
+    </MobileAppShell>
   );
 }
