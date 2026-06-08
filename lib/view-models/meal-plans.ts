@@ -202,6 +202,25 @@ export type MobileBookmarksPageView = {
   hasSavedPlans: boolean;
 };
 
+export type MobileMealPlanSearchResultView = MobileMealPlanRowView;
+
+export type MobileMealPlanSearchFilterView = {
+  queryLabel: string;
+  activeZipCountLabel: string;
+  activeZipChips: string[];
+  note: string;
+  hasActiveZipFilter: boolean;
+};
+
+export type MobileMealPlanSearchView = {
+  summaryCards: MobileMealPlanDirectorySummaryCardView[];
+  filters: MobileMealPlanSearchFilterView;
+  rows: MobileMealPlanSearchResultView[];
+  emptyState: MobileMealPlanEmptyStateView | null;
+  hasQuery: boolean;
+  hasResults: boolean;
+};
+
 const NO_VENDOR_ZIP = "ZIP unavailable";
 const NO_STATUS = "Status unavailable";
 const NO_MEAL_COUNT = "Meal count unavailable";
@@ -675,6 +694,73 @@ export function adaptClientMealPlanBookmarksView(args: {
       : null,
     hasFolders: folders.length > 0,
     hasSavedPlans: savedPlanCount > 0,
+  };
+}
+
+export function adaptClientMealPlanSearchView(args: {
+  mealPlans: MealPlanListPayload | JsonValue | null;
+  query?: string | null;
+  activeZipCodes?: string[];
+}): MobileMealPlanSearchView {
+  const mealPlans = readMealPlans(args.mealPlans);
+  const rows = adaptMealPlanRows(mealPlans, new Set<string>());
+  const normalizedQuery = args.query?.trim() ?? "";
+  const activeZipCodes = args.activeZipCodes ?? [];
+  const activeZipCountLabel =
+    activeZipCodes.length === 1 ? "1 active ZIP" : `${formatNumber(activeZipCodes.length)} active ZIPs`;
+  const queryLabel = normalizedQuery || "All meal plans";
+
+  return {
+    summaryCards: [
+      {
+        label: "Results",
+        value: formatNumber(rows.length),
+        progressText:
+          rows.length > 0
+            ? "Current search results returned by the protected client meal-plan route."
+            : "No search results are currently loaded.",
+      },
+      {
+        label: "Tracked ZIPs",
+        value: formatNumber(activeZipCodes.length),
+        progressText:
+          activeZipCodes.length > 0
+            ? "Tracked ZIP filters currently included in the protected search request."
+            : "No tracked ZIP filters are currently applied.",
+      },
+      {
+        label: "Query",
+        value: queryLabel,
+        progressText:
+          normalizedQuery
+            ? "Search text currently included in the protected client request."
+            : "Browsing the current client meal-plan catalog without a search query.",
+      },
+    ],
+    filters: {
+      queryLabel,
+      activeZipCountLabel,
+      activeZipChips: activeZipCodes,
+      note:
+        activeZipCodes.length > 0
+          ? "Tracked ZIP filters stay aligned with the existing client meal-plan request shape."
+          : "This page uses the current protected client catalog without tracked ZIP filters.",
+      hasActiveZipFilter: activeZipCodes.length > 0,
+    },
+    rows,
+    emptyState: rows.length === 0
+      ? normalizedQuery
+        ? {
+            title: "No meal plans match your search",
+            message: "Try a different meal plan name or vendor.",
+          }
+        : {
+            title: "No meal plans are available",
+            message: "No meal plans are available in the current catalog.",
+          }
+      : null,
+    hasQuery: Boolean(normalizedQuery),
+    hasResults: rows.length > 0,
   };
 }
 
