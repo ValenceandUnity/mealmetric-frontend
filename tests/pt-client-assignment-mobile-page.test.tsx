@@ -51,6 +51,7 @@ function jsonResponse(payload: unknown) {
 
 describe("PTClientAssignPage mobile experience", () => {
   beforeEach(() => {
+    vi.useRealTimers();
     fetchMock.mockReset();
     useSessionBootstrapMock.mockReset();
     useSessionBootstrapMock.mockReturnValue({
@@ -223,11 +224,13 @@ describe("PTClientAssignPage mobile experience", () => {
 
     render(React.createElement(PTClientAssignPage));
 
+    const trainingPackageField = await screen.findByLabelText("Training package");
+
     await waitFor(() => {
-      expect(screen.getByLabelText("Training package")).toBeTruthy();
+      expect((trainingPackageField as HTMLSelectElement).value).toBe("package-1");
     });
 
-    fireEvent.change(screen.getByLabelText("Training package"), {
+    fireEvent.change(trainingPackageField, {
       target: { value: "package-2" },
     });
     fireEvent.change(screen.getByLabelText("Start date"), {
@@ -273,6 +276,8 @@ describe("PTClientAssignPage mobile experience", () => {
   });
 
   it("preserves assignment creation error feedback without introducing a different mutation path", async () => {
+    let resolveCreate: (() => void) | null = null;
+
     fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
@@ -304,12 +309,18 @@ describe("PTClientAssignPage mobile experience", () => {
       }
 
       if (url === "/api/pt/clients/client-1/assignments/create" && method === "POST") {
-        return jsonResponse({
-          ok: false,
-          error: {
-            code: "bad_request",
-            message: "Unable to create assignment.",
-          },
+        return new Promise((resolve) => {
+          resolveCreate = () => {
+            resolve({
+              json: async () => ({
+                ok: false,
+                error: {
+                  code: "bad_request",
+                  message: "Unable to create assignment.",
+                },
+              }),
+            });
+          };
         });
       }
 
@@ -318,14 +329,19 @@ describe("PTClientAssignPage mobile experience", () => {
 
     render(React.createElement(PTClientAssignPage));
 
+    const trainingPackageField = await screen.findByLabelText("Training package");
+
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Create assignment" })).toBeTruthy();
+      expect((trainingPackageField as HTMLSelectElement).value).toBe("package-1");
     });
 
+    fireEvent.change(trainingPackageField, {
+      target: { value: "package-1" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Create assignment" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Unable to create assignment.")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Creating assignment..." })).toBeTruthy();
     });
 
     const createCalls = fetchMock.mock.calls.filter(
@@ -333,6 +349,23 @@ describe("PTClientAssignPage mobile experience", () => {
         String(url) === "/api/pt/clients/client-1/assignments/create" && init?.method === "POST",
     );
     expect(createCalls).toHaveLength(1);
+    expect(createCalls[0]?.[1]).toMatchObject({
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    expect(JSON.parse(String(createCalls[0]?.[1]?.body))).toEqual({
+      training_package_id: "package-1",
+      start_date: null,
+      end_date: null,
+    });
+
+    resolveCreate?.();
+
+    await waitFor(() => {
+      expect(screen.getByText("Unable to create assignment.")).toBeTruthy();
+    });
   });
 
   it("does not bypass PT session bootstrap before fetching PT assignment data", () => {
