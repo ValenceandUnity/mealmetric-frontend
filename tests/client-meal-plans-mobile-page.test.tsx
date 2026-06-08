@@ -73,6 +73,7 @@ describe("ClientMealPlansPage mobile experience", () => {
   beforeEach(() => {
     fetchMock.mockReset();
     useSessionBootstrapMock.mockReset();
+    window.sessionStorage.clear();
     useSessionBootstrapMock.mockReturnValue({
       status: "authenticated",
       user: {
@@ -131,9 +132,11 @@ describe("ClientMealPlansPage mobile experience", () => {
     expect(screen.getByRole("heading", { name: "Marketplace links" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Budget-aware discovery" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Catalog cards" })).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: "Home" })[0]?.getAttribute("href")).toBe("/client/meal-plans");
     expect(screen.getAllByRole("link", { name: "Schedule" })[0]?.getAttribute("href")).toBe("/client/meal-plans/schedule");
     expect(screen.getAllByRole("link", { name: "Search" })[0]?.getAttribute("href")).toBe("/client/meal-plans/search");
     expect(screen.getAllByRole("link", { name: "Bookmark" })[0]?.getAttribute("href")).toBe("/client/meal-plans/bookmark");
+    expect(screen.getAllByRole("link", { name: "View plan" })[0]?.getAttribute("href")).toBe("/client/meal-plans/plan-1");
     expect(screen.getByText("Budget open")).toBeTruthy();
     expect(screen.getAllByText("Lean Fuel Week").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Northside Prep | 10001").length).toBeGreaterThan(0);
@@ -327,6 +330,139 @@ describe("ClientMealPlansPage mobile experience", () => {
     await waitFor(() => {
       expect(screen.getByText("Bookmark saved")).toBeTruthy();
     });
+  });
+
+  it("preserves multi-ZIP persistence and sends the existing zip_codes query shape", async () => {
+    window.sessionStorage.setItem(
+      "mealmetric.client.meal-plans.active-zips",
+      JSON.stringify(["10001", "10002"]),
+    );
+
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url === "/api/client/meal-plans?zip_codes=10001%2C10002") {
+        return jsonResponse(mealPlansPayload);
+      }
+
+      if (url === "/api/client/bookmarks") {
+        return jsonResponse({
+          ok: true,
+          data: {
+            items: [],
+            count: 0,
+          },
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(React.createElement(ClientMealPlansPage));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/client/meal-plans?zip_codes=10001%2C10002", {
+        cache: "no-store",
+      });
+    });
+
+    expect(screen.getAllByText("2 active ZIPs").length).toBeGreaterThan(0);
+    expect(window.sessionStorage.getItem("mealmetric.client.meal-plans.active-zips")).toBe(
+      JSON.stringify(["10001", "10002"]),
+    );
+  });
+
+  it("preserves budget_max_cents while keeping budget duration local-only", async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.startsWith("/api/client/meal-plans")) {
+        return jsonResponse(mealPlansPayload);
+      }
+
+      if (url === "/api/client/bookmarks") {
+        return jsonResponse({
+          ok: true,
+          data: {
+            items: [],
+            count: 0,
+          },
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(React.createElement(ClientMealPlansPage));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open budget marker editor" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open budget marker editor" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Budget max ($)")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText("Budget max ($)"), {
+      target: { value: "25" },
+    });
+    fireEvent.change(screen.getByLabelText("Budget duration"), {
+      target: { value: "custom duration" },
+    });
+    fireEvent.change(screen.getByLabelText("Custom duration"), {
+      target: { value: "three days" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply meal-plan filters" }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(([input]) => String(input) === "/api/client/meal-plans?budget_max_cents=2500"),
+      ).toBe(true);
+    });
+
+    const mealPlanUrls = fetchMock.mock.calls
+      .map(([input]) => String(input))
+      .filter((url) => url.startsWith("/api/client/meal-plans"));
+
+    expect(mealPlanUrls.some((url) => url.includes("budget_duration"))).toBe(false);
+    expect(mealPlanUrls.some((url) => url.includes("custom_duration"))).toBe(false);
+  });
+
+  it("keeps the meal-plan catalog available when bookmarks fail and disables bookmark mutation safely", async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url === "/api/client/meal-plans") {
+        return jsonResponse(mealPlansPayload);
+      }
+
+      if (url === "/api/client/bookmarks") {
+        return jsonResponse({
+          ok: false,
+          error: {
+            code: "bookmark_load_failed",
+            message: "Unable to load bookmarks.",
+          },
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(React.createElement(ClientMealPlansPage));
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Some marketplace sources are unavailable" })).toBeTruthy();
+    });
+
+    expect(screen.getAllByText("Lean Fuel Week").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Unable to load bookmarks.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Bookmarks unavailable").length).toBeGreaterThan(0);
+    expect(
+      (screen.getByRole("button", { name: "Save plan for Lean Fuel Week" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 
   it("renders a safe empty state when no meal plans exist", async () => {
