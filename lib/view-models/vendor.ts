@@ -95,6 +95,20 @@ export type MobileVendorDashboardView = {
   hasVendorProfile: boolean;
 };
 
+export type MobileVendorMealPlansView = {
+  title: string;
+  subtitle: string;
+  summaryCards: MobileVendorSummaryCardView[];
+  highlight: MobileVendorMealPlanPreviewView | null;
+  mealPlans: MobileVendorMealPlanPreviewView[];
+  hasMealPlans: boolean;
+  emptyTitle: string;
+  emptyMessage: string;
+  highlightEmptyTitle: string;
+  highlightEmptyMessage: string;
+  readOnlyNote: string;
+};
+
 type VendorIdentityRecord = {
   email: string | null;
   vendorsCount: number;
@@ -336,12 +350,12 @@ function buildCatalogCards(args: {
     {
       label: "Published",
       value: formatNumber(args.publishedCount),
-      progressText: "Published status preserved from the vendor metrics slice.",
+      progressText: "Published status derived from the loaded meal-plan statuses.",
     },
     {
       label: "Draft",
       value: formatNumber(args.draftCount),
-      progressText: "Draft status preserved from the vendor metrics slice.",
+      progressText: "Draft status derived from the loaded meal-plan statuses.",
     },
     {
       label: "Availability entries",
@@ -473,5 +487,57 @@ export function adaptVendorDashboardView(args: {
     },
     actions: buildActionCards(),
     hasVendorProfile,
+  };
+}
+
+export function adaptVendorMealPlansView(args: {
+  mealPlans: MealPlanListPayload | JsonValue | null;
+}): MobileVendorMealPlansView {
+  const mealPlans = readMealPlanRows(args.mealPlans);
+  const publishedCount = mealPlans.filter((mealPlan) => mealPlan.statusLabel.toLowerCase() === "published").length;
+  const draftCount = mealPlans.length - publishedCount;
+  const availabilityCount = mealPlans.reduce(
+    (sum, mealPlan) => sum + Number.parseInt(mealPlan.availabilityLabel, 10),
+    0,
+  );
+  const leadVendorName = mealPlans[0]?.vendorName ?? "Vendor catalog";
+  const leadVendorZip = mealPlans[0]?.vendorZipLabel ?? ZIP_FALLBACK;
+
+  return {
+    title: "Vendor Meal Plans",
+    subtitle: `${leadVendorName} | ${leadVendorZip}`,
+    summaryCards: [
+      {
+        label: "Total meal plans",
+        value: formatNumber(mealPlans.length),
+        progressText: "Meal plans currently returned through the vendor meal-plan route.",
+      },
+      {
+        label: "Published",
+        value: formatNumber(publishedCount),
+        progressText: "Visible published entries derived from the loaded meal-plan statuses.",
+      },
+      {
+        label: "Draft",
+        value: formatNumber(draftCount),
+        progressText: "Entries not marked published in the current catalog payload.",
+      },
+      {
+        label: "Availability entries",
+        value: formatNumber(availabilityCount),
+        progressText: "Total availability rows exposed by the returned inventory.",
+      },
+    ],
+    highlight: mealPlans[0] ?? null,
+    mealPlans,
+    hasMealPlans: mealPlans.length > 0,
+    emptyTitle: "No vendor meal plans",
+    emptyMessage:
+      "No meal plans were returned for the current vendor membership, so the catalog workspace remains empty until inventory exists.",
+    highlightEmptyTitle: "No meal-plan spotlight",
+    highlightEmptyMessage:
+      "The spotlight remains empty until the vendor meal-plan route returns at least one plan.",
+    readOnlyNote:
+      "This catalog stays read-only. No create, edit, publish, archive, or delete workflow is introduced because the current vendor surface does not support those mutations here.",
   };
 }
