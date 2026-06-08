@@ -3,17 +3,24 @@
 import { type FormEvent, useEffect, useState } from "react";
 
 import { LogoutButton } from "@/components/LogoutButton";
-import { RecordCard } from "@/components/cards/RecordCard";
-import { PageShell } from "@/components/layout/PageShell";
+import { MobileAppShell } from "@/components/mobile/MobileAppShell";
+import { MobileCard } from "@/components/mobile/MobileCard";
+import { MobileSection } from "@/components/mobile/MobileSection";
+import { MobileStatCard } from "@/components/mobile/MobileStatCard";
 import { DebugPreview } from "@/components/ui/DebugPreview";
-import { ErrorBlock } from "@/components/ui/ErrorBlock";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
-import { Section } from "@/components/ui/Section";
 import { useSessionBootstrap } from "@/lib/client/session";
 import { getTextField, isJsonObject } from "@/lib/json/object";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
+import { formatDisplayNameFromUser } from "@/lib/view-models/common";
 
 type ProfileApiResponse = ApiResponse<JsonValue>;
+
+type SettingsStateCardProps = {
+  title: string;
+  message: string;
+  role?: "status" | "alert";
+};
 
 function getEditableFieldKey(value: JsonValue | null): string {
   if (!isJsonObject(value)) {
@@ -45,6 +52,21 @@ function getFieldLabel(fieldKey: string): string {
 
 function normalizeText(value: string): string {
   return value.trim();
+}
+
+function SettingsStateCard({
+  title,
+  message,
+  role = "status",
+}: SettingsStateCardProps) {
+  return (
+    <MobileCard as="div" variant="soft" className="mobile-pt-state-card">
+      <div className="mobile-section__copy" role={role} aria-live="polite">
+        <h3 className="mobile-section__title">{title}</h3>
+        <p className="mobile-section__description">{message}</p>
+      </div>
+    </MobileCard>
+  );
 }
 
 export default function PTSettingsPage() {
@@ -169,50 +191,147 @@ export default function PTSettingsPage() {
   }
 
   return (
-    <PageShell title="Settings" user={user} actions={<LogoutButton />}>
-      {loading ? <LoadingBlock title="Loading profile" message="Calling /api/me through the BFF." /> : null}
+    <MobileAppShell
+      user={user}
+      activePath="/pt/settings"
+      greeting={formatDisplayNameFromUser(user)}
+      title="Settings"
+      subtitle="PT profile and session settings through the authenticated BFF workflow."
+    >
+      {loading ? (
+        <MobileSection
+          eyebrow="Loading"
+          title="Loading profile"
+          description="Calling /api/me through the BFF."
+        >
+          <SettingsStateCard
+            title="Loading profile"
+            message="Calling /api/me through the BFF."
+          />
+        </MobileSection>
+      ) : null}
 
-      {errorMessage ? <ErrorBlock title="Unable to load settings" message={errorMessage} /> : null}
+      {errorMessage ? (
+        <MobileSection
+          eyebrow="Unavailable"
+          title="Unable to load settings"
+          description="This settings page stays on the existing authenticated PT and /api/me BFF workflow and does not fall back to direct backend calls."
+        >
+          <SettingsStateCard
+            title="Unable to load settings"
+            message={errorMessage}
+            role="alert"
+          />
+        </MobileSection>
+      ) : null}
 
       {!loading ? (
         <>
-          <Section title="Edit profile">
-            <form onSubmit={handleSubmit} className="form-grid">
-              <label className="field">
-                <span>{fieldLabel}</span>
-                <input
-                  type="text"
-                  value={draftName}
-                  onChange={(event) => setDraftName(event.target.value)}
-                  placeholder={`Enter ${fieldLabel.toLowerCase()}`}
-                />
-              </label>
-
-              <div className="row">
-                <button type="submit" disabled={saving || !hasChanges}>
-                  {saving ? "Saving..." : "Save changes"}
-                </button>
-                {saveMessage ? <p className="status-text status-text--success">{saveMessage}</p> : null}
+          <MobileSection
+            eyebrow="PT profile"
+            title="Profile summary"
+            description="Profile data remains inside the authenticated BFF session workflow."
+          >
+            <MobileCard as="article" variant="accent" className="mobile-pt-detail-action-card">
+              <div className="mobile-pt-client-card__header">
+                <div className="mobile-section__copy">
+                  <p className="mobile-section__eyebrow">Authenticated PT account</p>
+                  <h2 className="mobile-section__title">{user.email}</h2>
+                  <p className="mobile-section__description">
+                    Profile data remains inside the authenticated BFF session workflow.
+                  </p>
+                </div>
+                <span className="mobile-pill mobile-pill--purple">{user.role}</span>
               </div>
-            </form>
-          </Section>
 
-          <Section title="Profile summary">
-            <RecordCard
-              eyebrow="PT profile"
-              title={user.email}
-              description="Profile data remains inside the authenticated BFF session workflow."
-              metadata={[
-                { label: "Role", value: user.role },
-                { label: fieldLabel, value: currentTextValue || "Unavailable" },
-              ]}
-            />
+              <dl className="mobile-pt-fact-grid">
+                <div>
+                  <dt>Role</dt>
+                  <dd>{user.role}</dd>
+                </div>
+                <div>
+                  <dt>{fieldLabel}</dt>
+                  <dd>{currentTextValue || "Unavailable"}</dd>
+                </div>
+              </dl>
+            </MobileCard>
+
+            <div className="mobile-pt-detail-stat-grid">
+              <MobileStatCard
+                label="Role"
+                value={user.role}
+                progressText="Authenticated PT session role."
+              />
+              <MobileStatCard
+                label={fieldLabel}
+                value={currentTextValue || "Unavailable"}
+                progressText="Editable profile field returned by /api/me."
+              />
+            </div>
+
             {!currentTextValue && profileData ? (
               <DebugPreview value={profileData} label="Profile payload fallback" />
             ) : null}
-          </Section>
+          </MobileSection>
+
+          <MobileSection
+            eyebrow="Mutation"
+            title="Edit profile"
+            description="Profile edits remain limited to the current /api/me PATCH workflow."
+          >
+            <MobileCard as="article" variant="soft" className="mobile-pt-detail-action-card">
+              <form className="mobile-pt-form-grid" onSubmit={handleSubmit}>
+                <div className="field">
+                  <label htmlFor="pt-settings-name">{fieldLabel}</label>
+                  <input
+                    id="pt-settings-name"
+                    className="mobile-focus-ring"
+                    type="text"
+                    value={draftName}
+                    onChange={(event) => setDraftName(event.target.value)}
+                    placeholder={`Enter ${fieldLabel.toLowerCase()}`}
+                  />
+                </div>
+
+                <div className="mobile-pt-actions">
+                  <button
+                    type="submit"
+                    className="mobile-pt-button mobile-pt-button--primary mobile-focus-ring"
+                    disabled={saving || !hasChanges}
+                  >
+                    {saving ? "Saving..." : "Save changes"}
+                  </button>
+                </div>
+
+                {saveMessage ? (
+                  <p className="mobile-section__description" role="status" aria-live="polite">
+                    {saveMessage}
+                  </p>
+                ) : null}
+              </form>
+            </MobileCard>
+          </MobileSection>
+
+          <MobileSection
+            eyebrow="Session"
+            title="Account action"
+            description="Sign out continues to use the existing shared logout flow."
+          >
+            <MobileCard as="article" variant="soft" className="mobile-pt-detail-action-card">
+              <div className="mobile-section__copy">
+                <p className="mobile-section__eyebrow">Existing action</p>
+                <h3 className="mobile-section__title">Sign out</h3>
+                <p className="mobile-section__description">
+                  Signing out continues to use the existing auth BFF flow. No extra settings, billing, security, or profile-management flows are introduced on this route.
+                </p>
+              </div>
+              <div className="mobile-pt-actions">
+                <LogoutButton />
+              </div>
+            </MobileCard>
+          </MobileSection>
         </>
       ) : null}
-    </PageShell>
+    </MobileAppShell>
   );
 }
