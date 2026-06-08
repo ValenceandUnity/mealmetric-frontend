@@ -1,11 +1,12 @@
-import { NotificationsPage } from "@/components/notifications/NotificationsPage";
+import { NotificationsRouteSurface } from "@/components/notifications/NotificationsRouteSurface";
 
 export default function PTNotificationsRoute() {
   return (
-    <NotificationsPage
+    <NotificationsRouteSurface
       role="pt"
-      title="Notifications"
+      title="PT Notifications"
       description="Relevant client activity appears here when a linked client logs a real workout or another supported in-app event occurs."
+      activePath="/pt/notifications"
     />
   );
 }
