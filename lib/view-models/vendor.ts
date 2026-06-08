@@ -81,6 +81,26 @@ export type MobileVendorMetricsHealthCardView = {
   progressText: string;
 };
 
+export type MobileVendorAccountIdentityView = {
+  accountEmailLabel: string;
+  accountRoleLabel: string;
+  vendorsCountLabel: string;
+  defaultVendorStateLabel: string;
+  accountNote: string;
+};
+
+export type MobileVendorProfileView = {
+  vendorName: string;
+  vendorDescription: string;
+  vendorSlugLabel: string;
+  vendorZipLabel: string;
+  vendorStatusLabel: string;
+  vendorMealPlanCountLabel: string;
+  hasDefaultVendor: boolean;
+  unavailableTitle: string;
+  unavailableMessage: string;
+};
+
 export type MobileVendorActionView = {
   title: string;
   description: string;
@@ -133,6 +153,18 @@ export type MobileVendorMetricsView = {
   hasMetrics: boolean;
   unavailableTitle: string;
   unavailableMessage: string;
+};
+
+export type MobileVendorAccountView = {
+  title: string;
+  subtitle: string;
+  identity: MobileVendorAccountIdentityView;
+  profile: MobileVendorProfileView;
+  summaryCards: MobileVendorSummaryCardView[];
+  actions: MobileVendorActionView[];
+  readOnlyTitle: string;
+  readOnlyMessage: string;
+  hasProfileData: boolean;
 };
 
 type VendorIdentityRecord = {
@@ -569,6 +601,85 @@ function buildVendorMetricsActionCards(): MobileVendorActionView[] {
   ];
 }
 
+function buildVendorAccountActionCards(): MobileVendorActionView[] {
+  return [
+    {
+      title: "Vendor dashboard",
+      description: "Open the existing vendor dashboard overview route without changing its current BFF behavior.",
+      href: "/vendor",
+      ctaLabel: "Open dashboard",
+      badgeLabel: "Overview",
+      tone: "yellow",
+      isPlaceholder: false,
+    },
+    {
+      title: "Meal plans",
+      description: "Open the existing vendor catalog workspace for the full meal-plan inventory.",
+      href: "/vendor/meal-plans",
+      ctaLabel: "Open meal plans",
+      badgeLabel: "Catalog",
+      tone: "purple",
+      isPlaceholder: false,
+    },
+    {
+      title: "Metrics",
+      description: "Open the existing vendor metrics route for the current read-only performance summary.",
+      href: "/vendor/metrics",
+      ctaLabel: "Open metrics",
+      badgeLabel: "Metrics",
+      tone: "yellow",
+      isPlaceholder: false,
+    },
+    {
+      title: "Operations placeholder",
+      description: "Open the existing placeholder route only. No live vendor operations workflow is added here.",
+      href: "/vendor/operations",
+      ctaLabel: "Open operations placeholder",
+      badgeLabel: "Placeholder",
+      tone: "purple",
+      isPlaceholder: true,
+    },
+  ];
+}
+
+function formatRoleLabel(value: string | null | undefined): string {
+  if (!value) {
+    return "Role unavailable";
+  }
+
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function buildVendorAccountSummaryCards(args: {
+  vendorsCount: number;
+  defaultVendorMealPlanCount: number | null;
+  vendorZipLabel: string;
+  accountRoleLabel: string;
+}): MobileVendorSummaryCardView[] {
+  return [
+    {
+      label: "Account role",
+      value: args.accountRoleLabel,
+      progressText: "Role context remains sourced from the authenticated frontend session.",
+    },
+    {
+      label: "Vendor memberships",
+      value: formatNumber(args.vendorsCount),
+      progressText: "Vendor memberships returned by the vendor profile route.",
+    },
+    {
+      label: "Default vendor meal plans",
+      value: formatNumber(args.defaultVendorMealPlanCount, "Unavailable"),
+      progressText: "Meal-plan count returned for the current default vendor.",
+    },
+    {
+      label: "Vendor ZIP",
+      value: args.vendorZipLabel,
+      progressText: "ZIP value returned for the current default vendor.",
+    },
+  ];
+}
+
 export function adaptVendorDashboardView(args: {
   profile: VendorMePayload | JsonValue | null;
   metrics: VendorMetricsPayload | JsonValue | null;
@@ -731,5 +842,55 @@ export function adaptVendorMetricsView(args: {
     hasMetrics: metrics.hasMetrics,
     unavailableTitle: "Vendor metrics unavailable",
     unavailableMessage: "The vendor metrics route did not return mobile summary data for this account.",
+  };
+}
+
+export function adaptVendorAccountView(args: {
+  profile: VendorMePayload | JsonValue | null;
+  sessionEmail?: string | null;
+  sessionRole?: string | null;
+}): MobileVendorAccountView {
+  const profile = readVendorProfile(args.profile);
+  const vendorName = profile.defaultVendor?.name ?? VENDOR_NAME_FALLBACK;
+  const vendorZipLabel = profile.defaultVendor?.zipCode ?? ZIP_FALLBACK;
+  const accountEmailLabel = profile.email ?? args.sessionEmail ?? EMAIL_FALLBACK;
+  const accountRoleLabel = formatRoleLabel(args.sessionRole);
+  const hasProfileData = Boolean(profile.defaultVendor) || Boolean(profile.email) || Boolean(args.sessionEmail);
+
+  return {
+    title: "Vendor Account",
+    subtitle: `${vendorName} | ${vendorZipLabel}`,
+    identity: {
+      accountEmailLabel,
+      accountRoleLabel,
+      vendorsCountLabel: formatCountLabel(profile.vendorsCount, "vendor membership"),
+      defaultVendorStateLabel: profile.defaultVendor ? "Default vendor ready" : "Default vendor unavailable",
+      accountNote: profile.defaultVendor
+        ? "This account view stays read-only and uses the existing vendor identity route for default vendor context."
+        : "No default vendor is configured for this account, so vendor profile fields fall back to safe unavailable labels.",
+    },
+    profile: {
+      vendorName,
+      vendorDescription: profile.defaultVendor?.description ?? VENDOR_DESCRIPTION_FALLBACK,
+      vendorSlugLabel: profile.defaultVendor?.slug ?? SLUG_FALLBACK,
+      vendorZipLabel,
+      vendorStatusLabel: profile.defaultVendor?.status ?? STATUS_FALLBACK,
+      vendorMealPlanCountLabel: formatCountLabel(profile.defaultVendor?.mealPlanCount, "meal plan"),
+      hasDefaultVendor: Boolean(profile.defaultVendor),
+      unavailableTitle: "Default vendor unavailable",
+      unavailableMessage:
+        "No default vendor is configured for this account, so vendor profile details remain read-only and unavailable on this route.",
+    },
+    summaryCards: buildVendorAccountSummaryCards({
+      vendorsCount: profile.vendorsCount,
+      defaultVendorMealPlanCount: profile.defaultVendor?.mealPlanCount ?? null,
+      vendorZipLabel,
+      accountRoleLabel,
+    }),
+    actions: buildVendorAccountActionCards(),
+    readOnlyTitle: "Read-only account state",
+    readOnlyMessage:
+      "This route does not add profile editing or any unsupported vendor account workflows.",
+    hasProfileData,
   };
 }
