@@ -46,6 +46,7 @@ export type MobileMealPlanRecommendationView = {
 export type MobileBookmarkFolderView = {
   id: string;
   name: string;
+  description: string | null;
   itemCountLabel: string;
   items: MobileMealPlanRowView[];
   isEmpty: boolean;
@@ -190,6 +191,15 @@ export type MobileMealPlanDetailView = {
   hasMeals: boolean;
   hasAvailability: boolean;
   hasVendorDetails: boolean;
+};
+
+export type MobileBookmarksPageView = {
+  summaryCards: MobileMealPlanDirectorySummaryCardView[];
+  bookmarkState: MobileBookmarkStateView;
+  folders: MobileBookmarkFolderView[];
+  emptyState: MobileMealPlanEmptyStateView | null;
+  hasFolders: boolean;
+  hasSavedPlans: boolean;
 };
 
 const NO_VENDOR_ZIP = "ZIP unavailable";
@@ -349,6 +359,7 @@ function adaptBookmarkFoldersView(
   return folders.map((folder) => ({
     id: folder.id,
     name: folder.name,
+    description: folder.description,
     itemCountLabel: `${folder.items.length} saved plan${folder.items.length === 1 ? "" : "s"}`,
     items: folder.items.map((item) => buildMealPlanRow(item.meal_plan, bookmarkedIds)),
     isEmpty: folder.items.length === 0,
@@ -615,6 +626,55 @@ export function adaptClientMealPlansView(args: {
     hasMealPlans: discovery.rows.length > 0,
     hasBookmarks: countSavedPlans(folders) > 0,
     hasAnyData: discovery.rows.length > 0 || folders.length > 0,
+  };
+}
+
+export function adaptClientMealPlanBookmarksView(args: {
+  bookmarks?: BookmarkFolderListPayload | BookmarkFolder[] | null;
+}): MobileBookmarksPageView {
+  const folders = readBookmarkFolders(args.bookmarks);
+  const bookmarkedIds = buildBookmarkedIdSet(folders);
+  const bookmarkState = buildBookmarkState(folders);
+  const savedPlanCount = countSavedPlans(folders);
+  const folderViews = adaptBookmarkFoldersView(folders, bookmarkedIds);
+
+  return {
+    summaryCards: [
+      {
+        label: "Folders",
+        value: formatNumber(folders.length),
+        progressText:
+          folders.length > 0
+            ? "Bookmark folders returned by the protected client route."
+            : "No bookmark folders currently exist for this session.",
+      },
+      {
+        label: "Saved plans",
+        value: formatNumber(savedPlanCount),
+        progressText:
+          savedPlanCount > 0
+            ? "Saved meal plans currently present across returned folders."
+            : "No saved meal plans currently exist.",
+      },
+      {
+        label: "Primary folder",
+        value: bookmarkState.latestFolderLabel,
+        progressText:
+          folders.length > 0
+            ? "The first folder returned by the current bookmark route."
+            : "A primary folder appears after bookmarks exist.",
+      },
+    ],
+    bookmarkState,
+    folders: folderViews,
+    emptyState: folders.length === 0
+      ? {
+          title: "No saved meal plans yet",
+          message: "Start exploring and bookmark plans to see them here",
+        }
+      : null,
+    hasFolders: folders.length > 0,
+    hasSavedPlans: savedPlanCount > 0,
   };
 }
 
