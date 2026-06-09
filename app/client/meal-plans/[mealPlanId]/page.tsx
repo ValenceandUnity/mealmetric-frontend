@@ -525,10 +525,10 @@ export default function ClientMealPlanDetailPage() {
             />
           ) : null}
 
-          <MobileCard as="section" variant="action" className="mobile-pt-detail-hero">
+          <MobileCard as="section" variant="action" className="mobile-pt-detail-hero client-meal-plan-detail-hero">
             {view.hero.heroImageUrl ? (
               <div
-                className="mobile-training-card-media"
+                className="mobile-training-card-media client-meal-plan-detail-hero__media"
                 style={{
                   minHeight: "12rem",
                   padding: 0,
@@ -545,10 +545,15 @@ export default function ClientMealPlanDetailPage() {
                   style={{ objectFit: "cover" }}
                 />
               </div>
-            ) : null}
+            ) : (
+              <div className="mobile-meal-plan-placeholder client-meal-plan-detail-hero__media" aria-hidden="true">
+                <div className="mobile-meal-plan-placeholder__grid" />
+              </div>
+            )}
 
             {typeof detailCalories === "number" ? (
               <MobileMealPlanRow
+                className="client-meal-plan-detail-summary"
                 name={view.hero.title}
                 vendorName={view.hero.vendorName}
                 calories={formatNumber(detailCalories)}
@@ -564,7 +569,7 @@ export default function ClientMealPlanDetailPage() {
                 }
               />
             ) : (
-              <div className="mobile-pt-client-card__header">
+              <div className="mobile-pt-client-card__header client-meal-plan-detail-summary">
                 <div className="mobile-section__copy">
                   <p className="mobile-section__eyebrow">Meal plan</p>
                   <h2 className="mobile-section__title">{view.hero.title}</h2>
@@ -582,7 +587,7 @@ export default function ClientMealPlanDetailPage() {
 
             <p className="mobile-section__description">{view.hero.description}</p>
 
-            <dl className="mobile-pt-training-meta-grid">
+            <dl className="mobile-pt-training-meta-grid client-meal-plan-detail-summary__stats">
               <div>
                 <dt>Vendor ZIP</dt>
                 <dd>{view.hero.vendorZipLabel}</dd>
@@ -650,13 +655,13 @@ export default function ClientMealPlanDetailPage() {
             }
           >
             {view.hasMeals ? (
-              <div className="mobile-pt-detail-stack">
+              <div className="mobile-pt-detail-stack client-meal-plan-detail-includes">
                 {view.meals.map((item) => (
                   <MobileCard
                     key={item.key}
                     as="article"
                     variant="soft"
-                    className="mobile-pt-detail-action-card"
+                    className="mobile-pt-detail-action-card client-meal-plan-detail-includes__item"
                   >
                     <div className="mobile-pt-client-card__header">
                       <div className="mobile-section__copy">
@@ -668,7 +673,7 @@ export default function ClientMealPlanDetailPage() {
                       ) : null}
                     </div>
 
-                    <dl className="mobile-pt-training-meta-grid">
+                    <dl className="mobile-pt-training-meta-grid client-meal-plan-detail-includes__meta">
                       {item.quantityLabel ? (
                         <div>
                           <dt>Quantity</dt>
@@ -711,8 +716,8 @@ export default function ClientMealPlanDetailPage() {
             description="Source details are shown only when the current meal-plan payload supports them."
           >
             {view.hasVendorDetails ? (
-              <MobileCard as="div" variant="soft" className="mobile-pt-detail-action-card">
-                <dl className="mobile-pt-training-meta-grid">
+              <MobileCard as="div" variant="soft" className="mobile-pt-detail-action-card client-meal-plan-detail-vendor">
+                <dl className="mobile-pt-training-meta-grid client-meal-plan-detail-vendor__stats">
                   {view.vendorDetails.map((entry) => (
                     <div key={`${entry.label}-${entry.value}`}>
                       <dt>{entry.label}</dt>
@@ -803,7 +808,7 @@ export default function ClientMealPlanDetailPage() {
             title="Choose how to continue"
             description="Keep selection local to this page, or open the currently supported ordering options."
           >
-            <MobileCard as="div" variant="soft" className="mobile-pt-detail-action-card">
+            <MobileCard as="div" variant="soft" className={`mobile-pt-detail-action-card client-meal-plan-detail-actions ${actionState === "selected" ? "client-meal-plan-detail-actions--selected" : actionState === "ready" ? "client-meal-plan-detail-actions--ready" : ""}`}>
               <div className="mobile-section__copy">
                 <p className="mobile-section__eyebrow">Next step</p>
                 <h3 className="mobile-section__title">{actionTitle}</h3>

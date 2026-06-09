@@ -28,6 +28,9 @@ export function MobileMealPlanRow({
 
   return (
     <MobileCard variant="soft" className={["mobile-meal-plan-row", className ?? ""].filter(Boolean).join(" ")}>
+      <div className="mobile-meal-plan-row__media" aria-hidden="true">
+        <div className="mobile-meal-plan-row__media-grid" />
+      </div>
       <div className="mobile-meal-plan-row__content">
         <div className="mobile-meal-plan-row__header">
           <div className="mobile-meal-plan-row__meta">

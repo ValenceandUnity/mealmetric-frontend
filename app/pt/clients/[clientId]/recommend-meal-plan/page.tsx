@@ -9,7 +9,6 @@ import { MobileAppShell } from "@/components/mobile/MobileAppShell";
 import { MobileCard } from "@/components/mobile/MobileCard";
 import { MobileMealPlanRow } from "@/components/mobile/MobileMealPlanRow";
 import { MobileSection } from "@/components/mobile/MobileSection";
-import { MobileStatCard } from "@/components/mobile/MobileStatCard";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
@@ -402,6 +401,28 @@ export default function PTRecommendMealPlanPage() {
             title="Recommendation workspace"
             description="Guide the client with a plan, rationale, and timing without stepping outside the PT BFF routes."
           >
+            <MobileCard as="article" variant="action" className="mobile-meal-plan-hero">
+              <div className="mobile-meal-plan-hero__copy">
+                <div className="mobile-section__copy">
+                  <p className="mobile-section__eyebrow">Protected recommendation flow</p>
+                  <h3 className="mobile-section__title">Select, explain, and recommend without changing backend behavior</h3>
+                  <p className="mobile-section__description">
+                    Selection remains local until submission. The current PT create route, payload shape, and success feedback are preserved exactly.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mobile-meal-plan-hero__signals">
+                {view.summaryCards.map((item) => (
+                  <div key={item.label} className="mobile-meal-plan-hero__signal">
+                    <p className="mobile-section__eyebrow">{item.label}</p>
+                    <h3 className="mobile-section__title">{item.value}</h3>
+                    <p className="mobile-section__description">{item.progressText}</p>
+                  </div>
+                ))}
+              </div>
+            </MobileCard>
+
             <MobileCard as="article" variant="accent" className="mobile-pt-detail-action-card">
               <div className="mobile-pt-client-card__header">
                 <div className="mobile-section__copy">
@@ -424,14 +445,6 @@ export default function PTRecommendMealPlanPage() {
               </dl>
             </MobileCard>
 
-            {view.summaryCards.map((item) => (
-              <MobileStatCard
-                key={item.label}
-                label={item.label}
-                value={item.value}
-                progressText={item.progressText}
-              />
-            ))}
           </MobileSection>
 
           <MobileSection
@@ -557,7 +570,7 @@ export default function PTRecommendMealPlanPage() {
 
           <MobileSection
             eyebrow="Discovery"
-            title="Recommendable plans"
+            title="New meal plan releases"
             description="The PT meal-plan route still loads on page entry, and this mobile filter stays local without changing the request shape."
           >
             <MobileCard as="article" variant="soft" className="mobile-pt-detail-action-card">

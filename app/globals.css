@@ -1697,13 +1697,44 @@ html[data-theme="light"] .mobile-pill--yellow {
 }
 
 .mobile-meal-plan-row {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(4.8rem, 5.5rem) minmax(0, 1fr) auto;
   gap: var(--mobile-space-3);
   align-items: center;
   border-color: rgba(255, 255, 255, 0.06);
   background:
     linear-gradient(180deg, rgba(119, 123, 137, 0.18), rgba(50, 53, 64, 0.28)),
     rgba(17, 19, 28, 0.7);
+}
+
+.mobile-meal-plan-row__media {
+  position: relative;
+  min-height: 5.4rem;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(139, 92, 246, 0.18), rgba(17, 19, 28, 0.18)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03)),
+    linear-gradient(160deg, rgba(61, 66, 84, 0.94), rgba(20, 22, 32, 0.98));
+}
+
+.mobile-meal-plan-row__media::after {
+  content: "";
+  position: absolute;
+  inset: auto -0.8rem -1.2rem auto;
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(250, 204, 21, 0.42), transparent 68%);
+}
+
+.mobile-meal-plan-row__media-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 0.8rem 0.8rem;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.72), transparent);
 }
 
 .mobile-meal-plan-row__content {
@@ -1717,6 +1748,18 @@ html[data-theme="light"] .mobile-pill--yellow {
   font-size: 0.88rem;
 }
 
+.mobile-meal-plan-row__header {
+  align-items: start;
+}
+
+.mobile-meal-plan-row__title {
+  color: #f7f5ff;
+}
+
+.mobile-meal-plan-row__vendor {
+  color: rgba(232, 234, 244, 0.84);
+}
+
 .mobile-meal-plan-row__price {
   margin: 0;
   color: var(--mobile-text);
@@ -1728,6 +1771,95 @@ html[data-theme="light"] .mobile-pill--yellow {
 .mobile-meal-plan-row__actions {
   justify-items: end;
   gap: var(--mobile-space-2);
+}
+
+.mobile-meal-plan-surface,
+.mobile-meal-plan-hero,
+.mobile-meal-plan-hero__copy,
+.mobile-meal-plan-hero__signals,
+.mobile-meal-plan-hero__signal,
+.mobile-meal-plan-pill-row,
+.mobile-meal-plan-release-stack,
+.mobile-meal-plan-release-card,
+.mobile-meal-plan-release-card__copy,
+.mobile-meal-plan-placeholder,
+.mobile-meal-plan-placeholder__grid {
+  display: grid;
+  gap: var(--mobile-space-3);
+}
+
+.mobile-meal-plan-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(139, 92, 246, 0.2), rgba(9, 11, 20, 0) 30%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(10, 12, 20, 0.95)),
+    var(--mobile-card-accent);
+}
+
+.mobile-meal-plan-hero::before,
+.mobile-meal-plan-placeholder::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 1rem 1rem;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.78), transparent);
+  pointer-events: none;
+}
+
+.mobile-meal-plan-hero > *,
+.mobile-meal-plan-placeholder > * {
+  position: relative;
+  z-index: 1;
+}
+
+.mobile-meal-plan-hero__signals {
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+}
+
+.mobile-meal-plan-hero__signal {
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(14, 16, 26, 0.84)),
+    rgba(10, 12, 20, 0.84);
+}
+
+.mobile-meal-plan-hero__signal .mobile-section__title {
+  font-size: 1rem;
+}
+
+.mobile-meal-plan-pill-row {
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+  scrollbar-width: none;
+}
+
+.mobile-meal-plan-pill-row::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-meal-plan-release-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(14, 16, 26, 0.8)),
+    rgba(17, 19, 28, 0.82);
+}
+
+.mobile-meal-plan-placeholder {
+  position: relative;
+  overflow: hidden;
+  min-height: 11rem;
+  align-content: end;
+  background:
+    radial-gradient(circle at 82% 18%, rgba(250, 204, 21, 0.16), transparent 20%),
+    linear-gradient(180deg, rgba(139, 92, 246, 0.18), rgba(17, 19, 28, 0.18)),
+    linear-gradient(160deg, rgba(61, 66, 84, 0.94), rgba(20, 22, 32, 0.98));
 }
 
 .mobile-bottom-nav {
@@ -2683,6 +2815,10 @@ html[data-theme="light"] .mobile-pt-form-grid textarea {
 
   .mobile-meal-plan-row__actions {
     justify-items: start;
+  }
+
+  .mobile-meal-plan-hero__signals {
+    grid-template-columns: 1fr;
   }
 
   .client-home-featured-routine {

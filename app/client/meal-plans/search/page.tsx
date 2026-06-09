@@ -279,13 +279,24 @@ export default function ClientMealPlansSearchPage() {
             title="Meal-plan links"
             description="These links preserve the existing meal-plan home, schedule, search, and bookmark pages."
           >
-            <div className="mobile-pt-actions">
-              {SEARCH_LINKS.map((item) => (
-                <ActionPill key={item.href} href={item.href} tone={item.tone}>
-                  {item.label}
-                </ActionPill>
-              ))}
-            </div>
+            <MobileCard as="article" variant="action" className="mobile-meal-plan-hero">
+              <div className="mobile-meal-plan-hero__copy">
+                <div className="mobile-section__copy">
+                  <p className="mobile-section__eyebrow">Protected search surface</p>
+                  <h3 className="mobile-section__title">Search results in the same meal-card system</h3>
+                  <p className="mobile-section__description">
+                    Search keeps the existing 250ms debounce and the supported `q` plus `zip_codes` request shape. This patch only changes presentation.
+                  </p>
+                </div>
+                <div className="mobile-meal-plan-pill-row">
+                  {SEARCH_LINKS.map((item) => (
+                    <ActionPill key={item.href} href={item.href} tone={item.tone}>
+                      {item.label}
+                    </ActionPill>
+                  ))}
+                </div>
+              </div>
+            </MobileCard>
           </MobileSection>
 
           <MobileSection
@@ -326,7 +337,7 @@ export default function ClientMealPlansSearchPage() {
 
           <MobileSection
             eyebrow="Results"
-            title="Search results"
+            title="New meal plan releases"
             description="Search results show only real meal-plan fields already available on the current protected client payload."
           >
             {view.hasResults ? (

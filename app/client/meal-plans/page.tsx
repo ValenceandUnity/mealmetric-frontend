@@ -829,13 +829,43 @@ export default function ClientMealPlansPage() {
             title="Marketplace links"
             description="These links preserve the existing meal-plan home, schedule, search, and bookmark subpages."
           >
-            <div className="mobile-pt-actions">
-              {DIRECTORY_LINKS.map((item) => (
-                <ActionPill key={item.href} href={item.href} tone={item.tone}>
-                  {item.label}
-                </ActionPill>
-              ))}
-            </div>
+            <MobileCard as="article" variant="action" className="mobile-meal-plan-hero">
+              <div className="mobile-meal-plan-hero__copy">
+                <div className="mobile-section__copy">
+                  <p className="mobile-section__eyebrow">Protected client marketplace</p>
+                  <h3 className="mobile-section__title">Dark-shell meal-plan browsing with truthful state only</h3>
+                  <p className="mobile-section__description">
+                    The catalog, bookmarks, and filters stay on the certified client BFF routes. This phase only tightens the visual hierarchy toward the shared meal-card language.
+                  </p>
+                </div>
+
+                <div className="mobile-meal-plan-pill-row">
+                  {DIRECTORY_LINKS.map((item) => (
+                    <ActionPill key={item.href} href={item.href} tone={item.tone}>
+                      {item.label}
+                    </ActionPill>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mobile-meal-plan-hero__signals">
+                <div className="mobile-meal-plan-hero__signal">
+                  <p className="mobile-section__eyebrow">Loaded plans</p>
+                  <h3 className="mobile-section__title">{view.summaryCards[0]?.value ?? "0"}</h3>
+                  <p className="mobile-section__description">Returned by the current marketplace request only.</p>
+                </div>
+                <div className="mobile-meal-plan-hero__signal">
+                  <p className="mobile-section__eyebrow">Saved plans</p>
+                  <h3 className="mobile-section__title">{view.bookmarkState.savedPlanCountLabel}</h3>
+                  <p className="mobile-section__description">Bookmark state remains on existing folder routes.</p>
+                </div>
+                <div className="mobile-meal-plan-hero__signal">
+                  <p className="mobile-section__eyebrow">ZIP filter</p>
+                  <h3 className="mobile-section__title">{view.budgetMarker.zipSummaryLabel}</h3>
+                  <p className="mobile-section__description">Only supported ZIP filters shape the catalog request.</p>
+                </div>
+              </div>
+            </MobileCard>
           </MobileSection>
 
           <MobileSection
@@ -1130,7 +1160,7 @@ export default function ClientMealPlansPage() {
 
           <MobileSection
             eyebrow="Recommended now"
-            title="Quick browse"
+            title="New meal plan releases"
             description="These rows come directly from the current client meal-plan catalog and keep the discovery pass light on mobile."
             action={<ActionPill href="/client/meal-plans/search" tone="purple">Search page</ActionPill>}
           >
