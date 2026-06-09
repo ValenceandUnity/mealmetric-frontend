@@ -31,3 +31,20 @@
   - Existing form mode controls.
   - Existing history links and history section.
   - No backend, `app/api`, auth/session, or dependency changes.
+
+## Phase 12B.3 - Client add-log card sizing and recent exercises drawer
+
+- Route: `/client/add-log`
+- Changes:
+  - Made the four `Log Your Reps` cards equal height.
+  - Added a clickable GO/avatar action on the add-log header.
+  - Added a 75%-width slide-in recent exercises drawer backed by existing workout history data.
+  - Slightly reduced the add-log top header hero bottom height.
+- Preserved:
+  - Existing workout-log BFF fetch and mutation routes.
+  - Existing workout-log payload shape.
+  - Existing form mode controls.
+  - Existing history links and history section.
+  - No backend, `app/api`, auth/session, or dependency changes.
+- Note:
+  - The drawer uses existing workout history data already loaded on the page.

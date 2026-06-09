@@ -12,6 +12,10 @@ type MobileTopHubProps = {
   onSearchChange?: (value: string) => void;
   avatarInitials?: string;
   avatarLabel?: string;
+  onAvatarClick?: () => void;
+  avatarControls?: string;
+  avatarExpanded?: boolean;
+  avatarButtonLabel?: string;
   notificationSlot?: ReactNode;
   actionSlot?: ReactNode;
   statusStrip?: ReactNode;
@@ -28,6 +32,10 @@ export function MobileTopHub({
   onSearchChange,
   avatarInitials,
   avatarLabel,
+  onAvatarClick,
+  avatarControls,
+  avatarExpanded,
+  avatarButtonLabel,
   notificationSlot,
   actionSlot,
   statusStrip,
@@ -55,7 +63,18 @@ export function MobileTopHub({
           </div>
           <div className="mobile-top-hub__utility">
             {notificationSlot}
-            {avatarInitials ? (
+            {avatarInitials && onAvatarClick ? (
+              <button
+                type="button"
+                className="mobile-top-hub__avatar mobile-focus-ring"
+                aria-label={avatarButtonLabel ?? avatarLabel ?? `${avatarInitials} avatar`}
+                aria-controls={avatarControls}
+                aria-expanded={avatarExpanded}
+                onClick={onAvatarClick}
+              >
+                {avatarInitials}
+              </button>
+            ) : avatarInitials ? (
               <span
                 className="mobile-top-hub__avatar"
                 role="img"

@@ -17,6 +17,10 @@ type MobileAppShellProps = {
   onSearchChange?: (value: string) => void;
   avatarInitials?: string;
   avatarLabel?: string;
+  onAvatarClick?: () => void;
+  avatarControls?: string;
+  avatarExpanded?: boolean;
+  avatarButtonLabel?: string;
   notificationSlot?: ReactNode;
   topHubAction?: ReactNode;
   showTopHub?: boolean;
@@ -51,6 +55,10 @@ export function MobileAppShell({
   onSearchChange,
   avatarInitials,
   avatarLabel,
+  onAvatarClick,
+  avatarControls,
+  avatarExpanded,
+  avatarButtonLabel,
   notificationSlot,
   topHubAction,
   showTopHub = true,
@@ -88,6 +96,10 @@ export function MobileAppShell({
             onSearchChange={onSearchChange}
             avatarInitials={resolvedInitials}
             avatarLabel={avatarLabel}
+            onAvatarClick={onAvatarClick}
+            avatarControls={avatarControls}
+            avatarExpanded={avatarExpanded}
+            avatarButtonLabel={avatarButtonLabel}
             notificationSlot={notificationSlot}
             actionSlot={topHubAction}
             statusStrip={statusStrip}
