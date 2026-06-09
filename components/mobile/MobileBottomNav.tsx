@@ -96,7 +96,7 @@ export function MobileBottomNav({ role, activePath, className }: MobileBottomNav
         const content = (
           <>
             <span className="mobile-bottom-nav__icon">{renderIcon(item.icon)}</span>
-            <span>{item.label}</span>
+            <span className="mobile-bottom-nav__label">{item.label}</span>
           </>
         );
 

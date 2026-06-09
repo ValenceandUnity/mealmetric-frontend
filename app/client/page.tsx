@@ -20,13 +20,13 @@ type ClientHomeApiResponse = ApiResponse<ClientHomeResponse>;
 
 type ActionPillProps = {
   href: string;
-  children: string;
+  children: ReactNode;
   tone?: "purple" | "yellow";
 };
 
 type ActionPillButtonProps = {
   onClick: () => void;
-  children: string;
+  children: ReactNode;
   tone?: "purple" | "yellow";
 };
 
@@ -80,6 +80,21 @@ function matchesQuery(query: string, fields: Array<string | null | undefined>): 
   return fields.some((field) => field?.toLowerCase().includes(query));
 }
 
+function PillLabel({
+  children,
+  icon,
+}: {
+  children: ReactNode;
+  icon?: ReactNode;
+}) {
+  return (
+    <span className="client-home-pill-label">
+      {icon ? <span className="client-home-pill-label__icon" aria-hidden="true">{icon}</span> : null}
+      <span>{children}</span>
+    </span>
+  );
+}
+
 function getActivityIcon(label: string) {
   switch (label.toLowerCase()) {
     case "intake":
@@ -112,6 +127,31 @@ function getActivityIcon(label: string) {
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M12 5v14M5 12h14" />
+        </svg>
+      );
+  }
+}
+
+function getShortcutIcon(kind: "bookmarks" | "log" | "search") {
+  switch (kind) {
+    case "bookmarks":
+      return (
+        <svg viewBox="0 0 24 24">
+          <path d="M8 5h8a1 1 0 0 1 1 1v13l-5-3-5 3V6a1 1 0 0 1 1-1Z" />
+        </svg>
+      );
+    case "search":
+      return (
+        <svg viewBox="0 0 24 24">
+          <path d="m21 21-4.35-4.35" />
+          <circle cx="11" cy="11" r="5.5" />
+        </svg>
+      );
+    default:
+      return (
+        <svg viewBox="0 0 24 24">
+          <path d="M7 5.5h7l3 3V18a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-12.5Z" />
+          <path d="M9 10.5h6m-6 3h6" />
         </svg>
       );
   }
@@ -204,6 +244,10 @@ export default function ClientDashboardPage() {
   const showLoadingState = loading && !homeData && !errorMessage;
   const showFilteredEmptyState = query.length > 0;
   const featuredRoutine = filteredRoutines[0] ?? null;
+  const routineCountLabel =
+    view.routines.length > 0 ? `${view.routines.length} routine${view.routines.length === 1 ? "" : "s"}` : "Training preview";
+  const mealPlanCountLabel =
+    view.upcomingMealPlans.length > 0 ? `${view.upcomingMealPlans.length} meal plan${view.upcomingMealPlans.length === 1 ? "" : "s"}` : "Meal rows";
 
   return (
     <MobileAppShell
@@ -219,13 +263,27 @@ export default function ClientDashboardPage() {
           setSearchValue(nextValue);
         });
       }}
-      notificationSlot={<ActionPill href="/client/bookmarks">Bookmarks</ActionPill>}
-      topHubAction={<ActionPill href="/client/add-log">Add log</ActionPill>}
+      notificationSlot={(
+        <ActionPill href="/client/bookmarks" tone="purple">
+          <PillLabel icon={getShortcutIcon("bookmarks")}>Bookmarks</PillLabel>
+        </ActionPill>
+      )}
+      topHubAction={(
+        <>
+          <ActionPill href="/client/meal-plans/search" tone="purple">
+            <PillLabel icon={getShortcutIcon("search")}>Plan search</PillLabel>
+          </ActionPill>
+          <ActionPill href="/client/add-log">
+            <PillLabel icon={getShortcutIcon("log")}>Add log</PillLabel>
+          </ActionPill>
+        </>
+      )}
       activePath="/client"
       statusStrip={(
         <>
-          <span className="mobile-pill mobile-pill--purple">Protected mobile view</span>
-          <span className="mobile-pill">BFF-backed client home</span>
+          <span className="mobile-pill mobile-pill--purple">{routineCountLabel}</span>
+          <span className="mobile-pill">{mealPlanCountLabel}</span>
+          <span className="mobile-pill">Signed BFF</span>
         </>
       )}
     >
@@ -260,8 +318,8 @@ export default function ClientDashboardPage() {
           <MobileSection
             className="client-home-section client-home-section--activity"
             eyebrow="Daily activity"
-            title="Today at a glance"
-            description="Your overview stays compact here so training and nutrition remain one thumb away."
+            title="Daily Activity / Progress"
+            description="A compact progress card that stays tied to the current client overview response."
             action={<ActionPill href="/client/metrics">Open metrics</ActionPill>}
           >
             {view.dailyActivity.length > 0 ? (
@@ -294,10 +352,11 @@ export default function ClientDashboardPage() {
 
           <MobileSection
             className="client-home-section client-home-section--training"
-            eyebrow="Training"
-            title="Training preview"
-            description="Image-forward routine cards keep the next workout easy to reopen without changing the certified training flow."
+            eyebrow="Training routines"
+            title="Training routines"
+            description="Image-forward cards keep the next routine scannable without changing the certified training workflow."
             action={<ActionPill href="/client/training">Open training</ActionPill>}
+            contentClassName="client-home-training-strip"
             scroll
           >
             {featuredRoutine ? (
@@ -318,11 +377,22 @@ export default function ClientDashboardPage() {
               filteredRoutines.map((routine, index) => (
                 <MobileRoutineCard
                   key={routine.id ?? `${routine.title}-${index}`}
+                  className="client-home-routine-card"
                   title={routine.title}
                   subtitle={routine.subtitle}
                   taskCount={routine.taskCount}
                   category={routine.category}
                   gradient={routine.gradient}
+                  media={(
+                    <div className="mobile-routine-card__visual client-home-routine-card__visual">
+                      <div className="client-home-routine-card__overlay">
+                        {routine.status ? (
+                          <span className="mobile-pill mobile-pill--purple">{routine.status}</span>
+                        ) : null}
+                        <span className="mobile-pill">{routine.taskCount} {routine.taskCount === 1 ? "task" : "tasks"}</span>
+                      </div>
+                    </div>
+                  )}
                   action={
                     <ActionPill href={routine.href} tone={index === 0 ? "yellow" : "purple"}>
                       {index === 0 ? "Continue" : "Open"}
@@ -359,14 +429,16 @@ export default function ClientDashboardPage() {
 
           <MobileSection
             className="client-home-section client-home-section--meal-plans"
-            eyebrow="Meal plans"
-            title="Upcoming meal plans"
-            description="Meal-plan rows stay lighter and truthfully reflect the existing client home payload."
+            eyebrow="Upcoming meal plan"
+            title="Upcoming meal plan"
+            description="Gray row cards stay factual to the current client home payload and preserve existing plan links."
+            contentClassName="client-home-meal-plan-list"
             action={<ActionPill href="/client/meal-plans">Browse plans</ActionPill>}
           >
             {filteredMealPlans.length > 0 ? (
               filteredMealPlans.map((mealPlan, index) => (
                 <MobileMealPlanRow
+                  className="client-home-meal-plan-card"
                   key={mealPlan.id ?? `${mealPlan.name}-${index}`}
                   name={mealPlan.name}
                   vendorName={mealPlan.vendorName}
