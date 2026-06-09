@@ -221,6 +221,31 @@ export default function ClientMealPlansBookmarkPage() {
             title="Bookmarks and folders"
             description="Only bookmark-folder metrics returned by the protected client route are shown here."
           >
+            <MobileCard as="article" variant="action" className="mobile-meal-plan-hero">
+              <div className="mobile-meal-plan-hero__copy">
+                <div className="mobile-section__copy">
+                  <p className="mobile-section__eyebrow">Protected bookmark surface</p>
+                  <h3 className="mobile-section__title">Saved plans stay in the same gray-card language</h3>
+                  <p className="mobile-section__description">
+                    Folder and saved-plan counts remain tied to the current bookmark payload. This phase does not invent new bookmark editing behavior.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mobile-meal-plan-hero__signals">
+                <div className="mobile-meal-plan-hero__signal">
+                  <p className="mobile-section__eyebrow">Saved plans</p>
+                  <h3 className="mobile-section__title">{view.bookmarkState.savedPlanCountLabel}</h3>
+                  <p className="mobile-section__description">Returned by the existing bookmark route.</p>
+                </div>
+                <div className="mobile-meal-plan-hero__signal">
+                  <p className="mobile-section__eyebrow">Folders</p>
+                  <h3 className="mobile-section__title">{view.bookmarkState.folderCountLabel}</h3>
+                  <p className="mobile-section__description">Folder state remains read-only on this page.</p>
+                </div>
+              </div>
+            </MobileCard>
+
             {view.summaryCards.map((card) => (
               <MobileStatCard
                 key={card.label}

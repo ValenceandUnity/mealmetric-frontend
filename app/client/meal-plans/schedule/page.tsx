@@ -104,6 +104,16 @@ export default function ClientMealPlansSchedulePage() {
         title="Upcoming meals and pickups"
         description="The current client workspace does not expose dedicated schedule, pickup, subscription, or order data for this page yet."
       >
+        <MobileCard as="article" variant="action" className="mobile-meal-plan-placeholder">
+          <div className="mobile-section__copy">
+            <p className="mobile-section__eyebrow">Upcoming meal plan</p>
+            <h3 className="mobile-section__title">Truthful placeholder until schedule data exists</h3>
+            <p className="mobile-section__description">
+              The mobile UI can carry the same darker card language here without claiming real schedule, delivery, pickup, or subscription operations that the current workspace does not expose.
+            </p>
+          </div>
+        </MobileCard>
+
         <MobileCard as="article" variant="accent" className="mobile-pt-detail-action-card">
           <div className="mobile-pt-client-card__header">
             <div className="mobile-section__copy">

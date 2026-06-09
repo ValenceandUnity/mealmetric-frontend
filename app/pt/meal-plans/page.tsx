@@ -231,10 +231,21 @@ export default function PTMealPlansPage() {
             title="PT meal-plan workspace"
             description="The previous placeholder links remain available here, and recommendation creation still starts from a client workspace."
           >
-            <div className="mobile-pt-actions">
-              <ActionPill href="/pt" tone="purple">PT home</ActionPill>
-              <ActionPill href="/pt/clients">Open clients</ActionPill>
-            </div>
+            <MobileCard as="article" variant="action" className="mobile-meal-plan-hero">
+              <div className="mobile-meal-plan-hero__copy">
+                <div className="mobile-section__copy">
+                  <p className="mobile-section__eyebrow">Protected PT catalog</p>
+                  <h3 className="mobile-section__title">Browse meal plans with the same mobile card language</h3>
+                  <p className="mobile-section__description">
+                    PT discovery remains read-only here. Recommendation creation still belongs to the client-specific workflow.
+                  </p>
+                </div>
+                <div className="mobile-meal-plan-pill-row">
+                  <ActionPill href="/pt" tone="purple">PT home</ActionPill>
+                  <ActionPill href="/pt/clients">Open clients</ActionPill>
+                </div>
+              </div>
+            </MobileCard>
           </MobileSection>
 
           <MobileSection
@@ -265,7 +276,7 @@ export default function PTMealPlansPage() {
 
           <MobileSection
             eyebrow="Results"
-            title="Recommendable meal plans"
+            title="New meal plan releases"
             description="These cards show only real meal-plan fields already available on the current PT search payload."
           >
             {view.hasResults ? (
