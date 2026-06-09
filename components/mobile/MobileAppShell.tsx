@@ -22,6 +22,7 @@ type MobileAppShellProps = {
   showTopHub?: boolean;
   showBottomNav?: boolean;
   activePath?: string;
+  statusStrip?: ReactNode;
 };
 
 function fallbackInitials(user?: SessionUser, avatarInitials?: string): string | undefined {
@@ -55,6 +56,7 @@ export function MobileAppShell({
   showTopHub = true,
   showBottomNav = true,
   activePath,
+  statusStrip,
 }: MobileAppShellProps) {
   const resolvedInitials = fallbackInitials(user, avatarInitials);
   const resolvedTitle = title ?? "MealMetric";
@@ -88,6 +90,7 @@ export function MobileAppShell({
             avatarLabel={avatarLabel}
             notificationSlot={notificationSlot}
             actionSlot={topHubAction}
+            statusStrip={statusStrip}
           />
         ) : null}
         <div className="mobile-shell__viewport">{children}</div>

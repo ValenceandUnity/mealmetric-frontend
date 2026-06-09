@@ -62,7 +62,7 @@ function ActionPillButton({
 
 function HomeStateCard({ title, message, action }: HomeStateCardProps) {
   return (
-    <MobileCard as="div" variant="soft">
+    <MobileCard as="div" variant="soft" className="client-home-state-card">
       <div className="mobile-section__copy">
         <h3 className="mobile-section__title">{title}</h3>
         <p className="mobile-section__description">{message}</p>
@@ -203,6 +203,7 @@ export default function ClientDashboardPage() {
   );
   const showLoadingState = loading && !homeData && !errorMessage;
   const showFilteredEmptyState = query.length > 0;
+  const featuredRoutine = filteredRoutines[0] ?? null;
 
   return (
     <MobileAppShell
@@ -221,6 +222,12 @@ export default function ClientDashboardPage() {
       notificationSlot={<ActionPill href="/client/bookmarks">Bookmarks</ActionPill>}
       topHubAction={<ActionPill href="/client/add-log">Add log</ActionPill>}
       activePath="/client"
+      statusStrip={(
+        <>
+          <span className="mobile-pill mobile-pill--purple">Protected mobile view</span>
+          <span className="mobile-pill">BFF-backed client home</span>
+        </>
+      )}
     >
       {errorMessage ? (
         <MobileSection
@@ -238,6 +245,7 @@ export default function ClientDashboardPage() {
 
       {showLoadingState ? (
         <MobileSection
+          className="client-home-section client-home-section--state"
           eyebrow="Syncing"
           title="Loading your client home"
           description="Fetching the protected overview, training, and meal-plan summary from the current client BFF."
@@ -250,23 +258,27 @@ export default function ClientDashboardPage() {
       ) : (
         <>
           <MobileSection
+            className="client-home-section client-home-section--activity"
             eyebrow="Daily activity"
             title="Today at a glance"
             description="Your overview stays compact here so training and nutrition remain one thumb away."
             action={<ActionPill href="/client/metrics">Open metrics</ActionPill>}
           >
             {view.dailyActivity.length > 0 ? (
-              view.dailyActivity.map((activity) => (
-                <MobileStatCard
-                  key={activity.label}
-                  label={activity.label}
-                  value={activity.value}
-                  target={activity.target}
-                  unit={activity.unit}
-                  progressText={activity.progressText}
-                  icon={getActivityIcon(activity.label)}
-                />
-              ))
+              <div className="client-home-activity-grid">
+                {view.dailyActivity.map((activity, index) => (
+                  <MobileStatCard
+                    key={activity.label}
+                    className={index === 0 ? "mobile-stat-card--featured" : ""}
+                    label={activity.label}
+                    value={activity.value}
+                    target={activity.target}
+                    unit={activity.unit}
+                    progressText={activity.progressText}
+                    icon={getActivityIcon(activity.label)}
+                  />
+                ))}
+              </div>
             ) : view.hasOverviewData ? (
               <HomeStateCard
                 title="No daily activity metrics yet"
@@ -281,12 +293,27 @@ export default function ClientDashboardPage() {
           </MobileSection>
 
           <MobileSection
+            className="client-home-section client-home-section--training"
             eyebrow="Training"
             title="Training preview"
-            description="Assigned routines stay in a horizontal strip so the next session is easy to reopen."
+            description="Image-forward routine cards keep the next workout easy to reopen without changing the certified training flow."
             action={<ActionPill href="/client/training">Open training</ActionPill>}
             scroll
           >
+            {featuredRoutine ? (
+              <div className="client-home-featured-routine">
+                <div className="client-home-featured-routine__copy">
+                  <p className="client-home-featured-routine__eyebrow">Featured routine</p>
+                  <p className="client-home-featured-routine__title">{featuredRoutine.title}</p>
+                  <p className="client-home-featured-routine__subtitle">
+                    {featuredRoutine.subtitle}
+                  </p>
+                </div>
+                <ActionPill href={featuredRoutine.href} tone="yellow">
+                  Continue
+                </ActionPill>
+              </div>
+            ) : null}
             {filteredRoutines.length > 0 ? (
               filteredRoutines.map((routine, index) => (
                 <MobileRoutineCard
@@ -297,7 +324,7 @@ export default function ClientDashboardPage() {
                   category={routine.category}
                   gradient={routine.gradient}
                   action={
-                    <ActionPill href={routine.href} tone="yellow">
+                    <ActionPill href={routine.href} tone={index === 0 ? "yellow" : "purple"}>
                       {index === 0 ? "Continue" : "Open"}
                     </ActionPill>
                   }
@@ -331,9 +358,10 @@ export default function ClientDashboardPage() {
           </MobileSection>
 
           <MobileSection
+            className="client-home-section client-home-section--meal-plans"
             eyebrow="Meal plans"
             title="Upcoming meal plans"
-            description="Meal-plan rows stay lighter than training so nutrition still stays visible without taking over the home screen."
+            description="Meal-plan rows stay lighter and truthfully reflect the existing client home payload."
             action={<ActionPill href="/client/meal-plans">Browse plans</ActionPill>}
           >
             {filteredMealPlans.length > 0 ? (
@@ -378,6 +406,7 @@ export default function ClientDashboardPage() {
       )}
 
       <MobileSection
+        className="client-home-section client-home-section--account"
         eyebrow="Session"
         title="Account"
         description="Sign-out continues to use the existing protected client auth flow."
