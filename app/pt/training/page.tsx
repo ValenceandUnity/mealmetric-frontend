@@ -341,20 +341,38 @@ export default function PTTrainingPage() {
             title="Training overview"
             description="Summary cards reflect only the data returned by the current PT folders, packages, and routines routes."
           >
-            {view.summaryCards.map((item) => (
-              <MobileStatCard
-                key={item.label}
-                label={item.label}
-                value={item.value}
-                progressText={item.progressText}
-                icon={getTrainingIcon(item.label)}
-              />
-            ))}
+            <MobileCard as="article" variant="action" className="mobile-pt-hero-card">
+              <div className="mobile-pt-hero-masthead">
+                <div className="mobile-section__copy">
+                  <p className="mobile-section__eyebrow">Protected PT training</p>
+                  <h2 className="mobile-section__title">Portfolios and routines in the same visual language</h2>
+                  <p className="mobile-section__description">
+                    Folders, packages, and routines keep the current BFF-backed behavior while shifting into the darker grid and highlighted-card treatment used across the mobile client surfaces.
+                  </p>
+                </div>
+                <div className="mobile-pt-actions">
+                  <ActionPill href="/pt/clients">Open clients</ActionPill>
+                  <ActionPill href="/pt/metrics" tone="purple">Metrics</ActionPill>
+                </div>
+              </div>
+
+              <div className="mobile-pt-signal-grid">
+                {view.summaryCards.map((item) => (
+                  <MobileStatCard
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    progressText={item.progressText}
+                    icon={getTrainingIcon(item.label)}
+                  />
+                ))}
+              </div>
+            </MobileCard>
           </MobileSection>
 
           <MobileSection
             eyebrow="Folders"
-            title="Folder tiles"
+            title="Folder lanes"
             description="Folder tiles filter the PT training hub locally and do not trigger new backend requests."
           >
             {sectionErrors.folders && !view.hasFolders ? (
@@ -422,7 +440,7 @@ export default function PTTrainingPage() {
 
           <MobileSection
             eyebrow="Portfolios"
-            title="Training portfolios"
+            title="Portfolio cards"
             description="Portfolio cards come only from the current PT packages route. No editor or detail route is invented when one does not exist."
           >
             {sectionErrors.packages && !view.hasPackages ? (
@@ -481,7 +499,7 @@ export default function PTTrainingPage() {
 
           <MobileSection
             eyebrow="Routines"
-            title="Your Training Routines"
+            title="Routine cards"
             description="Routine cards come only from the current PT routines route and remain read-only until a stable editor route exists."
           >
             {sectionErrors.routines && !view.hasRoutines ? (
@@ -540,7 +558,7 @@ export default function PTTrainingPage() {
 
           <MobileSection
             eyebrow="Management"
-            title="Management actions"
+            title="Management status"
             description="This phase keeps PT training management read-only unless a stable editor route already exists."
           >
             <MobileCard as="article" variant="soft" className="mobile-pt-training-management-card">

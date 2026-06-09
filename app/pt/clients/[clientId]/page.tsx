@@ -444,21 +444,22 @@ export default function PTClientDetailPage() {
         <>
           <MobileSection
             eyebrow="PT client detail"
-            title="Client summary"
+            title="Client profile"
             description="Identity, assignment, activity, and nutrition fields are sourced only from the existing PT detail and metrics routes."
             action={<ActionPill href={`/pt/clients/${clientId}/metrics`} tone="purple">Metrics</ActionPill>}
           >
             <MobileCard as="article" variant="action" className="mobile-pt-detail-hero">
-              <div className="mobile-pt-client-card__header">
-                <div className="mobile-section__copy">
-                  <p className="mobile-section__eyebrow">Client workspace</p>
-                  <h2 className="mobile-section__title">{view.summary.clientDisplayLabel}</h2>
-                  <p className="mobile-section__description">{view.summary.clientEmail}</p>
+              <div className="mobile-pt-hero-masthead">
+                <div className="mobile-pt-client-card__header">
+                  <div className="mobile-section__copy">
+                    <p className="mobile-section__eyebrow">Client workspace</p>
+                    <h2 className="mobile-section__title">{view.summary.clientDisplayLabel}</h2>
+                    <p className="mobile-section__description">{view.summary.clientEmail}</p>
+                  </div>
+                  <span className="mobile-pill mobile-pill--purple">{view.summary.clientStatusLabel}</span>
                 </div>
-                <span className="mobile-pill mobile-pill--purple">{view.summary.clientStatusLabel}</span>
+                <p className="mobile-section__description">{view.summary.summaryText}</p>
               </div>
-
-              <p className="mobile-section__description">{view.summary.summaryText}</p>
 
               <dl className="mobile-pt-fact-grid">
                 {view.summary.factRows.map((item) => (
@@ -482,7 +483,7 @@ export default function PTClientDetailPage() {
 
           <MobileSection
             eyebrow="Quick actions"
-            title="PT client action cards"
+            title="Route launch cards"
             description="These cards link only to existing PT client routes for assignment, metrics, recommendation, and workout-log history."
           >
             <div className="mobile-pt-detail-action-grid">
@@ -505,7 +506,7 @@ export default function PTClientDetailPage() {
 
           <MobileSection
             eyebrow="Assignments"
-            title="Assignment summary"
+            title="Assignment deck"
             description="The client detail page preserves the current PT assignments route and falls back to embedded current assignments when needed."
             action={<ActionPill href={`/pt/clients/${clientId}/assign`}>Assign training</ActionPill>}
           >
@@ -565,7 +566,7 @@ export default function PTClientDetailPage() {
 
           <MobileSection
             eyebrow="Metrics"
-            title="Metrics snapshot"
+            title="Nutrition snapshot"
             description="This section reflects the current PT metrics route only and does not compute new nutrition values in the browser."
             action={<ActionPill href={`/pt/clients/${clientId}/metrics`} tone="purple">Open metrics</ActionPill>}
           >

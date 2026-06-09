@@ -101,12 +101,13 @@ describe("PTClientsPage", () => {
     render(React.createElement(PTClientsPage));
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Client Portal" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Client Roster" })).toBeTruthy();
     });
 
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/roster-categories", { cache: "no-store" });
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/clients", { cache: "no-store" });
-    expect(screen.getByRole("heading", { name: "Client Roster" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Roster control" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Roster lineup" })).toBeTruthy();
     expect(screen.getByRole("searchbox", { name: "Search roster clients" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Open invite" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Invite a Client" })).toBeTruthy();
@@ -114,6 +115,7 @@ describe("PTClientsPage", () => {
     expect(screen.queryByRole("button", { name: /send invite/i })).toBeNull();
     expect(screen.getAllByText("Goku").length).toBeGreaterThan(0);
     expect(screen.getByText("goku@example.com")).toBeTruthy();
+    expect(screen.getAllByText("MVPs").length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Client detail" }).getAttribute("href")).toBe("/pt/clients/client-1");
     expect(screen.getByRole("link", { name: "Log history" }).getAttribute("href")).toContain("/pt/clients/client-1/log-history");
 

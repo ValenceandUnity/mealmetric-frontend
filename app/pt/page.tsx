@@ -164,7 +164,7 @@ export default function PTDashboardPage() {
     <MobileAppShell
       user={user}
       greeting={formatDisplayNameFromUser(user)}
-      title="PT Command"
+      title="PT Studio"
       subtitle="Client progress, activity, and nutrition snapshots through the existing protected PT dashboard route."
       notificationSlot={<ActionPill href="/pt/settings" tone="purple">Settings</ActionPill>}
       topHubAction={<ActionPill href="/pt/clients">Open clients</ActionPill>}
@@ -187,7 +187,7 @@ export default function PTDashboardPage() {
       {showLoadingState ? (
         <MobileSection
           eyebrow="Syncing"
-          title="Loading your PT command surface"
+          title="Loading your PT studio"
           description="Fetching linked-client summaries through the current protected PT dashboard route."
         >
           <DashboardStateCard
@@ -198,26 +198,44 @@ export default function PTDashboardPage() {
       ) : (
         <>
           <MobileSection
-            eyebrow="PT dashboard"
-            title="Summary"
+            eyebrow="PT studio"
+            title="Today at a glance"
             description="These cards reflect only real linked-client, assignment, workout-log, and metrics snapshot data returned by the current PT dashboard response."
             action={<ActionPill href="/pt/clients" tone="purple">Client portal</ActionPill>}
           >
-            {view.stats.map((stat) => (
-              <MobileStatCard
-                key={stat.label}
-                label={stat.label}
-                value={stat.value}
-                unit={stat.unit}
-                progressText={stat.progressText}
-                icon={getDashboardIcon(stat.label)}
-              />
-            ))}
+            <MobileCard as="article" variant="action" className="mobile-pt-hero-card">
+              <div className="mobile-pt-hero-masthead">
+                <div className="mobile-section__copy">
+                  <p className="mobile-section__eyebrow">Protected PT workspace</p>
+                  <h2 className="mobile-section__title">Coach your roster with one visual system</h2>
+                  <p className="mobile-section__description">
+                    The PT shell now uses the same darker grid, contrast, and card rhythm as the client routes while staying on the existing dashboard BFF response.
+                  </p>
+                </div>
+                <div className="mobile-pt-actions">
+                  <ActionPill href="/pt/clients">Open clients</ActionPill>
+                  <ActionPill href="/pt/training" tone="purple">Training hub</ActionPill>
+                </div>
+              </div>
+
+              <div className="mobile-pt-signal-grid">
+                {view.stats.map((stat) => (
+                  <MobileStatCard
+                    key={stat.label}
+                    label={stat.label}
+                    value={stat.value}
+                    unit={stat.unit}
+                    progressText={stat.progressText}
+                    icon={getDashboardIcon(stat.label)}
+                  />
+                ))}
+              </div>
+            </MobileCard>
           </MobileSection>
 
           <MobileSection
             eyebrow="Client progress"
-            title="Linked client cards"
+            title="Roster momentum"
             description="Open the existing client detail, metrics, training, and recommendation routes from here without introducing new PT workflow endpoints."
           >
             {view.summaryCards.length > 0 ? (
@@ -256,7 +274,10 @@ export default function PTDashboardPage() {
                   </dl>
 
                   {client.notesPreview ? (
-                    <p className="mobile-section__description">Link notes: {client.notesPreview}</p>
+                    <div className="mobile-pt-surface-note">
+                      <p className="mobile-section__eyebrow">Coach note</p>
+                      <p className="mobile-section__description">{client.notesPreview}</p>
+                    </div>
                   ) : null}
 
                   <div className="mobile-pt-actions">
