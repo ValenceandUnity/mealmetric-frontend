@@ -137,6 +137,10 @@ describe("PTTrainingPage mobile experience", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/packages", { cache: "no-store" });
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/routines", { cache: "no-store" });
     expect(screen.getByRole("heading", { name: "PT Training" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Training overview" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Folder lanes" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Portfolio cards" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Routine cards" })).toBeTruthy();
     expect(screen.getByRole("searchbox", { name: "Search PT training" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Filter to Strength folder" })).toBeTruthy();
     expect(screen.getByText("Barbell-first programming")).toBeTruthy();

@@ -387,7 +387,7 @@ export default function PTClientsPage() {
     <MobileAppShell
       user={user}
       greeting={formatDisplayNameFromUser(user)}
-      title="Client Portal"
+      title="Client Roster"
       subtitle="Invite, organize, and launch PT client workspaces through the existing protected roster and invitation routes."
       searchLabel="Search roster clients"
       searchPlaceholder="Search clients or categories"
@@ -445,10 +445,44 @@ export default function PTClientsPage() {
         <>
           <MobileSection
             eyebrow="Invitations"
-            title="Client Roster"
+            title="Roster control"
             description="Keep the invite workflow and roster categories intact while moving the PT client portal into the mobile shell."
             action={<ActionPill href="/pt/settings" tone="purple">Settings</ActionPill>}
           >
+            <MobileCard as="article" variant="action" className="mobile-pt-hero-card">
+              <div className="mobile-pt-hero-masthead">
+                <div className="mobile-section__copy">
+                  <p className="mobile-section__eyebrow">Protected PT roster</p>
+                  <h2 className="mobile-section__title">Organize client work without leaving the shell</h2>
+                  <p className="mobile-section__description">
+                    Invites, category changes, and client launches still run through the existing PT BFF routes. This phase only changes the visual presentation and pacing.
+                  </p>
+                </div>
+                <div className="mobile-pt-actions">
+                  <ActionPill href="/pt">PT home</ActionPill>
+                  <ActionPill href="/pt/training" tone="purple">Training hub</ActionPill>
+                </div>
+              </div>
+
+              <div className="mobile-pt-signal-grid mobile-pt-signal-grid--compact">
+                <div className="mobile-pt-signal-card">
+                  <p className="mobile-section__eyebrow">Linked clients</p>
+                  <h3 className="mobile-section__title">{allClients.length}</h3>
+                  <p className="mobile-section__description">Visible across the current protected roster response.</p>
+                </div>
+                <div className="mobile-pt-signal-card">
+                  <p className="mobile-section__eyebrow">Categories</p>
+                  <h3 className="mobile-section__title">{categories.length + 1}</h3>
+                  <p className="mobile-section__description">Includes the uncategorized all-clients view.</p>
+                </div>
+                <div className="mobile-pt-signal-card">
+                  <p className="mobile-section__eyebrow">Current lens</p>
+                  <h3 className="mobile-section__title">{selectedFolderName}</h3>
+                  <p className="mobile-section__description">Local search and folder filters never call new endpoints.</p>
+                </div>
+              </div>
+            </MobileCard>
+
             {showInviteForm ? (
               <MobileCard as="div" variant="action" className="mobile-pt-form-card">
                 <form className="mobile-pt-form-grid" onSubmit={handleInviteClient}>
@@ -588,7 +622,7 @@ export default function PTClientsPage() {
 
           <MobileSection
             eyebrow="Client cards"
-            title="Roster clients"
+            title="Roster lineup"
             description="Local search filters the already-fetched roster list only. Client actions continue to point at the existing PT detail, metrics, assignment, recommendation, and log-history routes."
           >
             {filteredClients.length > 0 ? (
@@ -613,6 +647,11 @@ export default function PTClientsPage() {
                       <dd>{client.status}</dd>
                     </div>
                   </dl>
+
+                  <div className="mobile-pt-filter-summary">
+                    <span>{client.roster_name ?? "Uncategorized"}</span>
+                    <span>{client.status}</span>
+                  </div>
 
                   <div className="field">
                     <label htmlFor={`roster-category-${client.client_user_id}`}>Roster category</label>

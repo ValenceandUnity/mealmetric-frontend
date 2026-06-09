@@ -149,11 +149,12 @@ describe("PTMetricsPage mobile experience", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/dashboard", { cache: "no-store" });
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/clients", { cache: "no-store" });
-    expect(screen.getByRole("link", { name: "PT home" }).getAttribute("href")).toBe("/pt");
-    expect(screen.getByRole("link", { name: "Open clients" }).getAttribute("href")).toBe("/pt/clients");
+    expect(screen.getAllByRole("link", { name: "PT home" })[0]?.getAttribute("href")).toBe("/pt");
+    expect(screen.getAllByRole("link", { name: "Open clients" })[0]?.getAttribute("href")).toBe("/pt/clients");
     expect(screen.getByText("Linked clients")).toBeTruthy();
     expect(screen.getAllByText("Active clients").length).toBeGreaterThan(0);
     expect(screen.getByText("Comparison readiness")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Client comparison cards" })).toBeTruthy();
     expect(screen.getByText("Sam")).toBeTruthy();
     expect(screen.getByText("MVPs")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Client metrics" }).getAttribute("href")).toBe("/pt/clients/client-1/metrics");

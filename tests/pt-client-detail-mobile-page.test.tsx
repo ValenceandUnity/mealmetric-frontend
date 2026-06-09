@@ -183,10 +183,10 @@ describe("PTClientDetailPage mobile experience", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/clients/client-1/metrics", { cache: "no-store" });
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/clients/client-1/workout-logs", { cache: "no-store" });
     expect(screen.getAllByText("sam.client@example.com").length).toBeGreaterThan(0);
-    expect(screen.getByRole("heading", { name: "Client summary" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "PT client action cards" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Assignment summary" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Metrics snapshot" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Client profile" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Route launch cards" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Assignment deck" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Nutrition snapshot" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Workout log preview" })).toBeTruthy();
     expect(screen.getAllByText("Strength Block").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Upper Day").length).toBeGreaterThan(0);

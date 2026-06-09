@@ -119,15 +119,17 @@ describe("PTDashboardPage mobile experience", () => {
     render(React.createElement(PTDashboardPage));
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "PT Command" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "PT Studio" })).toBeTruthy();
     });
 
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/dashboard", { cache: "no-store" });
-    expect(screen.getByRole("link", { name: "Open clients" }).getAttribute("href")).toBe("/pt/clients");
+    expect(screen.getAllByRole("link", { name: "Open clients" })[0]?.getAttribute("href")).toBe("/pt/clients");
     expect(screen.getByText("Linked clients")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Today at a glance" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Roster momentum" })).toBeTruthy();
     expect(screen.getAllByText("Hi, Sam").length).toBeGreaterThan(0);
     expect(screen.getByText("sam.client@example.com")).toBeTruthy();
-    expect(screen.getByText("Link notes: Strength block focus")).toBeTruthy();
+    expect(screen.getByText("Strength block focus")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Meal plans" }).getAttribute("href")).toBe(
       "/pt/clients/client-1/recommend-meal-plan",
     );

@@ -262,15 +262,33 @@ export default function PTMetricsPage() {
             action={<ActionPill href="/pt/clients" tone="purple">Client portal</ActionPill>}
           >
             {view.hasClients ? (
-              view.summaryCards.map((item) => (
-                <MobileStatCard
-                  key={item.label}
-                  label={item.label}
-                  value={item.value}
-                  progressText={item.progressText}
-                  icon={getMetricsIcon(item.label)}
-                />
-              ))
+              <MobileCard as="article" variant="action" className="mobile-pt-hero-card">
+                <div className="mobile-pt-hero-masthead">
+                  <div className="mobile-section__copy">
+                    <p className="mobile-section__eyebrow">Protected PT reporting</p>
+                    <h2 className="mobile-section__title">Snapshot coverage for the active roster</h2>
+                    <p className="mobile-section__description">
+                      This screen compares only the data already returned by the PT dashboard and linked-client roster routes. No browser-side analytics layer is introduced here.
+                    </p>
+                  </div>
+                  <div className="mobile-pt-actions">
+                    <ActionPill href="/pt">PT home</ActionPill>
+                    <ActionPill href="/pt/clients" tone="purple">Open clients</ActionPill>
+                  </div>
+                </div>
+
+                <div className="mobile-pt-signal-grid">
+                  {view.summaryCards.map((item) => (
+                    <MobileStatCard
+                      key={item.label}
+                      label={item.label}
+                      value={item.value}
+                      progressText={item.progressText}
+                      icon={getMetricsIcon(item.label)}
+                    />
+                  ))}
+                </div>
+              </MobileCard>
             ) : (
               <MetricsStateCard
                 title={view.emptyState?.title ?? "PT metrics unavailable"}
@@ -337,7 +355,7 @@ export default function PTMetricsPage() {
 
           <MobileSection
             eyebrow="Client progress"
-            title="Linked client comparison cards"
+            title="Client comparison cards"
             description="Open the existing linked-client metrics pages from here when a deeper progress review is needed."
           >
             {view.comparisonCards.length > 0 ? (
