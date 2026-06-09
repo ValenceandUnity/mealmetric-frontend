@@ -14,6 +14,7 @@ type MobileTopHubProps = {
   avatarLabel?: string;
   notificationSlot?: ReactNode;
   actionSlot?: ReactNode;
+  statusStrip?: ReactNode;
 };
 
 export function MobileTopHub({
@@ -29,6 +30,7 @@ export function MobileTopHub({
   avatarLabel,
   notificationSlot,
   actionSlot,
+  statusStrip,
 }: MobileTopHubProps) {
   const searchId = useId();
 
@@ -40,24 +42,31 @@ export function MobileTopHub({
 
   return (
     <header className={["mobile-top-hub", className ?? ""].filter(Boolean).join(" ")}>
-      <div className="mobile-top-hub__header">
-        <div className="mobile-top-hub__copy">
-          {greeting ? <p className="mobile-top-hub__greeting">{greeting}</p> : null}
-          <h1 className="mobile-top-hub__title">{title}</h1>
-          {subtitle ? <p className="mobile-top-hub__subtitle">{subtitle}</p> : null}
+      <div className="mobile-top-hub__hero">
+        <div className="mobile-top-hub__hero-media" aria-hidden="true">
+          <div className="mobile-top-hub__hero-image" />
+          <div className="mobile-top-hub__hero-grid" />
         </div>
-        <div className="mobile-top-hub__utility">
-          {notificationSlot}
-          {avatarInitials ? (
-            <span
-              className="mobile-top-hub__avatar"
-              role="img"
-              aria-label={avatarLabel ?? `${avatarInitials} avatar`}
-            >
-              {avatarInitials}
-            </span>
-          ) : null}
+        <div className="mobile-top-hub__header">
+          <div className="mobile-top-hub__copy">
+            {greeting ? <p className="mobile-top-hub__greeting">{greeting}</p> : null}
+            <h1 className="mobile-top-hub__title">{title}</h1>
+            {subtitle ? <p className="mobile-top-hub__subtitle">{subtitle}</p> : null}
+          </div>
+          <div className="mobile-top-hub__utility">
+            {notificationSlot}
+            {avatarInitials ? (
+              <span
+                className="mobile-top-hub__avatar"
+                role="img"
+                aria-label={avatarLabel ?? `${avatarInitials} avatar`}
+              >
+                {avatarInitials}
+              </span>
+            ) : null}
+          </div>
         </div>
+        {statusStrip ? <div className="mobile-top-hub__status-strip">{statusStrip}</div> : null}
       </div>
       {searchPlaceholder ? (
         <div className="mobile-top-hub__search-field">
