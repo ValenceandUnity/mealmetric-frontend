@@ -2038,6 +2038,195 @@ html[data-theme="light"] .mobile-training-form textarea {
   color: #f8f6ff;
 }
 
+.client-training-parity-shell .mobile-shell__viewport {
+  gap: 1rem;
+}
+
+.client-training-parity-section,
+.client-training-detail-hero,
+.client-training-detail-section,
+.client-add-log-parity-hero,
+.client-add-log-parity-section,
+.client-training-parity-featured,
+.client-training-detail-routine-card,
+.client-training-detail-log-card__intro,
+.client-add-log-parity-context {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.client-training-parity-section--journal,
+.client-training-detail-hero,
+.client-add-log-parity-hero {
+  background:
+    linear-gradient(180deg, rgba(111, 59, 226, 0.18), rgba(18, 20, 31, 0.76)),
+    rgba(10, 12, 22, 0.92);
+}
+
+.client-training-parity-section--checklist,
+.client-training-detail-section,
+.client-add-log-parity-section {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(13, 14, 23, 0.76)),
+    rgba(10, 12, 22, 0.88);
+}
+
+.client-training-parity-strip {
+  gap: 0;
+}
+
+.client-training-parity-featured {
+  padding: 1rem;
+  border-radius: 1.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    linear-gradient(135deg, rgba(45, 45, 52, 0.9), rgba(12, 13, 20, 0.98));
+}
+
+.client-training-parity-featured__copy,
+.client-training-detail-routine-card__copy {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.client-training-parity-featured__eyebrow,
+.client-training-parity-featured__title,
+.client-training-parity-featured__subtitle,
+.client-training-detail-routine-card__eyebrow,
+.client-training-detail-routine-card__title,
+.client-training-detail-routine-card__subtitle {
+  margin: 0;
+}
+
+.client-training-parity-featured__eyebrow,
+.client-training-detail-routine-card__eyebrow {
+  color: rgba(240, 233, 255, 0.72);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.client-training-parity-featured__title,
+.client-training-detail-routine-card__title {
+  color: var(--mobile-text);
+  font-size: 1.08rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.client-training-parity-featured__subtitle,
+.client-training-detail-routine-card__subtitle {
+  color: var(--mobile-text-muted);
+  line-height: 1.45;
+}
+
+.client-training-parity-card {
+  min-height: 16rem;
+}
+
+.client-training-parity-card__visual {
+  position: relative;
+  min-height: 8.2rem;
+}
+
+.client-training-parity-card__visual::before,
+.client-training-detail-hero__visual::before,
+.client-training-detail-routine-card::before,
+.client-add-log-parity-hero__visual::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(180deg, rgba(6, 7, 14, 0.08), rgba(6, 7, 14, 0.62)),
+    radial-gradient(circle at 78% 20%, rgba(255, 255, 255, 0.16), transparent 16%),
+    radial-gradient(circle at 22% 34%, rgba(255, 255, 255, 0.12), transparent 14%),
+    linear-gradient(122deg, rgba(168, 168, 168, 0.28), rgba(73, 73, 73, 0.2)),
+    linear-gradient(180deg, rgba(78, 78, 78, 0.92), rgba(17, 17, 17, 0.98));
+  filter: grayscale(1) contrast(1.08);
+}
+
+.client-training-parity-card__footer,
+.client-training-detail-hero__overlay,
+.client-add-log-parity-hero__copy {
+  position: absolute;
+  inset: auto 0.8rem 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  z-index: 1;
+}
+
+.client-training-parity-card__caption {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.client-training-detail-hero__visual,
+.client-add-log-parity-hero__visual {
+  position: relative;
+  min-height: 8.6rem;
+  border-radius: 1.4rem;
+  overflow: hidden;
+}
+
+.client-training-detail-hero__visual {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    linear-gradient(135deg, rgba(53, 50, 64, 0.9), rgba(12, 13, 21, 0.98));
+}
+
+.client-training-detail-routine-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 7.4rem;
+  padding: 0.95rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+    linear-gradient(135deg, rgba(44, 44, 52, 0.88), rgba(12, 13, 20, 0.98));
+}
+
+.client-training-detail-routine-card__copy {
+  position: relative;
+  z-index: 1;
+  max-width: 12rem;
+}
+
+.client-training-detail-exercise-card {
+  border-color: rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(18, 20, 30, 0.82)),
+    rgba(11, 13, 23, 0.86);
+}
+
+.client-training-detail-log-card__intro,
+.client-add-log-parity-context {
+  padding: 0.9rem 0.95rem;
+  border-radius: 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+    rgba(13, 15, 24, 0.8);
+}
+
+.client-add-log-parity-card {
+  gap: 1rem;
+}
+
+.client-add-log-parity-row {
+  border-color: rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(14, 16, 26, 0.78)),
+    rgba(10, 12, 20, 0.84);
+}
+
 .mobile-pt-actions,
 .mobile-pt-client-card__header {
   display: flex;

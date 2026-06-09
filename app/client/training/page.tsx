@@ -169,9 +169,11 @@ export default function ClientTrainingHubPage() {
   );
   const showLoadingState = loading && !trainingData && !errorMessage;
   const showFilteredEmptyState = query.length > 0;
+  const featuredAssignment = filteredAssignments[0] ?? null;
 
   return (
     <MobileAppShell
+      className="client-training-parity-shell"
       user={user}
       greeting={formatDisplayNameFromUser(user)}
       title="Training Journal"
@@ -187,6 +189,20 @@ export default function ClientTrainingHubPage() {
       notificationSlot={<ActionPill href="/client/training/history" tone="purple">History</ActionPill>}
       topHubAction={<ActionPill href="/client/add-log">Log your reps</ActionPill>}
       activePath="/client/training"
+      statusStrip={(
+        <>
+          <span className="mobile-pill mobile-pill--purple">
+            {filteredAssignments.length > 0
+              ? `${filteredAssignments.length} routine${filteredAssignments.length === 1 ? "" : "s"}`
+              : "Workout journal"}
+          </span>
+          <span className="mobile-pill">
+            {filteredChecklist.length > 0
+              ? `${filteredChecklist.length} checklist row${filteredChecklist.length === 1 ? "" : "s"}`
+              : "Checklist preview"}
+          </span>
+        </>
+      )}
     >
       {errorMessage ? (
         <MobileSection
@@ -204,6 +220,7 @@ export default function ClientTrainingHubPage() {
 
       {showLoadingState ? (
         <MobileSection
+          className="client-training-parity-section client-training-parity-section--state"
           eyebrow="Syncing"
           title="Loading your workout journal"
           description="Fetching assigned training through the current protected client training route."
@@ -216,15 +233,39 @@ export default function ClientTrainingHubPage() {
       ) : (
         <>
           <MobileSection
+            className="client-training-parity-section client-training-parity-section--journal"
             eyebrow="Workout journal"
-            title="Assigned training"
-            description="Open a package to review routines, checklist detail, and rep logging without changing the backend contract."
+            title="Workout Journal"
+            description="Image-forward routine cards preserve the existing assignment detail and add-log paths while moving closer to the PDF workout flow."
             action={<ActionPill href="/client/training/history" tone="purple">Open history</ActionPill>}
+            contentClassName="client-training-parity-strip"
             scroll
           >
+            {featuredAssignment ? (
+              <div className="client-training-parity-featured">
+                <div className="client-training-parity-featured__copy">
+                  <p className="client-training-parity-featured__eyebrow">Featured routine</p>
+                  <h3 className="client-training-parity-featured__title">{featuredAssignment.title}</h3>
+                  <p className="client-training-parity-featured__subtitle">
+                    {buildAssignmentSubtitle({
+                      subtitle: featuredAssignment.subtitle,
+                      progressLabel: featuredAssignment.progressLabel,
+                      scheduleLabel: featuredAssignment.scheduleLabel,
+                    })}
+                  </p>
+                </div>
+                <div className="mobile-training-pill-row">
+                  {featuredAssignment.statusLabel ? (
+                    <span className="mobile-pill mobile-pill--purple">{featuredAssignment.statusLabel}</span>
+                  ) : null}
+                  <span className="mobile-pill">{featuredAssignment.routineCountLabel}</span>
+                </div>
+              </div>
+            ) : null}
             {filteredAssignments.length > 0 ? (
               filteredAssignments.map((assignment, index) => (
                 <MobileRoutineCard
+                  className="client-training-parity-card"
                   key={assignment.id ?? `${assignment.title}-${index}`}
                   title={assignment.title}
                   subtitle={buildAssignmentSubtitle({
@@ -236,13 +277,16 @@ export default function ClientTrainingHubPage() {
                   category={assignment.coachLabel ?? assignment.statusLabel ?? "Training package"}
                   gradient={assignment.gradient}
                   media={(
-                    <div className="mobile-routine-card__visual mobile-training-card-media">
+                    <div className="mobile-routine-card__visual mobile-training-card-media client-training-parity-card__visual">
                       <div className="mobile-training-pill-row">
                         {assignment.statusLabel ? (
                           <span className="mobile-pill mobile-pill--purple">{assignment.statusLabel}</span>
                         ) : null}
                         <span className="mobile-pill mobile-pill--yellow">{assignment.checklistLabel}</span>
                         <span className="mobile-pill">{assignment.routineCountLabel}</span>
+                      </div>
+                      <div className="client-training-parity-card__footer">
+                        <span className="client-training-parity-card__caption">Log your reps</span>
                       </div>
                     </div>
                   )}
@@ -269,9 +313,10 @@ export default function ClientTrainingHubPage() {
           </MobileSection>
 
           <MobileSection
+            className="client-training-parity-section client-training-parity-section--checklist"
             eyebrow="Checklist"
-            title="Workout checklist for the week"
-            description="Checklist rows come only from the assignment data already returned here. When checklist items are missing, the page points you to the routine instead of inventing them."
+            title="Workout Checklist For the Week"
+            description="Checklist rows come only from the assignment data already returned here. If detail is missing, the route stays explicit instead of inventing exercise state."
             action={<ActionPill href="/client/add-log">Quick log</ActionPill>}
           >
             {filteredChecklist.length > 0 ? (

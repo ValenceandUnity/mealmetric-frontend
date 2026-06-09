@@ -593,6 +593,7 @@ function AddLogPageContent() {
 
   return (
     <MobileAppShell
+      className="client-training-parity-shell client-training-parity-shell--add-log"
       user={user}
       greeting={formatDisplayNameFromUser(user)}
       title="Log Workout"
@@ -611,6 +612,12 @@ function AddLogPageContent() {
         ) : undefined
       }
       activePath="/client/add-log"
+      statusStrip={(
+        <>
+          <span className="mobile-pill mobile-pill--purple">{formatWorkoutType(getWorkoutModePayload(contextMode))}</span>
+          <span className="mobile-pill">{historyStatusLabel}</span>
+        </>
+      )}
     >
       {submitError ? (
         <FeedbackBanner
@@ -628,11 +635,18 @@ function AddLogPageContent() {
       ) : null}
 
       <MobileSection
+        className="client-add-log-parity-hero"
         eyebrow="Workout log"
-        title="Live add-log surface"
+        title="Log Your Reps"
         description="This page keeps the existing client workout-log mutation, form fields, and recent-history preview on the protected frontend BFF."
         variant="accent"
       >
+        <div className="client-add-log-parity-hero__visual" aria-hidden="true">
+          <div className="client-add-log-parity-hero__copy">
+            <span className="mobile-pill mobile-pill--yellow">Save Log Entry</span>
+            {hasPrefilledRoutine ? <span className="mobile-pill">{initialRoutineLabel || routineName}</span> : null}
+          </div>
+        </div>
         <div className="mobile-training-meta-grid">
           <MobileStatCard
             label="Mode"
@@ -673,8 +687,9 @@ function AddLogPageContent() {
 
       {showWorkoutForm ? (
         <MobileSection
+          className="client-add-log-parity-section"
           eyebrow="Entry form"
-          title="Log your workout"
+          title="Log Your Reps"
           description={contextCaption}
           action={
             <ActionPillButton
@@ -687,12 +702,26 @@ function AddLogPageContent() {
             </ActionPillButton>
           }
         >
-          <MobileCard as="div" variant="action" className="mobile-training-log-card">
+          <MobileCard as="div" variant="action" className="mobile-training-log-card client-add-log-parity-card">
             <form
               id="client-workout-entry-form"
               className="mobile-training-form"
               onSubmit={handleSubmit}
             >
+              <div className="client-add-log-parity-context">
+                <div className="mobile-section__copy">
+                  <p className="mobile-section__eyebrow">Routine context</p>
+                  <h3 className="mobile-section__title">
+                    {initialRoutineLabel || routineName || "Workout entry"}
+                  </h3>
+                  <p className="mobile-section__description">
+                    Last weight: unavailable
+                  </p>
+                  <p className="mobile-section__description">
+                    Last timing: unavailable
+                  </p>
+                </div>
+              </div>
               <div className="mobile-training-pill-row" role="radiogroup" aria-label="Workout type">
                 {(["rep", "set", "general"] as const).map((mode) => {
                   const active = contextMode === mode;
@@ -760,7 +789,7 @@ function AddLogPageContent() {
                       as="article"
                       variant="soft"
                       padding="compact"
-                      className="mobile-training-exercise-card"
+                      className="mobile-training-exercise-card client-add-log-parity-row"
                     >
                       <div className="mobile-training-checklist-card__header">
                         <div className="mobile-section__copy">
@@ -768,9 +797,7 @@ function AddLogPageContent() {
                           <h3 className="mobile-training-exercise-card__title">
                             {exercise.name.trim() || `Exercise ${index + 1}`}
                           </h3>
-                          <p className="mobile-section__description">
-                            These inputs preserve the current add-log payload mapping.
-                          </p>
+                          <p className="mobile-section__description">Rep-row styling preserves the current add-log payload mapping.</p>
                         </div>
                         <button
                           type="button"
@@ -885,7 +912,7 @@ function AddLogPageContent() {
                   className="mobile-training-button mobile-training-button--primary mobile-focus-ring"
                   disabled={submitting || blockingMessage !== null}
                 >
-                  {submitting ? "Saving..." : "Save Workout"}
+                  {submitting ? "Saving..." : "Save Log Entry"}
                 </button>
               </div>
             </form>

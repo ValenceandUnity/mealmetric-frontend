@@ -371,6 +371,7 @@ export default function AssignmentDetailPage() {
 
   return (
     <MobileAppShell
+      className="client-training-parity-shell client-training-parity-shell--detail"
       user={user}
       greeting={formatDisplayNameFromUser(user)}
       title={detailView.summary.title || "Training assignment"}
@@ -378,6 +379,12 @@ export default function AssignmentDetailPage() {
       notificationSlot={<ActionPill href="/client/training" tone="purple">Training hub</ActionPill>}
       topHubAction={<a href="#log-your-reps" className="mobile-pill mobile-pill--yellow mobile-focus-ring">Log your reps</a>}
       activePath="/client/training"
+      statusStrip={(
+        <>
+          <span className="mobile-pill mobile-pill--purple">{estimatedMinutesLabel}</span>
+          <span className="mobile-pill">{detailView.summary.checklistCount}</span>
+        </>
+      )}
     >
       {detailError ? (
         <MobileSection
@@ -415,12 +422,19 @@ export default function AssignmentDetailPage() {
       ) : (
         <>
           <MobileSection
+            className="client-training-detail-hero"
             eyebrow="Assignment"
             title={detailView.summary.title || "Training assignment"}
             description={detailView.summary.description}
             action={<ActionPill href="/client/training" tone="purple">Back to training</ActionPill>}
             variant="accent"
           >
+            <div className="client-training-detail-hero__visual" aria-hidden="true">
+              <div className="client-training-detail-hero__overlay">
+                <span className="mobile-pill mobile-pill--yellow">Log Your Reps</span>
+                <span className="mobile-pill">{detailView.summary.status ?? "Assignment"}</span>
+              </div>
+            </div>
             <div className="mobile-training-meta-grid">
               <MobileCard as="div" variant="soft" padding="compact" className="mobile-training-meta-card">
                 <p className="mobile-section__eyebrow">Status</p>
@@ -450,8 +464,9 @@ export default function AssignmentDetailPage() {
           </MobileSection>
 
           <MobileSection
+            className="client-training-detail-section client-training-detail-section--checklist"
             eyebrow="Checklist"
-            title="Checklist"
+            title="Workout Checklist For the Week"
             description="Only explicit checklist items from the assignment detail response are shown here."
           >
             {mobileView.checklistItems.length > 0 ? (
@@ -477,6 +492,7 @@ export default function AssignmentDetailPage() {
           </MobileSection>
 
           <MobileSection
+            className="client-training-detail-section client-training-detail-section--routines"
             eyebrow="Routines"
             title="Routine detail"
             description="Expand a routine to view the exercise detail that is already returned by the existing assignment route."
@@ -501,14 +517,22 @@ export default function AssignmentDetailPage() {
                   </summary>
 
                   <div className="mobile-training-accordion__body">
+                    <div className="client-training-detail-routine-card" aria-hidden="true">
+                      <div className="client-training-detail-routine-card__copy">
+                        <p className="client-training-detail-routine-card__eyebrow">Routine focus</p>
+                        <p className="client-training-detail-routine-card__title">{routine.title}</p>
+                        <p className="client-training-detail-routine-card__subtitle">{routine.subtitle}</p>
+                      </div>
+                    </div>
                     {routine.logEntries.length > 0 ? (
                       <div className="mobile-training-exercise-grid">
                         {routine.logEntries.map((entry) => (
-                          <MobileCard key={entry.id} as="article" variant="soft" padding="compact" className="mobile-training-exercise-card">
+                          <MobileCard key={entry.id} as="article" variant="soft" padding="compact" className="mobile-training-exercise-card client-training-detail-exercise-card">
                             <div className="mobile-section__copy">
                               <p className="mobile-section__eyebrow">Exercise detail</p>
                               <h4 className="mobile-training-exercise-card__title">{entry.label}</h4>
-                              <p className="mobile-section__description">Previous: unavailable</p>
+                              <p className="mobile-section__description">Last weight: unavailable</p>
+                              <p className="mobile-section__description">Last timing: unavailable</p>
                             </div>
                             <div className="mobile-training-pill-row">
                               <span className="mobile-pill">{entry.setsLabel}</span>
@@ -543,8 +567,17 @@ export default function AssignmentDetailPage() {
               title="Log your reps"
               description="This form submits only to the existing /api/client/training/workout-logs BFF route."
             >
-              <MobileCard as="div" variant="action" className="mobile-training-log-card">
+              <MobileCard as="div" variant="action" className="mobile-training-log-card client-training-detail-log-card">
                 <form className="mobile-training-form" onSubmit={handleSubmit}>
+                  <div className="client-training-detail-log-card__intro">
+                    <div className="mobile-section__copy">
+                      <p className="mobile-section__eyebrow">Log Your Reps</p>
+                      <h3 className="mobile-section__title">Save a routine entry</h3>
+                      <p className="mobile-section__description">
+                        Last weight and timing stay neutral unless that data is already available in the current assignment payload.
+                      </p>
+                    </div>
+                  </div>
                   <div className="mobile-training-form__grid">
                     <div className="field">
                       <label htmlFor="routineId">Routine</label>
@@ -688,7 +721,7 @@ export default function AssignmentDetailPage() {
                       className="mobile-training-button mobile-training-button--primary mobile-focus-ring"
                       disabled={submitLoading}
                     >
-                      {submitLoading ? "Saving log..." : "Save workout log"}
+                      {submitLoading ? "Saving log entry..." : "Save Log Entry"}
                     </button>
                   </div>
                 </form>
