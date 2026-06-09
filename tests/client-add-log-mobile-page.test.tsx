@@ -1,7 +1,7 @@
 import React from "react";
 import type { ReactNode } from "react";
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -150,6 +150,14 @@ describe("AddLogPage mobile experience", () => {
     expect(screen.getByText("Log Your Entire Routine")).toBeTruthy();
     expect(screen.getByText("Goals and Aspirations")).toBeTruthy();
     expect(screen.getByText("Establish and track your goals and progress")).toBeTruthy();
+    const recentExercisesButton = screen.getByRole("button", { name: "Show recent exercises" });
+    expect(recentExercisesButton).toBeTruthy();
+    fireEvent.click(recentExercisesButton);
+    const recentExercisesDialog = screen.getByRole("dialog", { name: "Recent Exercises" });
+    expect(within(recentExercisesDialog).getByText("Bench Press")).toBeTruthy();
+    expect(within(recentExercisesDialog).getByRole("button", { name: "Close" })).toBeTruthy();
+    fireEvent.click(within(recentExercisesDialog).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name: "Recent Exercises" })).toBeNull();
     expect(screen.getByRole("link", { name: "Full History" }).getAttribute("href")).toBe(
       "/client/add-log/full-log-history",
     );

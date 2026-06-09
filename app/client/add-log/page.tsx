@@ -375,6 +375,7 @@ function AddLogPageContent() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [recentDrawerOpen, setRecentDrawerOpen] = useState(false);
   const [historyData, setHistoryData] = useState<JsonValue | null>(null);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyErrorMessage, setHistoryErrorMessage] = useState<string | null>(null);
@@ -559,6 +560,10 @@ function AddLogPageContent() {
       greeting={formatDisplayNameFromUser(user)}
       title="Log Workout"
       subtitle="Capture a workout quickly"
+      onAvatarClick={() => setRecentDrawerOpen(true)}
+      avatarControls="client-add-log-recent-exercises-drawer"
+      avatarExpanded={recentDrawerOpen}
+      avatarButtonLabel="Show recent exercises"
       notificationSlot={<ActionPillLink href="/client/settings">Settings</ActionPillLink>}
       activePath="/client/add-log"
     >
@@ -576,6 +581,64 @@ function AddLogPageContent() {
           message="The workout was saved through the protected BFF route and confirmed in refreshed log history."
         />
       ) : null}
+      {recentDrawerOpen ? (
+        <section
+          id="client-add-log-recent-exercises-drawer"
+          role="dialog"
+          aria-labelledby="client-add-log-recent-exercises-title"
+          className="client-add-log-recent-drawer"
+        >
+          <div className="client-add-log-recent-drawer__header">
+            <div className="mobile-section__copy">
+              <h2
+                id="client-add-log-recent-exercises-title"
+                className="mobile-section__title"
+              >
+                Recent Exercises
+              </h2>
+              <p className="mobile-section__description">
+                Quick access to your latest logged exercise rows.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="mobile-pill mobile-pill--purple mobile-focus-ring"
+              onClick={() => setRecentDrawerOpen(false)}
+            >
+              Close
+            </button>
+          </div>
+
+          {historyLoading ? (
+            <p className="mobile-section__description">Loading recent exercises...</p>
+          ) : historyErrorMessage ? (
+            <p className="mobile-section__description">Unable to load recent exercises.</p>
+          ) : historyRows.length === 0 ? (
+            <p className="mobile-section__description">No recent exercises yet.</p>
+          ) : (
+            <div className="client-add-log-recent-drawer__list">
+              {historyRows.map((row) => (
+                <article key={row.id} className="client-add-log-recent-drawer__item">
+                  <div className="client-add-log-recent-drawer__summary">
+                    <div className="mobile-section__copy">
+                      <p className="mobile-section__eyebrow">{row.performedAtLabel}</p>
+                      <h3 className="mobile-section__title">{row.exerciseName}</h3>
+                      <p className="mobile-section__description">{row.typeLabel}</p>
+                    </div>
+                    <span className="mobile-pill mobile-pill--yellow">{row.typeLabel}</span>
+                  </div>
+                  <div className="mobile-training-pill-row" aria-label={`${row.exerciseName} recent summary`}>
+                    <span className="mobile-pill">Sets {row.sets}</span>
+                    <span className="mobile-pill">Reps {row.reps}</span>
+                    <span className="mobile-pill">Weight {row.weight}</span>
+                    <span className="mobile-pill">Time {row.duration}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
 
       <MobileSection
         className="client-add-log-parity-hero"
@@ -584,25 +647,28 @@ function AddLogPageContent() {
       >
         <div className="mobile-training-meta-grid">
           <MobileStatCard
+            className="client-add-log-option-card"
             label="Rep"
             value="Log A Rep"
             progressText="Log Singular Reps here"
           />
           <MobileStatCard
+            className="client-add-log-option-card"
             label="Set"
             value="Log A Set"
             progressText="Log multiple Reps"
           />
           <MobileStatCard
+            className="client-add-log-option-card"
             label="General Workout"
             value="Log a General Workout"
             progressText="Log Your Entire Routine"
           />
           <MobileStatCard
+            className="client-add-log-option-card client-add-log-goals-card"
             label="Goals"
             value="Goals and Aspirations"
             progressText="Establish and track your goals and progress"
-            className="client-add-log-goals-card"
           />
         </div>
       </MobileSection>

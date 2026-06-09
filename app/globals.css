@@ -2353,7 +2353,89 @@ html[data-theme="light"] .mobile-training-form textarea {
 }
 
 .client-training-parity-shell--add-log .mobile-top-hub__hero {
-  min-height: 9.5rem;
+  min-height: 8.9rem;
+}
+
+.client-training-parity-shell--add-log .mobile-top-hub__avatar[type="button"] {
+  padding: 0;
+  min-height: 3rem;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.client-training-parity-shell--add-log .client-add-log-option-card {
+  height: 10.25rem;
+  min-height: 10.25rem;
+  display: grid;
+  align-content: space-between;
+}
+
+.client-training-parity-shell--add-log .client-add-log-option-card .mobile-stat-card__value {
+  font-size: clamp(1.35rem, 5.2vw, 1.65rem);
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.client-training-parity-shell--add-log .client-add-log-option-card .mobile-stat-card__progress-text {
+  font-size: 0.82rem;
+  line-height: 1.28;
+}
+
+.client-training-parity-shell--add-log .client-add-log-recent-drawer {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 1rem);
+  right: max(0.8rem, calc((100vw - min(100vw, var(--page-width))) / 2 + 0.8rem));
+  z-index: 50;
+  width: min(75vw, 20rem);
+  max-height: calc(100dvh - var(--mobile-bottom-nav-height) - 2rem);
+  overflow: auto;
+  padding: 1rem;
+  border-radius: 1.4rem 0 0 1.4rem;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  background:
+    radial-gradient(circle at top right, rgba(125, 211, 252, 0.2), transparent 32%),
+    linear-gradient(160deg, rgba(13, 18, 35, 0.98), rgba(8, 10, 22, 0.98));
+  box-shadow: -18px 22px 44px rgba(2, 6, 18, 0.42);
+  animation: client-add-log-drawer-in 180ms ease-out;
+}
+
+@keyframes client-add-log-drawer-in {
+  from {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.client-training-parity-shell--add-log .client-add-log-recent-drawer__header,
+.client-training-parity-shell--add-log .client-add-log-recent-drawer__summary {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.client-training-parity-shell--add-log .client-add-log-recent-drawer__header {
+  margin-bottom: 0.95rem;
+}
+
+.client-training-parity-shell--add-log .client-add-log-recent-drawer__list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.client-training-parity-shell--add-log .client-add-log-recent-drawer__item {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(14, 16, 26, 0.78)),
+    rgba(10, 12, 20, 0.84);
 }
 
 .client-training-parity-shell--add-log .client-add-log-goals-card {
