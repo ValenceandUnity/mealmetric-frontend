@@ -1,0 +1,18 @@
+# Mobile UI Visual Polish Phase 12B
+
+## Phase 12B.1 - Client add-log header polish
+
+- Route: `/client/add-log`
+- Changes:
+  - Removed header-only action and status pills: `New Entry`, workout mode, and preview count.
+  - Replaced the header `History` pill with a `Settings` link to `/client/settings`.
+  - Updated the header caption to `Capture a workout quickly`.
+  - Compacted the add-log top pane with route-scoped styling under `.client-training-parity-shell--add-log`.
+- Preserved:
+  - Existing workout-log BFF fetch and mutation routes.
+  - Existing workout-log payload shape.
+  - Inline and full workout history links.
+  - Existing `/client/settings` route behavior.
+- Scope:
+  - Frontend visual, copy, test, and documentation only.
+  - No backend, `app/api`, auth/session, dependency, or lockfile changes.
