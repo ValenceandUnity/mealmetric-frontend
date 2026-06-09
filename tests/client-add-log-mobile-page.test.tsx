@@ -132,14 +132,18 @@ describe("AddLogPage mobile experience", () => {
         cache: "no-store",
       }),
     );
-    expect(screen.getByRole("link", { name: "History" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe(
+      "/client/settings",
+    );
+    expect(screen.getByText("Capture a workout quickly")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Full History" }).getAttribute("href")).toBe(
       "/client/add-log/full-log-history",
     );
     expect(
       screen.getByRole("link", { name: "View Full Log History" }).getAttribute("href"),
     ).toBe("/client/add-log/full-log-history");
     expect(screen.getByText("Bench Press")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "New Entry" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "New Entry" })).toBeNull();
   });
 
   it("preserves client session bootstrap gating before any BFF fetch", () => {
@@ -172,12 +176,6 @@ describe("AddLogPage mobile experience", () => {
     });
 
     render(React.createElement(AddLogPage));
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "New Entry" })).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "New Entry" }));
 
     await waitFor(() => {
       expect(screen.getByLabelText("Performed at")).toBeTruthy();
@@ -231,12 +229,6 @@ describe("AddLogPage mobile experience", () => {
     });
 
     render(React.createElement(AddLogPage));
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "New Entry" })).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "New Entry" }));
 
     await waitFor(() => {
       expect(screen.getByLabelText("Exercise name")).toBeTruthy();
@@ -307,7 +299,8 @@ describe("AddLogPage mobile experience", () => {
     });
 
     expect(scrollIntoViewMock).toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "New Entry" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
+    expect((screen.getByLabelText("Exercise name") as HTMLInputElement).value).toBe("");
   });
 
   it("preserves server error feedback without introducing a different mutation path", async () => {
@@ -333,12 +326,6 @@ describe("AddLogPage mobile experience", () => {
     });
 
     render(React.createElement(AddLogPage));
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "New Entry" })).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "New Entry" }));
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
