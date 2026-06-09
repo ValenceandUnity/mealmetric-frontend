@@ -194,7 +194,7 @@ describe("AddLogPage mobile experience", () => {
     expect(screen.getByLabelText("Weight")).toBeTruthy();
     expect(screen.getByLabelText("Time (minutes)")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Add Exercise" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Save Workout" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
   });
 
   it("submits the exact existing workout-log payload shape and preserves success confirmation", async () => {
@@ -257,7 +257,7 @@ describe("AddLogPage mobile experience", () => {
     fireEvent.change(screen.getByLabelText("Time (minutes)"), {
       target: { value: "1.5" },
     });
-    const saveButton = screen.getByRole("button", { name: "Save Workout" }) as HTMLButtonElement;
+    const saveButton = screen.getByRole("button", { name: "Save Log Entry" }) as HTMLButtonElement;
     expect(saveButton.disabled).toBe(false);
     fireEvent.submit(document.getElementById("client-workout-entry-form") as HTMLFormElement);
 
@@ -341,10 +341,10 @@ describe("AddLogPage mobile experience", () => {
     fireEvent.click(screen.getByRole("button", { name: "New Entry" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Save Workout" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Save Workout" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Log Entry" }));
 
     await waitFor(() => {
       expect(screen.getByText("Unable to submit workout log.")).toBeTruthy();

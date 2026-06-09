@@ -119,7 +119,7 @@ describe("AssignmentDetailPage mobile experience", () => {
     expect(screen.getByText("Warm up")).toBeTruthy();
     expect(screen.getByText("Back Squat")).toBeTruthy();
     expect(screen.getByLabelText("Routine")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Save workout log" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
   });
 
   it("submits the log-your-reps form through the existing workout-log BFF route", async () => {
@@ -180,7 +180,7 @@ describe("AssignmentDetailPage mobile experience", () => {
     fireEvent.change(screen.getByLabelText("Reps"), {
       target: { value: "8" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save workout log" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Log Entry" }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
