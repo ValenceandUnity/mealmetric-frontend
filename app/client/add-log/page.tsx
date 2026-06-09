@@ -551,11 +551,6 @@ function AddLogPageContent() {
   const addEntryLabel = contextMode === "set" ? "Add Rep" : "Add Exercise";
   const contextCaption =
     "For one offs, select Rep. For logging consecutive Reps, select Set. For logging an entire routine with multiple sets, select General Workout";
-  const historyStatusLabel = historyLoading
-    ? "Syncing"
-    : historyErrorMessage
-      ? "Unavailable"
-      : `${historyRows.length} preview`;
 
   return (
     <MobileAppShell
@@ -584,47 +579,30 @@ function AddLogPageContent() {
 
       <MobileSection
         className="client-add-log-parity-hero"
-        eyebrow="Workout log"
         title="Log Your Reps"
-        description="This page keeps the existing client workout-log mutation, form fields, and recent-history preview on the protected frontend BFF."
         variant="accent"
       >
-        <div className="client-add-log-parity-hero__visual" aria-hidden="true">
-          <div className="client-add-log-parity-hero__copy">
-            <span className="mobile-pill mobile-pill--yellow">Save Log Entry</span>
-            {hasPrefilledRoutine ? <span className="mobile-pill">{initialRoutineLabel || routineName}</span> : null}
-          </div>
-        </div>
         <div className="mobile-training-meta-grid">
           <MobileStatCard
-            label="Mode"
-            value={formatWorkoutType(getWorkoutModePayload(contextMode))}
-            progressText={
-              hasPrefilledRoutine
-                ? "Rep context came from existing navigation."
-                : "Choose Rep, Set, or General Workout."
-            }
+            label="Rep"
+            value="Log A Rep"
+            progressText="Log Singular Reps here"
           />
           <MobileStatCard
-            label="Entry Rows"
-            value={exercises.length}
-            progressText={`${addEntryLabel} keeps the current workout-log payload mapping.`}
+            label="Set"
+            value="Log A Set"
+            progressText="Log multiple Reps"
           />
           <MobileStatCard
-            label="History"
-            value={historyStatusLabel}
-            progressText={
-              historyErrorMessage
-                ? "History fetch failed."
-                : historyPage.hasMore
-                  ? "More saved rows are available."
-                  : "Latest preview is in sync."
-            }
+            label="General Workout"
+            value="Log a General Workout"
+            progressText="Log Your Entire Routine"
           />
           <MobileStatCard
-            label="Form"
-            value="Ready"
-            progressText="Current inputs stay visible on this route and map to the existing workout-log payload."
+            label="Goals"
+            value="Goals and Aspirations"
+            progressText="Establish and track your goals and progress"
+            className="client-add-log-goals-card"
           />
         </div>
       </MobileSection>

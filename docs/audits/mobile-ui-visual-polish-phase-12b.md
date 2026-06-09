@@ -16,3 +16,18 @@
 - Scope:
   - Frontend visual, copy, test, and documentation only.
   - No backend, `app/api`, auth/session, dependency, or lockfile changes.
+
+## Phase 12B.2 - Client add-log Log Your Reps section polish
+
+- Route: `/client/add-log`
+- Scope:
+  - Removed the `Log Your Reps` eyebrow and BFF description copy.
+  - Removed the decorative visual box above the four stat cards.
+  - Replaced the four stat-card labels, values, and supporting copy with user-facing rep, set, general workout, and goals language.
+  - Styled the `Goals and Aspirations` card with a route-scoped cool blue treatment.
+- Preserved:
+  - Existing workout-log BFF fetch and mutation routes.
+  - Existing workout-log payload shape.
+  - Existing form mode controls.
+  - Existing history links and history section.
+  - No backend, `app/api`, auth/session, or dependency changes.

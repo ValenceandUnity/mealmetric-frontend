@@ -136,6 +136,20 @@ describe("AddLogPage mobile experience", () => {
       "/client/settings",
     );
     expect(screen.getByText("Capture a workout quickly")).toBeTruthy();
+    expect(
+      screen.queryByText(
+        "This page keeps the existing client workout-log mutation, form fields, and recent-history preview on the protected frontend BFF.",
+      ),
+    ).toBeNull();
+    expect(screen.queryByText("Workout log")).toBeNull();
+    expect(screen.getByText("Log A Rep")).toBeTruthy();
+    expect(screen.getByText("Log Singular Reps here")).toBeTruthy();
+    expect(screen.getByText("Log A Set")).toBeTruthy();
+    expect(screen.getByText("Log multiple Reps")).toBeTruthy();
+    expect(screen.getByText("Log a General Workout")).toBeTruthy();
+    expect(screen.getByText("Log Your Entire Routine")).toBeTruthy();
+    expect(screen.getByText("Goals and Aspirations")).toBeTruthy();
+    expect(screen.getByText("Establish and track your goals and progress")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Full History" }).getAttribute("href")).toBe(
       "/client/add-log/full-log-history",
     );
@@ -193,6 +207,7 @@ describe("AddLogPage mobile experience", () => {
     expect(screen.getByLabelText("Time (minutes)")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Add Exercise" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
+    expect(screen.queryByText("Workout log")).toBeNull();
   });
 
   it("submits the exact existing workout-log payload shape and preserves success confirmation", async () => {
