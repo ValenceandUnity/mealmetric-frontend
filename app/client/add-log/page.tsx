@@ -52,6 +52,21 @@ type WorkoutHistoryTableRow = {
   duration: string;
   notes: string;
 };
+type GoalTemplateTheme = "emerald" | "lime" | "amber" | "orange" | "rose" | "coral";
+type GoalTemplateCard = {
+  id: string;
+  label: string;
+  value: string;
+  progressText: string;
+  theme: GoalTemplateTheme;
+  createdAt: string;
+};
+type GoalTemplateFormState = {
+  label: string;
+  value: string;
+  progressText: string;
+  theme: GoalTemplateTheme;
+};
 
 type ActionPillLinkProps = {
   href: string;
@@ -63,6 +78,31 @@ type StateCardProps = {
   title: string;
   message: string;
   action?: ReactNode;
+};
+
+const GOAL_TEMPLATE_STORAGE_KEY = "mealmetric:add-log:goal-templates";
+const GOAL_TEMPLATE_PAGE_SIZE = 4;
+const GOAL_TEMPLATE_THEMES: GoalTemplateTheme[] = [
+  "emerald",
+  "lime",
+  "amber",
+  "orange",
+  "rose",
+  "coral",
+];
+const GOAL_TEMPLATE_THEME_LABELS: Record<GoalTemplateTheme, string> = {
+  emerald: "Emerald",
+  lime: "Lime",
+  amber: "Amber",
+  orange: "Orange",
+  rose: "Rose",
+  coral: "Coral",
+};
+const DEFAULT_GOAL_TEMPLATE_FORM: GoalTemplateFormState = {
+  label: "",
+  value: "",
+  progressText: "",
+  theme: "emerald",
 };
 
 function ActionPillLink({
@@ -139,6 +179,81 @@ function normalizeOptionalInteger(value: string): number | undefined {
 
 function isBlank(value: string): boolean {
   return value.trim().length === 0;
+}
+
+function isGoalTemplateTheme(value: unknown): value is GoalTemplateTheme {
+  return typeof value === "string" && GOAL_TEMPLATE_THEMES.includes(value as GoalTemplateTheme);
+}
+
+function createGoalTemplateId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function readGoalTemplatesFromStorage(): GoalTemplateCard[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(GOAL_TEMPLATE_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.flatMap((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return [];
+      }
+
+      const record = entry as Record<string, unknown>;
+      if (
+        typeof record.id !== "string" ||
+        typeof record.label !== "string" ||
+        typeof record.value !== "string" ||
+        !isGoalTemplateTheme(record.theme) ||
+        typeof record.createdAt !== "string"
+      ) {
+        return [];
+      }
+
+      return [{
+        id: record.id,
+        label: record.label,
+        value: record.value,
+        progressText:
+          typeof record.progressText === "string" && record.progressText.trim().length > 0
+            ? record.progressText
+            : "Stored on this browser only.",
+        theme: record.theme,
+        createdAt: record.createdAt,
+      }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function chunkGoalTemplates(goalTemplates: GoalTemplateCard[]): GoalTemplateCard[][] {
+  if (goalTemplates.length === 0) {
+    return [[]];
+  }
+
+  const pages: GoalTemplateCard[][] = [];
+
+  for (let index = 0; index < goalTemplates.length; index += GOAL_TEMPLATE_PAGE_SIZE) {
+    pages.push(goalTemplates.slice(index, index + GOAL_TEMPLATE_PAGE_SIZE));
+  }
+
+  return pages;
 }
 
 function hasInvalidIntegerValue(value: string): boolean {
@@ -376,6 +491,17 @@ function AddLogPageContent() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [recentDrawerOpen, setRecentDrawerOpen] = useState(false);
+  const [goalTemplates, setGoalTemplates] = useState<GoalTemplateCard[]>([]);
+  const [goalModalOpen, setGoalModalOpen] = useState(false);
+  const [goalTemplateForm, setGoalTemplateForm] = useState<GoalTemplateFormState>(
+    DEFAULT_GOAL_TEMPLATE_FORM,
+  );
+  const [goalTemplateError, setGoalTemplateError] = useState<string | null>(null);
+  const [quadPageIndex, setQuadPageIndex] = useState(0);
+  const [quadSlideDirection, setQuadSlideDirection] = useState<"forward" | "backward">(
+    "forward",
+  );
+  const [goalTemplatesHydrated, setGoalTemplatesHydrated] = useState(false);
   const [historyData, setHistoryData] = useState<JsonValue | null>(null);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyErrorMessage, setHistoryErrorMessage] = useState<string | null>(null);
@@ -390,6 +516,56 @@ function AddLogPageContent() {
   const blockingMessage = hasInvalidExerciseIntegers
     ? "Sets and reps must be non-negative whole numbers before saving."
     : null;
+  const templatePages = chunkGoalTemplates(goalTemplates);
+  const totalQuadPages = 1 + templatePages.length;
+  const currentTemplatePage = quadPageIndex === 0 ? [] : (templatePages[quadPageIndex - 1] ?? []);
+  const visibleTemplateTiles: Array<GoalTemplateCard | null> = [...currentTemplatePage];
+  const activeTemplatePageNumber = Math.max(1, quadPageIndex);
+
+  while (visibleTemplateTiles.length < GOAL_TEMPLATE_PAGE_SIZE) {
+    visibleTemplateTiles.push(null);
+  }
+
+  useEffect(() => {
+    setGoalTemplates(readGoalTemplatesFromStorage());
+    setGoalTemplatesHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!goalTemplatesHydrated || typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(GOAL_TEMPLATE_STORAGE_KEY, JSON.stringify(goalTemplates));
+    } catch {
+      // Ignore storage write failures and keep the in-memory templates active.
+    }
+  }, [goalTemplates, goalTemplatesHydrated]);
+
+  useEffect(() => {
+    if (quadPageIndex <= totalQuadPages - 1) {
+      return;
+    }
+
+    setQuadPageIndex(totalQuadPages - 1);
+  }, [quadPageIndex, totalQuadPages]);
+
+  useEffect(() => {
+    if (!goalModalOpen || typeof window === "undefined") {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setGoalModalOpen(false);
+        setGoalTemplateError(null);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [goalModalOpen]);
 
   useEffect(() => {
     if (status !== "authenticated" || !user || user.role !== "client") {
@@ -452,6 +628,62 @@ function AddLogPageContent() {
         message="Workout logging requires an authenticated client session."
       />
     );
+  }
+
+  function navigateToQuadPage(nextPageIndex: number) {
+    const clampedPageIndex = Math.max(0, Math.min(nextPageIndex, totalQuadPages - 1));
+    if (clampedPageIndex === quadPageIndex) {
+      return;
+    }
+
+    setQuadSlideDirection(clampedPageIndex > quadPageIndex ? "forward" : "backward");
+    setQuadPageIndex(clampedPageIndex);
+  }
+
+  function openGoalModal() {
+    setGoalTemplateError(null);
+    setGoalModalOpen(true);
+  }
+
+  function closeGoalModal() {
+    setGoalModalOpen(false);
+    setGoalTemplateError(null);
+    setGoalTemplateForm(DEFAULT_GOAL_TEMPLATE_FORM);
+  }
+
+  function handleGoalTemplateFieldChange(
+    key: keyof GoalTemplateFormState,
+    value: string,
+  ) {
+    setGoalTemplateForm((current) => ({ ...current, [key]: value }));
+    setGoalTemplateError(null);
+  }
+
+  function handleGoalTemplateSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const label = normalizeOptionalText(goalTemplateForm.label);
+    const value = normalizeOptionalText(goalTemplateForm.value);
+    const progressText = normalizeOptionalText(goalTemplateForm.progressText);
+
+    if (!label || !value) {
+      setGoalTemplateError("Goal label and goal target are required.");
+      return;
+    }
+
+    const nextTemplate: GoalTemplateCard = {
+      id: createGoalTemplateId(),
+      label,
+      value,
+      progressText: progressText ?? "Stored on this browser only.",
+      theme: goalTemplateForm.theme,
+      createdAt: new Date().toISOString(),
+    };
+
+    setGoalTemplates((current) => [nextTemplate, ...current]);
+    setQuadSlideDirection("forward");
+    setQuadPageIndex(1);
+    closeGoalModal();
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -639,37 +871,287 @@ function AddLogPageContent() {
           )}
         </section>
       ) : null}
+      {goalModalOpen ? (
+        <div
+          className="client-add-log-goal-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeGoalModal();
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="client-add-log-goal-modal-title"
+            className="client-add-log-goal-modal"
+          >
+            <div className="client-add-log-goal-modal__header">
+              <div className="mobile-section__copy">
+                <p className="mobile-section__eyebrow">Local browser templates</p>
+                <h2
+                  id="client-add-log-goal-modal-title"
+                  className="mobile-section__title"
+                >
+                  Create Goal Template
+                </h2>
+                <p className="mobile-section__description">
+                  These templates stay in local browser state only during this phase.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="mobile-pill mobile-pill--purple mobile-focus-ring"
+                onClick={closeGoalModal}
+              >
+                Close
+              </button>
+            </div>
+
+            <form className="client-add-log-goal-modal__form" onSubmit={handleGoalTemplateSubmit}>
+              <div className="field">
+                <label htmlFor="goal-template-label">Goal label</label>
+                <input
+                  id="goal-template-label"
+                  value={goalTemplateForm.label}
+                  onChange={(event) =>
+                    handleGoalTemplateFieldChange("label", event.target.value)
+                  }
+                  placeholder="Push Ups"
+                  required
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="goal-template-value">Goal target</label>
+                <input
+                  id="goal-template-value"
+                  value={goalTemplateForm.value}
+                  onChange={(event) =>
+                    handleGoalTemplateFieldChange("value", event.target.value)
+                  }
+                  placeholder="50 Push Ups"
+                  required
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="goal-template-note">Goal note</label>
+                <textarea
+                  id="goal-template-note"
+                  value={goalTemplateForm.progressText}
+                  onChange={(event) =>
+                    handleGoalTemplateFieldChange("progressText", event.target.value)
+                  }
+                  placeholder="Complete every Monday and Thursday"
+                  rows={3}
+                />
+              </div>
+
+              <fieldset className="client-add-log-goal-theme-picker">
+                <legend>Color theme</legend>
+                <div
+                  className="client-add-log-goal-theme-picker__options"
+                  role="radiogroup"
+                  aria-label="Goal template color theme"
+                >
+                  {GOAL_TEMPLATE_THEMES.map((theme) => {
+                    const selected = goalTemplateForm.theme === theme;
+
+                    return (
+                      <label
+                        key={theme}
+                        className={[
+                          "client-add-log-goal-theme-chip",
+                          `client-add-log-goal-theme-chip--${theme}`,
+                          selected ? "is-selected" : "",
+                        ].filter(Boolean).join(" ")}
+                      >
+                        <input
+                          type="radio"
+                          name="goal-template-theme"
+                          value={theme}
+                          checked={selected}
+                          onChange={(event) =>
+                            handleGoalTemplateFieldChange("theme", event.target.value)
+                          }
+                        />
+                        <span>{GOAL_TEMPLATE_THEME_LABELS[theme]}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
+              {goalTemplateError ? (
+                <p className="mobile-section__description">{goalTemplateError}</p>
+              ) : null}
+
+              <div className="mobile-training-action-row">
+                <button
+                  type="button"
+                  className="mobile-pill mobile-pill--purple mobile-focus-ring"
+                  onClick={closeGoalModal}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="mobile-training-button mobile-training-button--primary mobile-focus-ring"
+                >
+                  Create Goal
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
 
       <MobileSection
         className="client-add-log-parity-hero"
         title="Log Your Reps"
         variant="accent"
       >
-        <div className="mobile-training-meta-grid">
-          <MobileStatCard
-            className="client-add-log-option-card"
-            label="Rep"
-            value="Log A Rep"
-            progressText="Log Singular Reps here"
-          />
-          <MobileStatCard
-            className="client-add-log-option-card"
-            label="Set"
-            value="Log A Set"
-            progressText="Log multiple Reps"
-          />
-          <MobileStatCard
-            className="client-add-log-option-card"
-            label="General Workout"
-            value="Log a General Workout"
-            progressText="Log Your Entire Routine"
-          />
-          <MobileStatCard
-            className="client-add-log-option-card client-add-log-goals-card"
-            label="Goals"
-            value="Goals and Aspirations"
-            progressText="Establish and track your goals and progress"
-          />
+        <div className="client-add-log-quad-frame">
+          <div className="client-add-log-quad-frame__header">
+            <div className="mobile-section__copy">
+              <p className="mobile-section__eyebrow">
+                {quadPageIndex === 0
+                  ? "Starter quad"
+                  : `Goal templates page ${activeTemplatePageNumber} of ${templatePages.length}`}
+              </p>
+              <p className="mobile-section__description">
+                {quadPageIndex === 0
+                  ? "Choose a quick logging lane, or open Goals and Aspirations to build reusable templates."
+                  : "Your goal templates are saved in this browser only for this phase."}
+              </p>
+            </div>
+            {quadPageIndex > 0 ? (
+              <button
+                type="button"
+                className="mobile-pill mobile-pill--yellow mobile-focus-ring"
+                onClick={openGoalModal}
+              >
+                Create Goal
+              </button>
+            ) : null}
+          </div>
+
+          <div
+            key={`quad-page-${quadPageIndex}`}
+            className={[
+              "client-add-log-quad-page",
+              `client-add-log-quad-page--${quadSlideDirection}`,
+            ].join(" ")}
+          >
+            {quadPageIndex === 0 ? (
+              <div className="mobile-training-meta-grid">
+                <MobileStatCard
+                  className="client-add-log-option-card"
+                  label="Rep"
+                  value="Log A Rep"
+                  progressText="Log Singular Reps here"
+                />
+                <MobileStatCard
+                  className="client-add-log-option-card"
+                  label="Set"
+                  value="Log A Set"
+                  progressText="Log multiple Reps"
+                />
+                <MobileStatCard
+                  className="client-add-log-option-card"
+                  label="General Workout"
+                  value="Log a General Workout"
+                  progressText="Log Your Entire Routine"
+                />
+                <button
+                  type="button"
+                  className="client-add-log-goals-card-button mobile-focus-ring"
+                  onClick={openGoalModal}
+                  aria-haspopup="dialog"
+                >
+                  <MobileStatCard
+                    className="client-add-log-option-card client-add-log-goals-card"
+                    label="Goals"
+                    value="Goals and Aspirations"
+                    progressText="Establish and track your goals and progress"
+                  />
+                </button>
+              </div>
+            ) : (
+              <div className="mobile-training-meta-grid">
+                {visibleTemplateTiles.map((goalTemplate, index) =>
+                  goalTemplate ? (
+                    <MobileStatCard
+                      key={goalTemplate.id}
+                      className={[
+                        "client-add-log-option-card",
+                        "client-add-log-template-card",
+                        `client-add-log-template-card--${goalTemplate.theme}`,
+                      ].join(" ")}
+                      label={goalTemplate.label}
+                      value={goalTemplate.value}
+                      progressText={goalTemplate.progressText}
+                    />
+                  ) : (
+                    <MobileCard
+                      key={`goal-template-placeholder-${quadPageIndex}-${index}`}
+                      as="article"
+                      variant="soft"
+                      className="client-add-log-option-card client-add-log-template-placeholder"
+                    >
+                      <div className="mobile-section__copy">
+                        <p className="mobile-section__eyebrow">Add Goal</p>
+                        <h3 className="mobile-section__title">Template slot open</h3>
+                        <p className="mobile-section__description">
+                          Use Goals and Aspirations to create a new template.
+                        </p>
+                      </div>
+                    </MobileCard>
+                  ),
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="client-add-log-quad-pager" aria-label="Goal template page navigation">
+            <div className="client-add-log-quad-pager__slot">
+              {quadPageIndex > 0 ? (
+                <button
+                  type="button"
+                  className="client-add-log-quad-pager__button mobile-focus-ring"
+                  onClick={() => navigateToQuadPage(quadPageIndex - 1)}
+                  aria-label="Previous quad page"
+                >
+                  <span aria-hidden="true">←</span>
+                </button>
+              ) : null}
+            </div>
+            <div className="client-add-log-quad-pager__dots">
+              {Array.from({ length: totalQuadPages }, (_, index) => (
+                <button
+                  key={`quad-page-dot-${index}`}
+                  type="button"
+                  className={[
+                    "client-add-log-quad-pager__dot",
+                    quadPageIndex === index ? "is-active" : "",
+                  ].filter(Boolean).join(" ")}
+                  onClick={() => navigateToQuadPage(index)}
+                  aria-label={`Go to quad page ${index + 1}`}
+                />
+              ))}
+            </div>
+            <div className="client-add-log-quad-pager__slot client-add-log-quad-pager__slot--end">
+              {quadPageIndex < totalQuadPages - 1 ? (
+                <button
+                  type="button"
+                  className="client-add-log-quad-pager__button mobile-focus-ring"
+                  onClick={() => navigateToQuadPage(quadPageIndex + 1)}
+                  aria-label="Next quad page"
+                >
+                  <span aria-hidden="true">→</span>
+                </button>
+              ) : null}
+            </div>
+          </div>
         </div>
       </MobileSection>
 

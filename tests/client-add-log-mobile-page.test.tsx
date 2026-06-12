@@ -50,6 +50,8 @@ vi.mock("@/lib/client/session", async () => {
 
 import AddLogPage from "@/app/client/add-log/page";
 
+const GOAL_TEMPLATE_STORAGE_KEY = "mealmetric:add-log:goal-templates";
+
 function jsonResponse(payload: unknown) {
   return Promise.resolve({
     json: async () => payload,
@@ -95,6 +97,7 @@ describe("AddLogPage mobile experience", () => {
     scrollIntoViewMock.mockReset();
     searchParamsMock.mockReset();
     useSessionBootstrapMock.mockReset();
+    window.localStorage.clear();
     searchParamsMock.mockReturnValue(new URLSearchParams());
     useSessionBootstrapMock.mockReturnValue({
       status: "authenticated",
@@ -107,6 +110,19 @@ describe("AddLogPage mobile experience", () => {
     vi.stubGlobal("fetch", fetchMock);
     HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
   });
+
+  function mockHistoryPreviewOnly() {
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (url === "/api/client/training/workout-logs?limit=5&offset=0" && method === "GET") {
+        return jsonResponse(historyPreviewPayload());
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+  }
 
   it("renders the mobile add-log route and preserves the existing history BFF fetch", async () => {
     fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -324,6 +340,127 @@ describe("AddLogPage mobile experience", () => {
     expect(scrollIntoViewMock).toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
     expect((screen.getByLabelText("Exercise name") as HTMLInputElement).value).toBe("");
+  });
+
+  it("opens the Goals and Aspirations dialog with the required goal template fields", async () => {
+    mockHistoryPreviewOnly();
+
+    render(React.createElement(AddLogPage));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Goals and Aspirations/i })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Goals and Aspirations/i }));
+
+    const dialog = screen.getByRole("dialog", { name: "Create Goal Template" });
+    expect(within(dialog).getByLabelText("Goal label")).toBeTruthy();
+    expect(within(dialog).getByLabelText("Goal target")).toBeTruthy();
+    expect(within(dialog).getByLabelText("Goal note")).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Create Goal" })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeTruthy();
+  });
+
+  it("creates a local goal template and navigates to the template quad page", async () => {
+    mockHistoryPreviewOnly();
+
+    render(React.createElement(AddLogPage));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Goals and Aspirations/i })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Goals and Aspirations/i }));
+
+    const dialog = screen.getByRole("dialog", { name: "Create Goal Template" });
+    fireEvent.change(within(dialog).getByLabelText("Goal label"), {
+      target: { value: "Running" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Goal target"), {
+      target: { value: "1 Mile Run" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Goal note"), {
+      target: { value: "Complete every Monday and Thursday" },
+    });
+    fireEvent.click(within(dialog).getByLabelText("Coral"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create Goal" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Create Goal Template" })).toBeNull();
+    });
+
+    expect(screen.getByText("Running")).toBeTruthy();
+    expect(screen.getByText("1 Mile Run")).toBeTruthy();
+    expect(screen.getByText("Complete every Monday and Thursday")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Previous quad page" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Create Goal" })).toBeTruthy();
+
+    const storedTemplates = JSON.parse(
+      window.localStorage.getItem(GOAL_TEMPLATE_STORAGE_KEY) ?? "[]",
+    ) as Array<{ label: string; value: string; theme: string }>;
+    expect(storedTemplates[0]).toMatchObject({
+      label: "Running",
+      value: "1 Mile Run",
+      theme: "coral",
+    });
+  });
+
+  it("pages goal templates in groups of four while preserving the starter quad", async () => {
+    mockHistoryPreviewOnly();
+
+    render(React.createElement(AddLogPage));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Goals and Aspirations/i })).toBeTruthy();
+    });
+
+    const templates = [
+      { label: "Goal 1", value: "10 Push Ups", note: "Monday", theme: "emerald" },
+      { label: "Goal 2", value: "20 Push Ups", note: "Tuesday", theme: "lime" },
+      { label: "Goal 3", value: "30 Push Ups", note: "Wednesday", theme: "amber" },
+      { label: "Goal 4", value: "40 Push Ups", note: "Thursday", theme: "orange" },
+      { label: "Goal 5", value: "50 Push Ups", note: "Friday", theme: "rose" },
+    ] as const;
+
+    templates.forEach((template, index) => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: index === 0 ? /Goals and Aspirations/i : "Create Goal",
+        }),
+      );
+
+      const dialog = screen.getByRole("dialog", { name: "Create Goal Template" });
+      fireEvent.change(within(dialog).getByLabelText("Goal label"), {
+        target: { value: template.label },
+      });
+      fireEvent.change(within(dialog).getByLabelText("Goal target"), {
+        target: { value: template.value },
+      });
+      fireEvent.change(within(dialog).getByLabelText("Goal note"), {
+        target: { value: template.note },
+      });
+      fireEvent.click(within(dialog).getByLabelText(template.theme.charAt(0).toUpperCase() + template.theme.slice(1)));
+      fireEvent.click(within(dialog).getByRole("button", { name: "Create Goal" }));
+
+      expect(screen.queryByRole("dialog", { name: "Create Goal Template" })).toBeNull();
+    });
+
+    expect(screen.getByText("Goal 5")).toBeTruthy();
+    expect(screen.getByText("Goal 4")).toBeTruthy();
+    expect(screen.getByText("Goal 3")).toBeTruthy();
+    expect(screen.getByText("Goal 2")).toBeTruthy();
+    expect(screen.queryByText("Goal 1")).toBeNull();
+    expect(screen.getByRole("button", { name: "Next quad page" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next quad page" }));
+
+    expect(screen.getByText("Goal 1")).toBeTruthy();
+    expect(screen.queryByText("Goal 5")).toBeNull();
+    expect(screen.getAllByText("Template slot open").length).toBe(3);
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous quad page" }));
+    expect(screen.getByText("Goal 5")).toBeTruthy();
+    expect(screen.queryByText("Goal 1")).toBeNull();
   });
 
   it("preserves server error feedback without introducing a different mutation path", async () => {

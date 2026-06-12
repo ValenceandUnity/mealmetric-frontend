@@ -48,3 +48,21 @@
   - No backend, `app/api`, auth/session, or dependency changes.
 - Note:
   - The drawer uses existing workout history data already loaded on the page.
+
+## Phase 12B.4 - Client add-log goal template quad flow
+
+- Route: `/client/add-log`
+- Changes:
+  - Added starter-quad-to-template-quad arrow navigation.
+  - Added a `Goals and Aspirations` modal/floater for creating goal-template cards.
+  - Added local-browser-state goal-template storage.
+  - Added non-purple and non-blue color themes for user-created template quads.
+  - Limited visible template quads to four at a time with paging.
+- Preserved:
+  - Existing workout-log BFF fetch and mutation routes.
+  - Existing workout-log payload shape.
+  - Existing recent-exercises drawer.
+  - Existing Rep, Set, and General Workout controls.
+  - No backend, `app/api`, auth/session, or dependency changes.
+- Note:
+  - Goal templates are local-browser-state only in this phase.
