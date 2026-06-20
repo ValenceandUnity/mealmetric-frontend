@@ -392,7 +392,13 @@ describe("AddLogPage mobile experience", () => {
     expect(screen.getByText("Running")).toBeTruthy();
     expect(screen.getByText("1 Mile Run")).toBeTruthy();
     expect(screen.getByText("Complete every Monday and Thursday")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Previous quad page" })).toBeTruthy();
+    const starterPageButton = screen.getByRole("button", { name: "Show starter quad" });
+    const firstTemplatePageButton = screen.getByRole("button", { name: "Show goal template page 1" });
+    expect(within(starterPageButton).getByText("1")).toBeTruthy();
+    expect(within(firstTemplatePageButton).getByText("2")).toBeTruthy();
+    expect(firstTemplatePageButton.getAttribute("aria-current")).toBe("page");
+    expect(screen.queryByRole("button", { name: "Previous quad page" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Next quad page" })).toBeNull();
     expect(screen.getByRole("button", { name: "Create Goal" })).toBeTruthy();
 
     const storedTemplates = JSON.parse(
@@ -445,22 +451,63 @@ describe("AddLogPage mobile experience", () => {
       expect(screen.queryByRole("dialog", { name: "Create Goal Template" })).toBeNull();
     });
 
+    const starterPageButton = screen.getByRole("button", { name: "Show starter quad" });
+    const firstTemplatePageButton = screen.getByRole("button", { name: "Show goal template page 1" });
+    const secondTemplatePageButton = screen.getByRole("button", { name: "Show goal template page 2" });
+
+    expect(within(starterPageButton).getByText("1")).toBeTruthy();
+    expect(within(firstTemplatePageButton).getByText("2")).toBeTruthy();
+    expect(within(secondTemplatePageButton).getByText("3")).toBeTruthy();
+    expect(firstTemplatePageButton.getAttribute("aria-current")).toBe("page");
     expect(screen.getByText("Goal 5")).toBeTruthy();
     expect(screen.getByText("Goal 4")).toBeTruthy();
     expect(screen.getByText("Goal 3")).toBeTruthy();
     expect(screen.getByText("Goal 2")).toBeTruthy();
     expect(screen.queryByText("Goal 1")).toBeNull();
-    expect(screen.getByRole("button", { name: "Next quad page" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Next quad page" }));
+    fireEvent.click(secondTemplatePageButton);
 
+    expect(secondTemplatePageButton.getAttribute("aria-current")).toBe("page");
     expect(screen.getByText("Goal 1")).toBeTruthy();
     expect(screen.queryByText("Goal 5")).toBeNull();
     expect(screen.getAllByText("Template slot open").length).toBe(3);
 
-    fireEvent.click(screen.getByRole("button", { name: "Previous quad page" }));
+    fireEvent.click(firstTemplatePageButton);
+    expect(firstTemplatePageButton.getAttribute("aria-current")).toBe("page");
     expect(screen.getByText("Goal 5")).toBeTruthy();
     expect(screen.queryByText("Goal 1")).toBeNull();
+  });
+
+  it("renders numbered quad page buttons and lets the user switch between starter and placeholder pages", async () => {
+    mockHistoryPreviewOnly();
+
+    render(React.createElement(AddLogPage));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Show starter quad" })).toBeTruthy();
+    });
+
+    const starterPageButton = screen.getByRole("button", { name: "Show starter quad" });
+    const firstTemplatePageButton = screen.getByRole("button", { name: "Show goal template page 1" });
+
+    expect(within(starterPageButton).getByText("1")).toBeTruthy();
+    expect(within(firstTemplatePageButton).getByText("2")).toBeTruthy();
+    expect(starterPageButton.getAttribute("aria-current")).toBe("page");
+    expect(screen.queryByRole("button", { name: "Previous quad page" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Next quad page" })).toBeNull();
+    expect(screen.getByText("Log A Rep")).toBeTruthy();
+
+    fireEvent.click(firstTemplatePageButton);
+
+    expect(firstTemplatePageButton.getAttribute("aria-current")).toBe("page");
+    expect(screen.getAllByText("Template slot open").length).toBe(4);
+    expect(screen.queryByText("Log A Rep")).toBeNull();
+
+    fireEvent.click(starterPageButton);
+
+    expect(starterPageButton.getAttribute("aria-current")).toBe("page");
+    expect(screen.getByText("Log A Rep")).toBeTruthy();
+    expect(screen.queryByText("Template slot open")).toBeNull();
   });
 
   it("preserves server error feedback without introducing a different mutation path", async () => {

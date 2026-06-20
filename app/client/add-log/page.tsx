@@ -260,6 +260,10 @@ function hasInvalidIntegerValue(value: string): boolean {
   return !isBlank(value) && normalizeOptionalInteger(value) === undefined;
 }
 
+function getQuadPageAriaLabel(pageIndex: number): string {
+  return pageIndex === 0 ? "Show starter quad" : `Show goal template page ${pageIndex}`;
+}
+
 function normalizeExerciseEntries(
   exercises: ExerciseInputRowState[],
 ): WorkoutLogExerciseEntryInput[] {
@@ -517,7 +521,9 @@ function AddLogPageContent() {
     ? "Sets and reps must be non-negative whole numbers before saving."
     : null;
   const templatePages = chunkGoalTemplates(goalTemplates);
-  const totalQuadPages = 1 + templatePages.length;
+  const templatePageCount = templatePages.length;
+  const totalQuadPages = 1 + templatePageCount;
+  const quadPageNumbers = Array.from({ length: totalQuadPages }, (_, index) => index);
   const currentTemplatePage = quadPageIndex === 0 ? [] : (templatePages[quadPageIndex - 1] ?? []);
   const visibleTemplateTiles: Array<GoalTemplateCard | null> = [...currentTemplatePage];
   const activeTemplatePageNumber = Math.max(1, quadPageIndex);
@@ -1016,7 +1022,7 @@ function AddLogPageContent() {
               <p className="mobile-section__eyebrow">
                 {quadPageIndex === 0
                   ? "Starter quad"
-                  : `Goal templates page ${activeTemplatePageNumber} of ${templatePages.length}`}
+                  : `Goal templates page ${activeTemplatePageNumber} of ${templatePageCount}`}
               </p>
               <p className="mobile-section__description">
                 {quadPageIndex === 0
@@ -1113,43 +1119,23 @@ function AddLogPageContent() {
           </div>
 
           <div className="client-add-log-quad-pager" aria-label="Goal template page navigation">
-            <div className="client-add-log-quad-pager__slot">
-              {quadPageIndex > 0 ? (
-                <button
-                  type="button"
-                  className="client-add-log-quad-pager__button mobile-focus-ring"
-                  onClick={() => navigateToQuadPage(quadPageIndex - 1)}
-                  aria-label="Previous quad page"
-                >
-                  <span aria-hidden="true">←</span>
-                </button>
-              ) : null}
-            </div>
             <div className="client-add-log-quad-pager__dots">
-              {Array.from({ length: totalQuadPages }, (_, index) => (
+              {quadPageNumbers.map((index) => (
                 <button
-                  key={`quad-page-dot-${index}`}
+                  key={`quad-page-button-${index}`}
                   type="button"
                   className={[
-                    "client-add-log-quad-pager__dot",
-                    quadPageIndex === index ? "is-active" : "",
+                    "client-add-log-quad-page-button",
+                    quadPageIndex === index ? "client-add-log-quad-page-button--active" : "",
+                    "mobile-focus-ring",
                   ].filter(Boolean).join(" ")}
                   onClick={() => navigateToQuadPage(index)}
-                  aria-label={`Go to quad page ${index + 1}`}
-                />
-              ))}
-            </div>
-            <div className="client-add-log-quad-pager__slot client-add-log-quad-pager__slot--end">
-              {quadPageIndex < totalQuadPages - 1 ? (
-                <button
-                  type="button"
-                  className="client-add-log-quad-pager__button mobile-focus-ring"
-                  onClick={() => navigateToQuadPage(quadPageIndex + 1)}
-                  aria-label="Next quad page"
+                  aria-label={getQuadPageAriaLabel(index)}
+                  aria-current={quadPageIndex === index ? "page" : undefined}
                 >
-                  <span aria-hidden="true">→</span>
+                  <span aria-hidden="true">{index + 1}</span>
                 </button>
-              ) : null}
+              ))}
             </div>
           </div>
         </div>

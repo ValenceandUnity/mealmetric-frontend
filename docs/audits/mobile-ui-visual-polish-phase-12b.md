@@ -66,3 +66,17 @@
   - No backend, `app/api`, auth/session, or dependency changes.
 - Note:
   - Goal templates are local-browser-state only in this phase.
+
+## Phase 12B.4a - Add-log numbered quad pager
+
+- Route: `/client/add-log`
+- Changes:
+  - Replaced the arrow-style quad navigation with numbered circular page buttons.
+  - Page `1` represents the starter quad.
+  - Page `2+` represents goal-template quad pages.
+- Preserved:
+  - Existing local-browser-only goal-template storage.
+  - Existing recent-exercises drawer.
+  - Existing workout-log BFF fetch and mutation routes.
+  - Existing workout-log payload shape.
+  - No backend, `app/api`, auth/session, or dependency changes.
