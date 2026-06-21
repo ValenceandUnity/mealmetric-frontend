@@ -80,3 +80,24 @@
   - Existing workout-log BFF fetch and mutation routes.
   - Existing workout-log payload shape.
   - No backend, `app/api`, auth/session, or dependency changes.
+
+## Phase 12B.5 - Add-log staple goal icons and default template quad
+
+- Route: `/client/add-log`
+- Changes:
+  - Added an internal no-dependency staple goal icon set.
+  - Added default page-2 goal template quad:
+    - `100 PUSH UP`
+    - `RUN A MILE`
+    - `BENCH 200LBS`
+    - `10 MINS STRAIGHT JUMP ROPE`
+  - Added selectable staple cards that prefill the local Create Goal Template modal.
+  - Added icon selector for user-created goal templates.
+  - Kept user-generated colors distinct from starter purple/blue quad colors.
+- Preserved:
+  - Existing workout-log BFF fetch and mutation routes.
+  - Existing workout-log payload shape.
+  - Existing recent-exercises drawer.
+  - Existing numbered pager.
+  - Existing localStorage-only goal-template behavior.
+  - No backend, `app/api`, auth/session, or dependency changes.

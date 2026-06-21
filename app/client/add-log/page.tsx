@@ -52,20 +52,33 @@ type WorkoutHistoryTableRow = {
   duration: string;
   notes: string;
 };
+type GoalTemplateIconName = "pushup" | "running" | "bench" | "jumpRope";
 type GoalTemplateTheme = "emerald" | "lime" | "amber" | "orange" | "rose" | "coral";
+type StapleGoalTemplateTheme = "stapleBlue" | "stapleOrange" | "stapleLavender";
+type GoalTemplateCardTheme = GoalTemplateTheme | StapleGoalTemplateTheme;
 type GoalTemplateCard = {
   id: string;
   label: string;
   value: string;
   progressText: string;
   theme: GoalTemplateTheme;
+  iconName: GoalTemplateIconName;
   createdAt: string;
+};
+type StapleGoalTemplateCard = {
+  id: string;
+  label: string;
+  value: string;
+  progressText: string;
+  theme: StapleGoalTemplateTheme;
+  iconName: GoalTemplateIconName;
 };
 type GoalTemplateFormState = {
   label: string;
   value: string;
   progressText: string;
   theme: GoalTemplateTheme;
+  iconName: GoalTemplateIconName;
 };
 
 type ActionPillLinkProps = {
@@ -98,12 +111,53 @@ const GOAL_TEMPLATE_THEME_LABELS: Record<GoalTemplateTheme, string> = {
   rose: "Rose",
   coral: "Coral",
 };
+const GOAL_TEMPLATE_ICON_LABELS: Record<GoalTemplateIconName, string> = {
+  pushup: "Push-up",
+  running: "Running",
+  bench: "Bench press",
+  jumpRope: "Jump rope",
+};
 const DEFAULT_GOAL_TEMPLATE_FORM: GoalTemplateFormState = {
   label: "",
   value: "",
   progressText: "",
   theme: "emerald",
+  iconName: "pushup",
 };
+const STAPLE_GOAL_TEMPLATE_CARDS: StapleGoalTemplateCard[] = [
+  {
+    id: "staple-pushup",
+    label: "100",
+    value: "PUSH UP",
+    progressText: "",
+    iconName: "pushup",
+    theme: "stapleBlue",
+  },
+  {
+    id: "staple-running",
+    label: "RUN A",
+    value: "MILE",
+    progressText: "",
+    iconName: "running",
+    theme: "stapleBlue",
+  },
+  {
+    id: "staple-bench",
+    label: "BENCH",
+    value: "200LBS",
+    progressText: "",
+    iconName: "bench",
+    theme: "stapleOrange",
+  },
+  {
+    id: "staple-jump-rope",
+    label: "10 MINS STRAIGHT",
+    value: "JUMP ROPE",
+    progressText: "",
+    iconName: "jumpRope",
+    theme: "stapleLavender",
+  },
+];
 
 function ActionPillLink({
   href,
@@ -185,6 +239,157 @@ function isGoalTemplateTheme(value: unknown): value is GoalTemplateTheme {
   return typeof value === "string" && GOAL_TEMPLATE_THEMES.includes(value as GoalTemplateTheme);
 }
 
+function isGoalTemplateIconName(value: unknown): value is GoalTemplateIconName {
+  return (
+    value === "pushup" ||
+    value === "running" ||
+    value === "bench" ||
+    value === "jumpRope"
+  );
+}
+
+function GoalTemplateIcon({
+  iconName,
+  className,
+}: {
+  iconName: GoalTemplateIconName;
+  className?: string;
+}) {
+  switch (iconName) {
+    case "running":
+      return (
+        <svg viewBox="0 0 72 72" className={className} aria-hidden="true" focusable="false">
+          <circle cx="46" cy="12" r="5" fill="currentColor" />
+          <path
+            d="M38 24l10-6 9 4m-19 2l7 8 9 3m-14-11l-7 10m12-2l-7 13m15-10l11 10m-30 1l-12 8m17-20l-14-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="4.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M10 22h10M6 31h13"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            opacity="0.72"
+          />
+        </svg>
+      );
+    case "bench":
+      return (
+        <svg viewBox="0 0 72 72" className={className} aria-hidden="true" focusable="false">
+          <path
+            d="M10 14h52M16 9v10m40-10v10M23 27h26m-14 0v12m-14 2h28m-30 0l-7 15m44-15l7 15m-40-1v8m26-8v8"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <circle cx="36" cy="34" r="3.5" fill="currentColor" />
+        </svg>
+      );
+    case "jumpRope":
+      return (
+        <svg viewBox="0 0 72 72" className={className} aria-hidden="true" focusable="false">
+          <circle cx="36" cy="13" r="5" fill="currentColor" />
+          <path
+            d="M36 20v15m0 0l-10 11m10-11l10 11m-14 4l-4 13m18-13l4 13"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="4.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M14 52c2-18 10-26 14-29M58 52c-2-18-10-26-14-29"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3.2"
+            strokeLinecap="round"
+            opacity="0.88"
+          />
+        </svg>
+      );
+    case "pushup":
+    default:
+      return (
+        <svg viewBox="0 0 72 72" className={className} aria-hidden="true" focusable="false">
+          <circle cx="56" cy="20" r="5" fill="currentColor" />
+          <path
+            d="M16 40h18l12-14m-22 14l-5 16m9-16l10 18m8-32l11 8m-20 8h22"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="4.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
+  }
+}
+
+function GoalTemplateCardSurface({
+  card,
+  onClick,
+}: {
+  card: {
+    id: string;
+    label: string;
+    value: string;
+    progressText: string;
+    theme: GoalTemplateCardTheme;
+    iconName: GoalTemplateIconName;
+  };
+  onClick?: () => void;
+}) {
+  const isStapleCard = card.theme.startsWith("staple");
+  const className = [
+    "client-add-log-option-card",
+    isStapleCard ? "client-add-log-staple-card" : "client-add-log-template-card",
+    isStapleCard
+      ? `client-add-log-staple-card--${card.theme.replace("staple", "").toLowerCase()}`
+      : `client-add-log-template-card--${card.theme}`,
+  ].join(" ");
+
+  const content = (
+    <>
+      <div className="client-add-log-template-card__copy">
+        <p className="client-add-log-template-card__label">{card.label}</p>
+        <h3 className="client-add-log-template-card__value">{card.value}</h3>
+        {card.progressText.trim().length > 0 ? (
+          <p className="client-add-log-template-card__progress">{card.progressText}</p>
+        ) : null}
+      </div>
+      <div className="client-add-log-template-card__icon">
+        <GoalTemplateIcon iconName={card.iconName} className="client-add-log-template-card__icon-svg" />
+      </div>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className={`${className} mobile-focus-ring`}
+        onClick={onClick}
+        aria-label={`Use staple goal ${card.label} ${card.value}`}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <MobileCard as="article" variant="soft" className={className}>
+      {content}
+    </MobileCard>
+  );
+}
+
 function createGoalTemplateId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -234,6 +439,7 @@ function readGoalTemplatesFromStorage(): GoalTemplateCard[] {
             ? record.progressText
             : "Stored on this browser only.",
         theme: record.theme,
+        iconName: isGoalTemplateIconName(record.iconName) ? record.iconName : "pushup",
         createdAt: record.createdAt,
       }];
     });
@@ -244,7 +450,7 @@ function readGoalTemplatesFromStorage(): GoalTemplateCard[] {
 
 function chunkGoalTemplates(goalTemplates: GoalTemplateCard[]): GoalTemplateCard[][] {
   if (goalTemplates.length === 0) {
-    return [[]];
+    return [];
   }
 
   const pages: GoalTemplateCard[][] = [];
@@ -261,7 +467,15 @@ function hasInvalidIntegerValue(value: string): boolean {
 }
 
 function getQuadPageAriaLabel(pageIndex: number): string {
-  return pageIndex === 0 ? "Show starter quad" : `Show goal template page ${pageIndex}`;
+  if (pageIndex === 0) {
+    return "Show starter quad";
+  }
+
+  if (pageIndex === 1) {
+    return "Show staple goal templates";
+  }
+
+  return `Show goal template page ${pageIndex - 1}`;
 }
 
 function normalizeExerciseEntries(
@@ -520,13 +734,14 @@ function AddLogPageContent() {
   const blockingMessage = hasInvalidExerciseIntegers
     ? "Sets and reps must be non-negative whole numbers before saving."
     : null;
-  const templatePages = chunkGoalTemplates(goalTemplates);
-  const templatePageCount = templatePages.length;
-  const totalQuadPages = 1 + templatePageCount;
+  const userTemplatePages = chunkGoalTemplates(goalTemplates);
+  const userTemplatePageCount = userTemplatePages.length;
+  const totalQuadPages = 2 + userTemplatePageCount;
   const quadPageNumbers = Array.from({ length: totalQuadPages }, (_, index) => index);
-  const currentTemplatePage = quadPageIndex === 0 ? [] : (templatePages[quadPageIndex - 1] ?? []);
-  const visibleTemplateTiles: Array<GoalTemplateCard | null> = [...currentTemplatePage];
-  const activeTemplatePageNumber = Math.max(1, quadPageIndex);
+  const currentUserTemplatePage =
+    quadPageIndex <= 1 ? [] : (userTemplatePages[quadPageIndex - 2] ?? []);
+  const visibleTemplateTiles: Array<GoalTemplateCard | null> = [...currentUserTemplatePage];
+  const activeUserTemplatePageNumber = Math.max(1, quadPageIndex - 1);
 
   while (visibleTemplateTiles.length < GOAL_TEMPLATE_PAGE_SIZE) {
     visibleTemplateTiles.push(null);
@@ -646,8 +861,9 @@ function AddLogPageContent() {
     setQuadPageIndex(clampedPageIndex);
   }
 
-  function openGoalModal() {
+  function openGoalModal(prefill?: Partial<GoalTemplateFormState>) {
     setGoalTemplateError(null);
+    setGoalTemplateForm({ ...DEFAULT_GOAL_TEMPLATE_FORM, ...prefill });
     setGoalModalOpen(true);
   }
 
@@ -655,6 +871,15 @@ function AddLogPageContent() {
     setGoalModalOpen(false);
     setGoalTemplateError(null);
     setGoalTemplateForm(DEFAULT_GOAL_TEMPLATE_FORM);
+  }
+
+  function handleStapleGoalCardClick(stapleGoalTemplate: StapleGoalTemplateCard) {
+    openGoalModal({
+      label: stapleGoalTemplate.label,
+      value: stapleGoalTemplate.value,
+      progressText: stapleGoalTemplate.progressText,
+      iconName: stapleGoalTemplate.iconName,
+    });
   }
 
   function handleGoalTemplateFieldChange(
@@ -683,12 +908,13 @@ function AddLogPageContent() {
       value,
       progressText: progressText ?? "Stored on this browser only.",
       theme: goalTemplateForm.theme,
+      iconName: goalTemplateForm.iconName,
       createdAt: new Date().toISOString(),
     };
 
     setGoalTemplates((current) => [nextTemplate, ...current]);
     setQuadSlideDirection("forward");
-    setQuadPageIndex(1);
+    setQuadPageIndex(2);
     closeGoalModal();
   }
 
@@ -952,6 +1178,45 @@ function AddLogPageContent() {
                 />
               </div>
 
+              <fieldset className="client-add-log-icon-picker">
+                <legend>Icon</legend>
+                <div
+                  className="client-add-log-icon-picker__options"
+                  role="radiogroup"
+                  aria-label="Goal template icon"
+                >
+                  {(Object.keys(GOAL_TEMPLATE_ICON_LABELS) as GoalTemplateIconName[]).map((iconName) => {
+                    const selected = goalTemplateForm.iconName === iconName;
+
+                    return (
+                      <label
+                        key={iconName}
+                        className={[
+                          "client-add-log-icon-picker__option",
+                          selected ? "client-add-log-icon-picker__option--active" : "",
+                        ].filter(Boolean).join(" ")}
+                      >
+                        <input
+                          type="radio"
+                          name="goal-template-icon"
+                          value={iconName}
+                          checked={selected}
+                          aria-label={GOAL_TEMPLATE_ICON_LABELS[iconName]}
+                          onChange={(event) =>
+                            handleGoalTemplateFieldChange("iconName", event.target.value)
+                          }
+                        />
+                        <GoalTemplateIcon
+                          iconName={iconName}
+                          className="client-add-log-icon-picker__icon"
+                        />
+                        <span>{GOAL_TEMPLATE_ICON_LABELS[iconName]}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
               <fieldset className="client-add-log-goal-theme-picker">
                 <legend>Color theme</legend>
                 <div
@@ -1022,19 +1287,23 @@ function AddLogPageContent() {
               <p className="mobile-section__eyebrow">
                 {quadPageIndex === 0
                   ? "Starter quad"
-                  : `Goal templates page ${activeTemplatePageNumber} of ${templatePageCount}`}
+                  : quadPageIndex === 1
+                    ? "Staple goals"
+                    : `Goal templates page ${activeUserTemplatePageNumber} of ${userTemplatePageCount}`}
               </p>
               <p className="mobile-section__description">
                 {quadPageIndex === 0
                   ? "Choose a quick logging lane, or open Goals and Aspirations to build reusable templates."
-                  : "Your goal templates are saved in this browser only for this phase."}
+                  : quadPageIndex === 1
+                    ? "Tap a staple goal card to prefill the template modal with its icon and copy."
+                    : "Your goal templates are saved in this browser only for this phase."}
               </p>
             </div>
             {quadPageIndex > 0 ? (
               <button
                 type="button"
                 className="mobile-pill mobile-pill--yellow mobile-focus-ring"
-                onClick={openGoalModal}
+                onClick={() => openGoalModal()}
               >
                 Create Goal
               </button>
@@ -1071,7 +1340,7 @@ function AddLogPageContent() {
                 <button
                   type="button"
                   className="client-add-log-goals-card-button mobile-focus-ring"
-                  onClick={openGoalModal}
+                  onClick={() => openGoalModal()}
                   aria-haspopup="dialog"
                 >
                   <MobileStatCard
@@ -1082,20 +1351,23 @@ function AddLogPageContent() {
                   />
                 </button>
               </div>
+            ) : quadPageIndex === 1 ? (
+              <div className="mobile-training-meta-grid">
+                {STAPLE_GOAL_TEMPLATE_CARDS.map((stapleGoalTemplate) => (
+                  <GoalTemplateCardSurface
+                    key={stapleGoalTemplate.id}
+                    card={stapleGoalTemplate}
+                    onClick={() => handleStapleGoalCardClick(stapleGoalTemplate)}
+                  />
+                ))}
+              </div>
             ) : (
               <div className="mobile-training-meta-grid">
                 {visibleTemplateTiles.map((goalTemplate, index) =>
                   goalTemplate ? (
-                    <MobileStatCard
+                    <GoalTemplateCardSurface
                       key={goalTemplate.id}
-                      className={[
-                        "client-add-log-option-card",
-                        "client-add-log-template-card",
-                        `client-add-log-template-card--${goalTemplate.theme}`,
-                      ].join(" ")}
-                      label={goalTemplate.label}
-                      value={goalTemplate.value}
-                      progressText={goalTemplate.progressText}
+                      card={goalTemplate}
                     />
                   ) : (
                     <MobileCard
