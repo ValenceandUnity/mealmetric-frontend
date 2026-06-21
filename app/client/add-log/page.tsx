@@ -349,6 +349,11 @@ function formatCellNumber(value: number | null): string {
   return value === null ? "-" : String(value);
 }
 
+function parseCellNumberValue(value: string): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function formatWorkoutType(mode: WorkoutLogMode): string {
   switch (mode) {
     case "rep":
@@ -495,6 +500,7 @@ function AddLogPageContent() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [recentDrawerOpen, setRecentDrawerOpen] = useState(false);
+  const [entryFormOpen, setEntryFormOpen] = useState(false);
   const [goalTemplates, setGoalTemplates] = useState<GoalTemplateCard[]>([]);
   const [goalModalOpen, setGoalModalOpen] = useState(false);
   const [goalTemplateForm, setGoalTemplateForm] = useState<GoalTemplateFormState>(
@@ -574,6 +580,21 @@ function AddLogPageContent() {
   }, [goalModalOpen]);
 
   useEffect(() => {
+    if (!entryFormOpen || typeof window === "undefined") {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setEntryFormOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [entryFormOpen]);
+
+  useEffect(() => {
     if (status !== "authenticated" || !user || user.role !== "client") {
       return;
     }
@@ -644,6 +665,17 @@ function AddLogPageContent() {
 
     setQuadSlideDirection(clampedPageIndex > quadPageIndex ? "forward" : "backward");
     setQuadPageIndex(clampedPageIndex);
+  }
+
+  function openEntryForm(mode: ContextMode) {
+    setContextMode(mode);
+    setEntryFormOpen(true);
+    setSubmitError(null);
+    setSubmitSuccess(null);
+  }
+
+  function closeEntryForm() {
+    setEntryFormOpen(false);
   }
 
   function openGoalModal() {
@@ -753,6 +785,7 @@ function AddLogPageContent() {
 
       setSubmitSuccess("Workout Saved");
       setExercises([createExerciseRow()]);
+      setEntryFormOpen(false);
       historySectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
       setSubmitError(
@@ -786,10 +819,65 @@ function AddLogPageContent() {
   }
 
   const historyPage = adaptWorkoutHistoryPage(historyData);
-  const historyRows = flattenExerciseEntries(historyPage.items).slice(0, 3);
+  const allHistoryRows = flattenExerciseEntries(historyPage.items);
+  const historyRows = allHistoryRows.slice(0, 3);
+  const bestRepsRow = allHistoryRows.reduce<WorkoutHistoryTableRow | null>((best, row) => {
+    const repsValue = parseCellNumberValue(row.reps);
+    if (repsValue === null) {
+      return best;
+    }
+
+    if (!best) {
+      return row;
+    }
+
+    const bestValue = parseCellNumberValue(best.reps);
+    return bestValue === null || repsValue > bestValue ? row : best;
+  }, null);
+  const bestWeightRow = allHistoryRows.reduce<WorkoutHistoryTableRow | null>((best, row) => {
+    const weightValue = parseCellNumberValue(row.weight);
+    if (weightValue === null) {
+      return best;
+    }
+
+    if (!best) {
+      return row;
+    }
+
+    const bestValue = parseCellNumberValue(best.weight);
+    return bestValue === null || weightValue > bestValue ? row : best;
+  }, null);
+  const bestTimingRow = allHistoryRows.find((row) => row.duration !== "-") ?? null;
+  const bestPerformanceItems = [
+    bestRepsRow
+      ? {
+          label: "Best reps",
+          value: bestRepsRow.reps,
+          detail: `${bestRepsRow.exerciseName} • ${bestRepsRow.performedAtLabel}`,
+        }
+      : null,
+    bestWeightRow
+      ? {
+          label: "Best weight",
+          value: bestWeightRow.weight,
+          detail: `${bestWeightRow.exerciseName} • ${bestWeightRow.performedAtLabel}`,
+        }
+      : null,
+    bestTimingRow
+      ? {
+          label: "Best timing",
+          value: bestTimingRow.duration,
+          detail: `${bestTimingRow.exerciseName} • ${bestTimingRow.performedAtLabel}`,
+        }
+      : null,
+  ].filter((item): item is { label: string; value: string; detail: string } => item !== null);
   const addEntryLabel = contextMode === "set" ? "Add Rep" : "Add Exercise";
-  const contextCaption =
-    "For one offs, select Rep. For logging consecutive Reps, select Set. For logging an entire routine with multiple sets, select General Workout";
+  const entryModalTitle =
+    contextMode === "rep"
+      ? "Log A Rep"
+      : contextMode === "set"
+        ? "Log A Set"
+        : "Log a General Workout";
 
   return (
     <MobileAppShell
@@ -1011,6 +1099,273 @@ function AddLogPageContent() {
         </div>
       ) : null}
 
+      {entryFormOpen ? (
+        <div
+          className="client-add-log-entry-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeEntryForm();
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="client-add-log-entry-modal-title"
+            className="client-add-log-entry-modal"
+          >
+            <div className="client-add-log-entry-modal__header">
+              <div className="mobile-section__copy">
+                <p className="mobile-section__eyebrow">Entry Form</p>
+                <h2
+                  id="client-add-log-entry-modal-title"
+                  className="mobile-section__title"
+                >
+                  {entryModalTitle}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="mobile-pill mobile-pill--purple mobile-focus-ring"
+                onClick={closeEntryForm}
+              >
+                Close
+              </button>
+            </div>
+
+            <MobileCard as="div" variant="action" className="mobile-training-log-card client-add-log-parity-card">
+              <form
+                id="client-workout-entry-form"
+                className="mobile-training-form"
+                onSubmit={handleSubmit}
+              >
+                <div className="mobile-training-pill-row" role="radiogroup" aria-label="Workout type">
+                  {(["rep", "set", "general"] as const).map((mode) => {
+                    const active = contextMode === mode;
+                    const label =
+                      mode === "general"
+                        ? "General Workout"
+                        : mode === "set"
+                          ? "Set"
+                          : "Rep";
+
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        className={[
+                          "mobile-pill",
+                          active ? "mobile-pill--yellow" : "mobile-pill--purple",
+                          "mobile-focus-ring",
+                        ].join(" ")}
+                        onClick={() => setContextMode(mode)}
+                        aria-pressed={active}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="client-add-log-best-performance-card mobile-training-checklist-card">
+                  <div className="mobile-section__copy">
+                    <p className="mobile-section__eyebrow">Recent history</p>
+                    <h3 className="mobile-section__title">Best Performance</h3>
+                    {bestPerformanceItems.length > 0 ? (
+                      <>
+                        <p className="mobile-section__description">Best from recent logs</p>
+                        <div className="mobile-training-pill-row" aria-label="Best performance summary">
+                          {bestPerformanceItems.map((item) => (
+                            <span key={item.label} className="mobile-pill">
+                              {item.label} {item.value}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="stacked-list">
+                          {bestPerformanceItems.map((item) => (
+                            <p key={`${item.label}-detail`} className="mobile-section__description">
+                              {item.detail}
+                            </p>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="mobile-section__description">No best performance logged yet.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mobile-training-form__grid">
+                  {contextMode === "rep" ? (
+                    <div className="field">
+                      <label htmlFor="routine-context-name">Rep</label>
+                      <input
+                        id="routine-context-name"
+                        value={routineName}
+                        onChange={(event) => setRoutineName(event.target.value)}
+                        placeholder={
+                          initialRoutineLabel.length > 0
+                            ? initialRoutineLabel
+                            : "Enter rep name"
+                        }
+                        readOnly={hasPrefilledRoutine}
+                        disabled={submitting}
+                      />
+                    </div>
+                  ) : null}
+
+                  <div className="field">
+                    <label htmlFor="performed-at">Performed at</label>
+                    <input
+                      id="performed-at"
+                      type="datetime-local"
+                      value={performedAt}
+                      onChange={(event) => setPerformedAt(event.target.value)}
+                      disabled={submitting}
+                    />
+                  </div>
+                </div>
+
+                {exercises.length > 0 ? (
+                  <div className="mobile-training-exercise-grid">
+                    {exercises.map((exercise, index) => (
+                      <MobileCard
+                        key={exercise.id}
+                        as="article"
+                        variant="soft"
+                        padding="compact"
+                        className="mobile-training-exercise-card client-add-log-parity-row"
+                      >
+                        <div className="mobile-training-checklist-card__header">
+                          <div className="mobile-section__copy">
+                            <p className="mobile-section__eyebrow">Exercise row {index + 1}</p>
+                            <h3 className="mobile-training-exercise-card__title">
+                              {exercise.name.trim() || `Exercise ${index + 1}`}
+                            </h3>
+                            <p className="mobile-section__description">Track this movement for today.</p>
+                          </div>
+                          <button
+                            type="button"
+                            className="button--danger"
+                            onClick={() => handleRemoveExercise(exercise.id)}
+                            disabled={submitting || exercises.length === 1}
+                          >
+                            Remove
+                          </button>
+                        </div>
+
+                        <div className="mobile-training-form__grid">
+                          <div className="field">
+                            <label htmlFor={`exercise-name-${exercise.id}`}>Exercise name</label>
+                            <input
+                              id={`exercise-name-${exercise.id}`}
+                              value={exercise.name}
+                              onChange={(event) =>
+                                handleExerciseChange(exercise.id, "name", event.target.value)
+                              }
+                              placeholder="Bench press"
+                              disabled={submitting}
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor={`exercise-sets-${exercise.id}`}>Sets</label>
+                            <input
+                              id={`exercise-sets-${exercise.id}`}
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={exercise.sets}
+                              onChange={(event) =>
+                                handleExerciseChange(exercise.id, "sets", event.target.value)
+                              }
+                              placeholder="3"
+                              disabled={submitting}
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor={`exercise-reps-${exercise.id}`}>Reps</label>
+                            <input
+                              id={`exercise-reps-${exercise.id}`}
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={exercise.reps}
+                              onChange={(event) =>
+                                handleExerciseChange(exercise.id, "reps", event.target.value)
+                              }
+                              placeholder="10"
+                              disabled={submitting}
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor={`exercise-weight-${exercise.id}`}>Weight</label>
+                            <input
+                              id={`exercise-weight-${exercise.id}`}
+                              type="number"
+                              min="0"
+                              value={exercise.weight}
+                              onChange={(event) =>
+                                handleExerciseChange(exercise.id, "weight", event.target.value)
+                              }
+                              placeholder="135"
+                              disabled={submitting}
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor={`exercise-time-${exercise.id}`}>
+                              Time (minutes)
+                            </label>
+                            <input
+                              id={`exercise-time-${exercise.id}`}
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              value={exercise.time}
+                              onChange={(event) =>
+                                handleExerciseChange(exercise.id, "time", event.target.value)
+                              }
+                              placeholder="15"
+                              disabled={submitting}
+                            />
+                          </div>
+                        </div>
+                      </MobileCard>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="Start your workout log"
+                    message="Add an exercise row to begin capturing this workout."
+                  />
+                )}
+
+                {blockingMessage ? (
+                  <p className="mobile-section__description">{blockingMessage}</p>
+                ) : null}
+
+                <div className="mobile-training-action-row">
+                  <button
+                    type="button"
+                    className="mobile-pill mobile-pill--purple mobile-focus-ring"
+                    onClick={handleAddExercise}
+                    disabled={submitting}
+                  >
+                    {addEntryLabel}
+                  </button>
+                  <button
+                    type="submit"
+                    className="mobile-training-button mobile-training-button--primary mobile-focus-ring"
+                    disabled={submitting || blockingMessage !== null}
+                  >
+                    {submitting ? "Saving..." : "Save Log Entry"}
+                  </button>
+                </div>
+              </form>
+            </MobileCard>
+          </section>
+        </div>
+      ) : null}
+
       <MobileSection
         className="client-add-log-parity-hero"
         title="Log Your Reps"
@@ -1050,24 +1405,45 @@ function AddLogPageContent() {
           >
             {quadPageIndex === 0 ? (
               <div className="mobile-training-meta-grid">
-                <MobileStatCard
-                  className="client-add-log-option-card"
-                  label="Rep"
-                  value="Log A Rep"
-                  progressText="Log Singular Reps here"
-                />
-                <MobileStatCard
-                  className="client-add-log-option-card"
-                  label="Set"
-                  value="Log A Set"
-                  progressText="Log multiple Reps"
-                />
-                <MobileStatCard
-                  className="client-add-log-option-card"
-                  label="General Workout"
-                  value="Log a General Workout"
-                  progressText="Log Your Entire Routine"
-                />
+                <button
+                  type="button"
+                  className="client-add-log-entry-trigger mobile-focus-ring"
+                  onClick={() => openEntryForm("rep")}
+                  aria-label="Open Log A Rep form"
+                >
+                  <MobileStatCard
+                    className="client-add-log-option-card"
+                    label="Rep"
+                    value="Log A Rep"
+                    progressText="Log Singular Reps here"
+                  />
+                </button>
+                <button
+                  type="button"
+                  className="client-add-log-entry-trigger mobile-focus-ring"
+                  onClick={() => openEntryForm("set")}
+                  aria-label="Open Log A Set form"
+                >
+                  <MobileStatCard
+                    className="client-add-log-option-card"
+                    label="Set"
+                    value="Log A Set"
+                    progressText="Log multiple Reps"
+                  />
+                </button>
+                <button
+                  type="button"
+                  className="client-add-log-entry-trigger mobile-focus-ring"
+                  onClick={() => openEntryForm("general")}
+                  aria-label="Open Log a General Workout form"
+                >
+                  <MobileStatCard
+                    className="client-add-log-option-card"
+                    label="General Workout"
+                    value="Log a General Workout"
+                    progressText="Log Your Entire Routine"
+                  />
+                </button>
                 <button
                   type="button"
                   className="client-add-log-goals-card-button mobile-focus-ring"
@@ -1139,229 +1515,6 @@ function AddLogPageContent() {
             </div>
           </div>
         </div>
-      </MobileSection>
-
-      <MobileSection
-        className="client-add-log-parity-section"
-        eyebrow="Entry form"
-        title="Log Your Reps"
-        description={contextCaption}
-      >
-        <MobileCard as="div" variant="action" className="mobile-training-log-card client-add-log-parity-card">
-          <form
-            id="client-workout-entry-form"
-            className="mobile-training-form"
-            onSubmit={handleSubmit}
-          >
-            <div className="client-add-log-parity-context">
-              <div className="mobile-section__copy">
-                <p className="mobile-section__eyebrow">Routine context</p>
-                <h3 className="mobile-section__title">
-                  {initialRoutineLabel || routineName || "Workout entry"}
-                </h3>
-                <p className="mobile-section__description">
-                  Last weight: unavailable
-                </p>
-                <p className="mobile-section__description">
-                  Last timing: unavailable
-                </p>
-              </div>
-            </div>
-            <div className="mobile-training-pill-row" role="radiogroup" aria-label="Workout type">
-              {(["rep", "set", "general"] as const).map((mode) => {
-                const active = contextMode === mode;
-                const label =
-                  mode === "general"
-                    ? "General Workout"
-                    : mode === "set"
-                      ? "Set"
-                      : "Rep";
-
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    className={[
-                      "mobile-pill",
-                      active ? "mobile-pill--yellow" : "mobile-pill--purple",
-                      "mobile-focus-ring",
-                    ].join(" ")}
-                    onClick={() => setContextMode(mode)}
-                    aria-pressed={active}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mobile-training-form__grid">
-              {contextMode === "rep" ? (
-                <div className="field">
-                  <label htmlFor="routine-context-name">Rep</label>
-                  <input
-                    id="routine-context-name"
-                    value={routineName}
-                    onChange={(event) => setRoutineName(event.target.value)}
-                    placeholder={
-                      initialRoutineLabel.length > 0
-                        ? initialRoutineLabel
-                        : "Enter rep name"
-                    }
-                    readOnly={hasPrefilledRoutine}
-                    disabled={submitting}
-                  />
-                </div>
-              ) : null}
-
-              <div className="field">
-                <label htmlFor="performed-at">Performed at</label>
-                <input
-                  id="performed-at"
-                  type="datetime-local"
-                  value={performedAt}
-                  onChange={(event) => setPerformedAt(event.target.value)}
-                  disabled={submitting}
-                />
-              </div>
-            </div>
-
-            {exercises.length > 0 ? (
-              <div className="mobile-training-exercise-grid">
-                {exercises.map((exercise, index) => (
-                  <MobileCard
-                    key={exercise.id}
-                    as="article"
-                    variant="soft"
-                    padding="compact"
-                    className="mobile-training-exercise-card client-add-log-parity-row"
-                  >
-                    <div className="mobile-training-checklist-card__header">
-                      <div className="mobile-section__copy">
-                        <p className="mobile-section__eyebrow">Exercise row {index + 1}</p>
-                        <h3 className="mobile-training-exercise-card__title">
-                          {exercise.name.trim() || `Exercise ${index + 1}`}
-                        </h3>
-                        <p className="mobile-section__description">Rep-row styling preserves the current add-log payload mapping.</p>
-                      </div>
-                      <button
-                        type="button"
-                        className="button--danger"
-                        onClick={() => handleRemoveExercise(exercise.id)}
-                        disabled={submitting || exercises.length === 1}
-                      >
-                        Remove
-                      </button>
-                    </div>
-
-                    <div className="mobile-training-form__grid">
-                      <div className="field">
-                        <label htmlFor={`exercise-name-${exercise.id}`}>Exercise name</label>
-                        <input
-                          id={`exercise-name-${exercise.id}`}
-                          value={exercise.name}
-                          onChange={(event) =>
-                            handleExerciseChange(exercise.id, "name", event.target.value)
-                          }
-                          placeholder="Bench press"
-                          disabled={submitting}
-                        />
-                      </div>
-                      <div className="field">
-                        <label htmlFor={`exercise-sets-${exercise.id}`}>Sets</label>
-                        <input
-                          id={`exercise-sets-${exercise.id}`}
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={exercise.sets}
-                          onChange={(event) =>
-                            handleExerciseChange(exercise.id, "sets", event.target.value)
-                          }
-                          placeholder="3"
-                          disabled={submitting}
-                        />
-                      </div>
-                      <div className="field">
-                        <label htmlFor={`exercise-reps-${exercise.id}`}>Reps</label>
-                        <input
-                          id={`exercise-reps-${exercise.id}`}
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={exercise.reps}
-                          onChange={(event) =>
-                            handleExerciseChange(exercise.id, "reps", event.target.value)
-                          }
-                          placeholder="10"
-                          disabled={submitting}
-                        />
-                      </div>
-                      <div className="field">
-                        <label htmlFor={`exercise-weight-${exercise.id}`}>Weight</label>
-                        <input
-                          id={`exercise-weight-${exercise.id}`}
-                          type="number"
-                          min="0"
-                          value={exercise.weight}
-                          onChange={(event) =>
-                            handleExerciseChange(exercise.id, "weight", event.target.value)
-                          }
-                          placeholder="135"
-                          disabled={submitting}
-                        />
-                      </div>
-                      <div className="field">
-                        <label htmlFor={`exercise-time-${exercise.id}`}>
-                          Time (minutes)
-                        </label>
-                        <input
-                          id={`exercise-time-${exercise.id}`}
-                          type="number"
-                          min="0"
-                          step="0.1"
-                          value={exercise.time}
-                          onChange={(event) =>
-                            handleExerciseChange(exercise.id, "time", event.target.value)
-                          }
-                          placeholder="15"
-                          disabled={submitting}
-                        />
-                      </div>
-                    </div>
-                  </MobileCard>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title="Start your workout log"
-                message="Add an exercise row to begin capturing this workout."
-              />
-            )}
-
-            {blockingMessage ? (
-              <p className="mobile-section__description">{blockingMessage}</p>
-            ) : null}
-
-            <div className="mobile-training-action-row">
-              <button
-                type="button"
-                className="mobile-pill mobile-pill--purple mobile-focus-ring"
-                onClick={handleAddExercise}
-                disabled={submitting}
-              >
-                {addEntryLabel}
-              </button>
-              <button
-                type="submit"
-                className="mobile-training-button mobile-training-button--primary mobile-focus-ring"
-                disabled={submitting || blockingMessage !== null}
-              >
-                {submitting ? "Saving..." : "Save Log Entry"}
-              </button>
-            </div>
-          </form>
-        </MobileCard>
       </MobileSection>
 
       <section id="client-inline-workout-history" ref={historySectionRef}>

@@ -80,3 +80,21 @@
   - Existing workout-log BFF fetch and mutation routes.
   - Existing workout-log payload shape.
   - No backend, `app/api`, auth/session, or dependency changes.
+
+## Phase 12B.6 - Add-log entry form modal polish
+
+- Route: `/client/add-log`
+- Reference: June 11 UI Polish PDF
+- Changes:
+  - Starter quad cards now open the workout entry form as a modal overlay.
+  - Removed old explanatory form description.
+  - Removed old Routine Context section.
+  - Replaced old Workout entry area with Best Performance.
+  - Best Performance is backed only by existing loaded workout-history data.
+  - Preserved Rep / Set / General Workout mode tags.
+- Preserved:
+  - Existing workout-log BFF fetch and mutation routes.
+  - Existing workout-log payload shape.
+  - Existing recent-exercises drawer.
+  - Existing goal-template localStorage behavior if present.
+  - No backend, `app/api`, auth/session, or dependency changes.

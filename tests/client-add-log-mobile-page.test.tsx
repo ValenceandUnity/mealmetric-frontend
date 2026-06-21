@@ -182,6 +182,8 @@ describe("AddLogPage mobile experience", () => {
     ).toBe("/client/add-log/full-log-history");
     expect(screen.getByText("Bench Press")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "New Entry" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Log A Rep" })).toBeNull();
+    expect(screen.queryByLabelText("Exercise name")).toBeNull();
   });
 
   it("preserves client session bootstrap gating before any BFF fetch", () => {
@@ -216,9 +218,12 @@ describe("AddLogPage mobile experience", () => {
     render(React.createElement(AddLogPage));
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Performed at")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Open Log A Rep form" })).toBeTruthy();
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "Open Log A Rep form" }));
+
+    expect(screen.getByRole("dialog", { name: "Log A Rep" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Rep" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Set" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "General Workout" })).toBeTruthy();
@@ -232,6 +237,78 @@ describe("AddLogPage mobile experience", () => {
     expect(screen.getByRole("button", { name: "Add Exercise" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
     expect(screen.queryByText("Workout log")).toBeNull();
+  });
+
+  it("opens the starter quad cards as entry-form modals and removes the old inline copy", async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (url === "/api/client/training/workout-logs?limit=5&offset=0" && method === "GET") {
+        return jsonResponse(historyPreviewPayload({ id: "log-1", hasMore: true }));
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+
+    render(React.createElement(AddLogPage));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open Log A Rep form" })).toBeTruthy();
+    });
+
+    expect(
+      screen.queryByText(
+        "For one offs, select Rep. For logging consecutive Reps, select Set. For logging an entire routine with multiple sets, select General Workout",
+      ),
+    ).toBeNull();
+    expect(screen.queryByText("Routine context")).toBeNull();
+    expect(screen.queryByText("Workout entry")).toBeNull();
+    expect(screen.queryByText("Last weight: unavailable")).toBeNull();
+    expect(screen.queryByText("Last timing: unavailable")).toBeNull();
+    expect(
+      screen.queryByText("Rep-row styling preserves the current add-log payload mapping."),
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Log A Rep form" }));
+    expect(screen.getByRole("dialog", { name: "Log A Rep" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Log A Set form" }));
+    expect(screen.getByRole("dialog", { name: "Log A Set" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Log a General Workout form" }));
+    expect(screen.getByRole("dialog", { name: "Log a General Workout" })).toBeTruthy();
+  });
+
+  it("shows Best Performance from existing workout history inside the entry modal", async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (url === "/api/client/training/workout-logs?limit=5&offset=0" && method === "GET") {
+        return jsonResponse(historyPreviewPayload({ id: "log-1", exerciseName: "Bench Press" }));
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+
+    render(React.createElement(AddLogPage));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open Log A Rep form" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Log A Rep form" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Log A Rep" });
+    expect(within(dialog).getByText("Best Performance")).toBeTruthy();
+    expect(within(dialog).getByText("Best from recent logs")).toBeTruthy();
+    expect(within(dialog).getByText("Best reps 8")).toBeTruthy();
+    expect(within(dialog).getByText("Best weight 135.5")).toBeTruthy();
+    expect(within(dialog).getByText("Best timing 1m 30s")).toBeTruthy();
+    expect(within(dialog).getAllByText(/Bench Press • Jun 8, 2026,/).length).toBeGreaterThan(0);
   });
 
   it("submits the exact existing workout-log payload shape and preserves success confirmation", async () => {
@@ -270,8 +347,10 @@ describe("AddLogPage mobile experience", () => {
     render(React.createElement(AddLogPage));
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Exercise name")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Open Log A Rep form" })).toBeTruthy();
     });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Log A Rep form" }));
 
     fireEvent.change(screen.getByLabelText("Exercise name"), {
       target: { value: "Bench Press" },
@@ -338,7 +417,8 @@ describe("AddLogPage mobile experience", () => {
     });
 
     expect(scrollIntoViewMock).toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Log A Rep" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Open Log A Rep form" }));
     expect((screen.getByLabelText("Exercise name") as HTMLInputElement).value).toBe("");
   });
 
@@ -535,14 +615,17 @@ describe("AddLogPage mobile experience", () => {
     render(React.createElement(AddLogPage));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Open Log A Rep form" })).toBeTruthy();
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "Open Log A Rep form" }));
     fireEvent.click(screen.getByRole("button", { name: "Save Log Entry" }));
 
     await waitFor(() => {
       expect(screen.getByText("Unable to submit workout log.")).toBeTruthy();
     });
+
+    expect(screen.getByRole("dialog", { name: "Log A Rep" })).toBeTruthy();
 
     const workoutLogCalls = fetchMock.mock.calls.filter(
       ([url, init]) => String(url) === "/api/client/training/workout-logs" && init?.method === "POST",
