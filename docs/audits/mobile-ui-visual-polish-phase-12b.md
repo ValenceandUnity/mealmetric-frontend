@@ -166,3 +166,22 @@
   - Existing Rep/Set hidden sets cleanup and General Workout sets behavior.
   - Existing recent-exercises drawer and localStorage-only goal-template behavior.
   - No backend, `app/api`, auth/session, dependency, or lockfile changes.
+
+## Phase 12B.9 - Stabilize add-log modal shell
+
+- Route: `/client/add-log`
+- Attempts:
+  - 12B.7 top-anchor attempt implemented, did not solve visual shift.
+  - 12B.8 hard-anchor attempt implemented, did not solve visual shift.
+  - 12B.9 stabilizes modal shell height and internal layout.
+- Changes:
+  - Added fixed-height modal shell.
+  - Split modal into stable header/body/tab viewport structure.
+  - Kept header and tab row fixed while only inner tab panel changes.
+- Preserved:
+  - Existing workout-log BFF behavior.
+  - Existing Log / Recent History tab behavior.
+  - Existing recent-history filtering.
+  - Rep/Set hidden sets cleanup.
+  - General Workout sets behavior.
+  - No backend/app-api/auth/session/dependency changes.

@@ -1381,59 +1381,60 @@ function AddLogPageContent() {
               </button>
             </div>
 
-            <MobileCard as="div" variant="action" className="mobile-training-log-card client-add-log-parity-card">
-              <form
-                id="client-workout-entry-form"
-                className="mobile-training-form"
-                onSubmit={handleSubmit}
+            <div className="client-add-log-entry-modal__body">
+              <div
+                className="client-add-log-entry-tabs"
+                role="tablist"
+                aria-label="Add log modal sections"
               >
-                <div
-                  className="client-add-log-entry-tabs"
-                  role="tablist"
-                  aria-label="Add log modal sections"
+                <button
+                  id="client-add-log-entry-tab-log"
+                  type="button"
+                  role="tab"
+                  aria-label="Show log form"
+                  aria-selected={entryModalTab === "log"}
+                  aria-controls="client-workout-entry-form"
+                  tabIndex={entryModalTab === "log" ? 0 : -1}
+                  className={[
+                    "client-add-log-entry-tab",
+                    entryModalTab === "log" ? "client-add-log-entry-tab--active" : "",
+                    "mobile-focus-ring",
+                  ].filter(Boolean).join(" ")}
+                  onClick={() => setEntryModalTab("log")}
                 >
-                  <button
-                    id="client-add-log-entry-tab-log"
-                    type="button"
-                    role="tab"
-                    aria-label="Show log form"
-                    aria-selected={entryModalTab === "log"}
-                    aria-controls="client-add-log-entry-panel-log"
-                    tabIndex={entryModalTab === "log" ? 0 : -1}
-                    className={[
-                      "client-add-log-entry-tab",
-                      entryModalTab === "log" ? "client-add-log-entry-tab--active" : "",
-                      "mobile-focus-ring",
-                    ].filter(Boolean).join(" ")}
-                    onClick={() => setEntryModalTab("log")}
-                  >
-                    Log
-                  </button>
-                  <button
-                    id="client-add-log-entry-tab-recent-history"
-                    type="button"
-                    role="tab"
-                    aria-label="Show recent history"
-                    aria-selected={entryModalTab === "recent-history"}
-                    aria-controls="client-add-log-entry-panel-recent-history"
-                    tabIndex={entryModalTab === "recent-history" ? 0 : -1}
-                    className={[
-                      "client-add-log-entry-tab",
-                      entryModalTab === "recent-history" ? "client-add-log-entry-tab--active" : "",
-                      "mobile-focus-ring",
-                    ].filter(Boolean).join(" ")}
-                    onClick={() => setEntryModalTab("recent-history")}
-                  >
-                    Recent History
-                  </button>
-                </div>
+                  Log
+                </button>
+                <button
+                  id="client-add-log-entry-tab-recent-history"
+                  type="button"
+                  role="tab"
+                  aria-label="Show recent history"
+                  aria-selected={entryModalTab === "recent-history"}
+                  aria-controls="client-add-log-entry-panel-recent-history"
+                  tabIndex={entryModalTab === "recent-history" ? 0 : -1}
+                  className={[
+                    "client-add-log-entry-tab",
+                    entryModalTab === "recent-history" ? "client-add-log-entry-tab--active" : "",
+                    "mobile-focus-ring",
+                  ].filter(Boolean).join(" ")}
+                  onClick={() => setEntryModalTab("recent-history")}
+                >
+                  Recent History
+                </button>
+              </div>
 
+              <MobileCard
+                as="div"
+                variant="action"
+                className="mobile-training-log-card client-add-log-parity-card client-add-log-entry-tab-viewport"
+              >
                 {entryModalTab === "log" ? (
-                  <div
-                    id="client-add-log-entry-panel-log"
+                  <form
+                    id="client-workout-entry-form"
                     role="tabpanel"
                     aria-labelledby="client-add-log-entry-tab-log"
-                    className="client-add-log-entry-tab-panel"
+                    className="mobile-training-form client-add-log-entry-tab-panel"
+                    onSubmit={handleSubmit}
                   >
                     <div className="mobile-training-form__grid">
                       {contextMode === "rep" ? (
@@ -1604,7 +1605,7 @@ function AddLogPageContent() {
                         {submitting ? "Saving..." : "Save Log Entry"}
                       </button>
                     </div>
-                  </div>
+                  </form>
                 ) : (
                   <section
                     id="client-add-log-entry-panel-recent-history"
@@ -1648,8 +1649,8 @@ function AddLogPageContent() {
                     )}
                   </section>
                 )}
-              </form>
-            </MobileCard>
+              </MobileCard>
+            </div>
           </section>
         </div>
       ) : null}
