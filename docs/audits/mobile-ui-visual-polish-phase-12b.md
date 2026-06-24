@@ -166,3 +166,64 @@
   - Existing Rep/Set hidden sets cleanup and General Workout sets behavior.
   - Existing recent-exercises drawer and localStorage-only goal-template behavior.
   - No backend, `app/api`, auth/session, dependency, or lockfile changes.
+
+## Phase 12B.9 - Stabilize add-log modal shell
+
+- Route: `/client/add-log`
+- Attempts:
+  - 12B.7 top-anchor attempt implemented, did not solve visual shift.
+  - 12B.8 hard-anchor attempt implemented, did not solve visual shift.
+  - 12B.9 stabilizes modal shell height and internal layout.
+- Changes:
+  - Added fixed-height modal shell.
+  - Split modal into stable header/body/tab viewport structure.
+  - Kept header and tab row fixed while only inner tab panel changes.
+- Preserved:
+  - Existing workout-log BFF behavior.
+  - Existing Log / Recent History tab behavior.
+  - Existing recent-history filtering.
+  - Rep/Set hidden sets cleanup.
+  - General Workout sets behavior.
+  - No backend/app-api/auth/session/dependency changes.
+
+## Phase 12B.10 - Portal anchor add-log modal
+
+- Route: `/client/add-log`
+- Attempts:
+  - 12B.7 top-anchor attempt implemented, failed visually.
+  - 12B.8 hard-anchor attempt implemented, failed visually.
+  - 12B.9 fixed-height shell attempt implemented, failed visually.
+  - 12B.10 portals the entry modal to `document.body` and anchors it directly to the viewport.
+- Changes:
+  - Rendered the entry modal via React portal.
+  - Added portal-specific fixed viewport modal styles.
+  - Prevented page scroll while the modal is open.
+  - Preserved a stable shell/header/tabs layout with a scrollable tab viewport.
+- Preserved:
+  - Existing workout-log BFF behavior.
+  - Existing Log / Recent History behavior.
+  - Existing recent-history filtering.
+  - Rep/Set hidden sets cleanup.
+  - General Workout sets behavior.
+  - No backend/app-api/auth/session/dependency changes.
+
+## Phase 12B.10b - Align add-log modal tabs without scrollbar
+
+- Route: `/client/add-log`
+- Attempts:
+  - 12B.7 top-anchor attempt failed.
+  - 12B.8 hard-anchor attempt failed.
+  - 12B.9 fixed-height shell attempt failed.
+  - 12B.10 portal attempt introduced an unwanted internal scrollbar.
+  - 12B.10b keeps both tab panels mounted in an overlapping grid stack so the modal sizes to the taller Log form without visible internal scrolling.
+- Changes:
+  - Removed visible internal scroll viewport from the normal modal layout.
+  - Kept portal/fixed viewport anchoring.
+  - Rendered Log and Recent History panels together so the modal shell height remains stable.
+- Preserved:
+  - Existing workout-log BFF behavior.
+  - Existing Log / Recent History behavior.
+  - Existing recent-history filtering.
+  - Rep/Set hidden sets cleanup.
+  - General Workout sets behavior.
+  - No backend/app-api/auth/session/dependency changes.

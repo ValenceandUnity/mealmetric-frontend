@@ -295,8 +295,10 @@ describe("AddLogPage mobile experience", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open Log A Rep form" }));
     expect(screen.getByRole("dialog", { name: "Log A Rep" })).toBeTruthy();
+    expect(document.body.style.overflow).toBe("hidden");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog", { name: "Log A Rep" })).toBeNull();
+    expect(document.body.style.overflow).toBe("");
 
     fireEvent.click(screen.getByRole("button", { name: "Open Log A Set form" }));
     expect(screen.getByRole("dialog", { name: "Log A Set" })).toBeTruthy();
@@ -336,11 +338,17 @@ describe("AddLogPage mobile experience", () => {
     expect(within(tablist).queryByRole("tab", { name: "General Workout" })).toBeNull();
 
     fireEvent.click(recentHistoryTab);
-    expect(within(dialog).getByRole("heading", { name: "Recent History" })).toBeTruthy();
-    expect(within(dialog).queryByLabelText("Exercise name")).toBeNull();
+    const historyPanel = document.getElementById("client-add-log-entry-history-panel");
+    expect(screen.getByRole("dialog", { name: "Log A Rep" })).toBe(dialog);
+    expect(document.getElementById("client-add-log-entry-log-panel")?.getAttribute("aria-hidden")).toBe("true");
+    expect(historyPanel?.getAttribute("aria-hidden")).toBe("false");
+    expect(within(historyPanel as HTMLElement).getByRole("heading", { name: "Recent History" })).toBeTruthy();
     expect(within(dialog).queryByRole("button", { name: "Save Log Entry" })).toBeNull();
 
     fireEvent.click(logTab);
+    expect(screen.getByRole("dialog", { name: "Log A Rep" })).toBe(dialog);
+    expect(document.getElementById("client-add-log-entry-log-panel")?.getAttribute("aria-hidden")).toBe("false");
+    expect(document.getElementById("client-add-log-entry-history-panel")?.getAttribute("aria-hidden")).toBe("true");
     expect(within(dialog).getByLabelText("Exercise name")).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
   });
