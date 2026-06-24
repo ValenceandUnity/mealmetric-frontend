@@ -206,3 +206,24 @@
   - Rep/Set hidden sets cleanup.
   - General Workout sets behavior.
   - No backend/app-api/auth/session/dependency changes.
+
+## Phase 12B.10b - Align add-log modal tabs without scrollbar
+
+- Route: `/client/add-log`
+- Attempts:
+  - 12B.7 top-anchor attempt failed.
+  - 12B.8 hard-anchor attempt failed.
+  - 12B.9 fixed-height shell attempt failed.
+  - 12B.10 portal attempt introduced an unwanted internal scrollbar.
+  - 12B.10b keeps both tab panels mounted in an overlapping grid stack so the modal sizes to the taller Log form without visible internal scrolling.
+- Changes:
+  - Removed visible internal scroll viewport from the normal modal layout.
+  - Kept portal/fixed viewport anchoring.
+  - Rendered Log and Recent History panels together so the modal shell height remains stable.
+- Preserved:
+  - Existing workout-log BFF behavior.
+  - Existing Log / Recent History behavior.
+  - Existing recent-history filtering.
+  - Rep/Set hidden sets cleanup.
+  - General Workout sets behavior.
+  - No backend/app-api/auth/session/dependency changes.

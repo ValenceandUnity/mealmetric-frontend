@@ -338,13 +338,17 @@ describe("AddLogPage mobile experience", () => {
     expect(within(tablist).queryByRole("tab", { name: "General Workout" })).toBeNull();
 
     fireEvent.click(recentHistoryTab);
+    const historyPanel = document.getElementById("client-add-log-entry-history-panel");
     expect(screen.getByRole("dialog", { name: "Log A Rep" })).toBe(dialog);
-    expect(within(dialog).getByRole("heading", { name: "Recent History" })).toBeTruthy();
-    expect(within(dialog).queryByLabelText("Exercise name")).toBeNull();
+    expect(document.getElementById("client-add-log-entry-log-panel")?.getAttribute("aria-hidden")).toBe("true");
+    expect(historyPanel?.getAttribute("aria-hidden")).toBe("false");
+    expect(within(historyPanel as HTMLElement).getByRole("heading", { name: "Recent History" })).toBeTruthy();
     expect(within(dialog).queryByRole("button", { name: "Save Log Entry" })).toBeNull();
 
     fireEvent.click(logTab);
     expect(screen.getByRole("dialog", { name: "Log A Rep" })).toBe(dialog);
+    expect(document.getElementById("client-add-log-entry-log-panel")?.getAttribute("aria-hidden")).toBe("false");
+    expect(document.getElementById("client-add-log-entry-history-panel")?.getAttribute("aria-hidden")).toBe("true");
     expect(within(dialog).getByLabelText("Exercise name")).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
   });

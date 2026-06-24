@@ -2875,11 +2875,11 @@ html[data-theme="light"] .mobile-training-form textarea {
   left: 50%;
   transform: translateX(-50%);
   width: min(calc(100vw - 2rem), 21rem);
-  height: min(36rem, calc(100dvh - var(--mobile-bottom-nav-height) - 6rem));
-  max-height: calc(100dvh - var(--mobile-bottom-nav-height) - 6rem);
+  height: auto;
+  max-height: none;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  overflow: hidden;
+  grid-template-rows: auto auto;
+  overflow: visible;
   border: 1px solid rgba(173, 187, 255, 0.18);
   border-radius: 1.6rem;
   padding: 1.1rem;
@@ -2916,8 +2916,8 @@ html[data-theme="light"] .mobile-training-form textarea {
 .client-add-log-entry-modal-portal__body {
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
   gap: 1rem;
+  overflow: visible;
 }
 
 .client-training-parity-shell--add-log .client-add-log-entry-tabs,
@@ -2966,11 +2966,43 @@ html[data-theme="light"] .mobile-training-form textarea {
   box-shadow: 0 16px 30px rgba(250, 204, 21, 0.18);
 }
 
+.client-add-log-entry-modal-portal__tab-viewport {
+  display: grid;
+  min-height: 0;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.client-add-log-entry-tab-stack {
+  display: grid;
+  align-items: start;
+}
+
+.client-add-log-entry-tab-stack > .client-add-log-entry-tab-panel {
+  grid-area: 1 / 1;
+}
+
+.client-add-log-entry-tab-panel--active {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.client-add-log-entry-tab-panel--inactive {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  position: relative;
+  z-index: 0;
+}
+
 .client-training-parity-shell--add-log .client-add-log-entry-tab-viewport,
 .client-add-log-entry-modal-portal__tab-viewport {
+  gap: 1rem;
   min-height: 0;
-  overflow-y: auto;
-  padding-right: 0.15rem;
+  overflow: visible;
 }
 
 .client-training-parity-shell--add-log .client-add-log-entry-tab-panel,
