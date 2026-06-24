@@ -2838,6 +2838,15 @@ html[data-theme="light"] .mobile-training-form textarea {
   overflow: hidden;
 }
 
+.client-add-log-entry-modal-portal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(3, 7, 18, 0.76);
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+}
+
 .client-training-parity-shell--add-log .client-add-log-entry-modal {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 4.5rem);
@@ -2860,7 +2869,36 @@ html[data-theme="light"] .mobile-training-form textarea {
   box-shadow: 0 34px 82px rgba(2, 6, 23, 0.56);
 }
 
+.client-add-log-entry-modal-portal {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 4.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(100vw - 2rem), 21rem);
+  height: min(36rem, calc(100dvh - var(--mobile-bottom-nav-height) - 6rem));
+  max-height: calc(100dvh - var(--mobile-bottom-nav-height) - 6rem);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid rgba(173, 187, 255, 0.18);
+  border-radius: 1.6rem;
+  padding: 1.1rem;
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.16), transparent 32%),
+    radial-gradient(circle at top left, rgba(124, 92, 255, 0.14), transparent 30%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(7, 10, 18, 0.98));
+  box-shadow: 0 34px 82px rgba(2, 6, 23, 0.56);
+}
+
 .client-training-parity-shell--add-log .client-add-log-entry-modal__header {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+.client-add-log-entry-modal-portal__header {
   display: flex;
   gap: 0.8rem;
   justify-content: space-between;
@@ -2875,7 +2913,15 @@ html[data-theme="light"] .mobile-training-form textarea {
   gap: 1rem;
 }
 
-.client-training-parity-shell--add-log .client-add-log-entry-tabs {
+.client-add-log-entry-modal-portal__body {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.client-training-parity-shell--add-log .client-add-log-entry-tabs,
+.client-add-log-entry-modal-portal .client-add-log-entry-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.65rem;
@@ -2886,7 +2932,8 @@ html[data-theme="light"] .mobile-training-form textarea {
   flex-shrink: 0;
 }
 
-.client-training-parity-shell--add-log .client-add-log-entry-tab {
+.client-training-parity-shell--add-log .client-add-log-entry-tab,
+.client-add-log-entry-modal-portal .client-add-log-entry-tab {
   min-height: 2.9rem;
   padding: 0.72rem 1rem;
   border-radius: 999px;
@@ -2903,12 +2950,14 @@ html[data-theme="light"] .mobile-training-form textarea {
     transform 140ms ease;
 }
 
-.client-training-parity-shell--add-log .client-add-log-entry-tab:hover {
+.client-training-parity-shell--add-log .client-add-log-entry-tab:hover,
+.client-add-log-entry-modal-portal .client-add-log-entry-tab:hover {
   transform: translateY(-1px);
   border-color: rgba(255, 255, 255, 0.14);
 }
 
-.client-training-parity-shell--add-log .client-add-log-entry-tab--active {
+.client-training-parity-shell--add-log .client-add-log-entry-tab--active,
+.client-add-log-entry-modal-portal .client-add-log-entry-tab--active {
   border-color: rgba(255, 248, 196, 0.22);
   background:
     linear-gradient(135deg, rgba(255, 242, 184, 0.96), rgba(250, 204, 21, 0.86)),
@@ -2917,23 +2966,27 @@ html[data-theme="light"] .mobile-training-form textarea {
   box-shadow: 0 16px 30px rgba(250, 204, 21, 0.18);
 }
 
-.client-training-parity-shell--add-log .client-add-log-entry-tab-viewport {
+.client-training-parity-shell--add-log .client-add-log-entry-tab-viewport,
+.client-add-log-entry-modal-portal__tab-viewport {
   min-height: 0;
   overflow-y: auto;
   padding-right: 0.15rem;
 }
 
-.client-training-parity-shell--add-log .client-add-log-entry-tab-panel {
+.client-training-parity-shell--add-log .client-add-log-entry-tab-panel,
+.client-add-log-entry-modal-portal .client-add-log-entry-tab-panel {
   min-height: 100%;
 }
 
-.client-training-parity-shell--add-log .client-add-log-recent-history-panel {
+.client-training-parity-shell--add-log .client-add-log-recent-history-panel,
+.client-add-log-entry-modal-portal .client-add-log-recent-history-panel {
   display: grid;
   gap: 0.95rem;
   align-content: start;
 }
 
-.client-training-parity-shell--add-log .client-add-log-recent-history-row {
+.client-training-parity-shell--add-log .client-add-log-recent-history-row,
+.client-add-log-entry-modal-portal .client-add-log-recent-history-row {
   display: grid;
   gap: 0.75rem;
   padding: 0.95rem 1rem;

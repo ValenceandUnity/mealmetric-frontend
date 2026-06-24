@@ -295,8 +295,10 @@ describe("AddLogPage mobile experience", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open Log A Rep form" }));
     expect(screen.getByRole("dialog", { name: "Log A Rep" })).toBeTruthy();
+    expect(document.body.style.overflow).toBe("hidden");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog", { name: "Log A Rep" })).toBeNull();
+    expect(document.body.style.overflow).toBe("");
 
     fireEvent.click(screen.getByRole("button", { name: "Open Log A Set form" }));
     expect(screen.getByRole("dialog", { name: "Log A Set" })).toBeTruthy();
@@ -336,11 +338,13 @@ describe("AddLogPage mobile experience", () => {
     expect(within(tablist).queryByRole("tab", { name: "General Workout" })).toBeNull();
 
     fireEvent.click(recentHistoryTab);
+    expect(screen.getByRole("dialog", { name: "Log A Rep" })).toBe(dialog);
     expect(within(dialog).getByRole("heading", { name: "Recent History" })).toBeTruthy();
     expect(within(dialog).queryByLabelText("Exercise name")).toBeNull();
     expect(within(dialog).queryByRole("button", { name: "Save Log Entry" })).toBeNull();
 
     fireEvent.click(logTab);
+    expect(screen.getByRole("dialog", { name: "Log A Rep" })).toBe(dialog);
     expect(within(dialog).getByLabelText("Exercise name")).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
   });

@@ -185,3 +185,24 @@
   - Rep/Set hidden sets cleanup.
   - General Workout sets behavior.
   - No backend/app-api/auth/session/dependency changes.
+
+## Phase 12B.10 - Portal anchor add-log modal
+
+- Route: `/client/add-log`
+- Attempts:
+  - 12B.7 top-anchor attempt implemented, failed visually.
+  - 12B.8 hard-anchor attempt implemented, failed visually.
+  - 12B.9 fixed-height shell attempt implemented, failed visually.
+  - 12B.10 portals the entry modal to `document.body` and anchors it directly to the viewport.
+- Changes:
+  - Rendered the entry modal via React portal.
+  - Added portal-specific fixed viewport modal styles.
+  - Prevented page scroll while the modal is open.
+  - Preserved a stable shell/header/tabs layout with a scrollable tab viewport.
+- Preserved:
+  - Existing workout-log BFF behavior.
+  - Existing Log / Recent History behavior.
+  - Existing recent-history filtering.
+  - Rep/Set hidden sets cleanup.
+  - General Workout sets behavior.
+  - No backend/app-api/auth/session/dependency changes.
