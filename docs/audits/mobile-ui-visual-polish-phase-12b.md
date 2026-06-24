@@ -244,3 +244,20 @@
 - Note:
   - Date archive filtering is frontend-only over currently loaded BFF rows in this phase.
   - True all-history date archive can be added later only with an explicit backend/BFF contract.
+
+## Phase 12B.17 - Full log weekly archive blocks
+
+- Route: `/client/add-log/full-log-history`
+- Changes:
+  - Removed the add-log full-history type filter pills while leaving `/client/training/history` unchanged.
+  - Replaced the single archive date input with native `Start date` and `End date` controls.
+  - Added default `This Week` and `Last Week` archive blocks when no custom range is selected.
+  - Added frontend-only weekly archive blocks for selected date ranges with collapsible data-cell rows.
+  - Removed type pills from the add-log archive rows while preserving search and older-entry pagination.
+- Preserved:
+  - Existing workout-history BFF fetch route.
+  - Existing client session gating.
+  - Existing training-history utility section and type-filter behavior on `/client/training/history`.
+  - No backend, `app/api`, auth/session, or dependency changes.
+- Note:
+  - Weekly archive grouping remains frontend-only over currently loaded BFF rows in this phase.

@@ -2083,8 +2083,70 @@ html[data-theme="light"] .mobile-bottom-nav {
   gap: var(--mobile-space-3);
 }
 
+.client-history-date-range-grid,
+.client-history-week-archive,
+.client-history-week-archive__panel,
+.client-history-week-data-grid,
+.client-history-week-data-cell {
+  display: grid;
+  gap: var(--mobile-space-3);
+}
+
+.client-history-date-range-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .client-history-date-archive__clear {
   justify-self: start;
+}
+
+.client-history-week-archive {
+  border-color: rgba(173, 187, 255, 0.16);
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(14, 16, 26, 0.88)),
+    rgba(12, 16, 28, 0.94);
+}
+
+.client-history-week-archive__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--mobile-space-3);
+}
+
+.client-history-week-archive__toggle {
+  width: 2.75rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+}
+
+.client-history-week-archive__toggle span {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.client-history-week-archive__panel {
+  padding-top: 0.2rem;
+}
+
+.client-history-week-data-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(173, 187, 255, 0.14);
+  background: rgba(9, 14, 24, 0.72);
+}
+
+.client-history-week-data-cell {
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.client-history-week-data-cell .mobile-section__description {
+  color: var(--mobile-text-soft);
+  word-break: break-word;
 }
 
 .mobile-training-meta-card__value,
@@ -5987,6 +6049,11 @@ html[data-theme="light"] .client-settings-toggle__option {
   .client-bookmarks-hero__stats,
   .client-bookmarks-analytics,
   .client-bookmarks-featured__stats {
+    grid-template-columns: 1fr;
+  }
+
+  .client-history-date-range-grid,
+  .client-history-week-data-grid {
     grid-template-columns: 1fr;
   }
 
