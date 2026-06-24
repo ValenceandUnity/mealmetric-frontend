@@ -13,6 +13,7 @@ import type { ApiResponse, JsonValue } from "@/lib/types/api";
 import {
   adaptClientHistoryView,
   type ClientHistoryModeFilter,
+  type MobileClientWorkoutLogCardView,
 } from "@/lib/view-models/client-history";
 import { formatDisplayNameFromUser } from "@/lib/view-models/common";
 
@@ -28,6 +29,7 @@ export type ClientHistoryRouteSurfaceProps = {
   sectionDescription: string;
   showHistoryUtility?: boolean;
   showDateArchive?: boolean;
+  showTypeFilter?: boolean;
   historyUtilityVariant?: "default" | "hidden";
 };
 
@@ -42,6 +44,11 @@ type StateCardProps = {
   message: string;
   action?: ReactNode;
 };
+type HistoryArchiveBlockView = {
+  id: string;
+  label: string;
+  rows: MobileClientWorkoutLogCardView[];
+};
 
 const HISTORY_API_PATH = "/api/client/training/workout-logs";
 const PAGE_LIMIT = 30;
@@ -52,6 +59,10 @@ const FILTER_OPTIONS: Array<{ value: ClientHistoryModeFilter; label: string }> =
   { value: "set", label: "Set" },
   { value: "general_workout", label: "General Workout" },
 ];
+const weekLabelFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+});
 
 function ActionPill({ href, children, tone = "yellow" }: ActionPillProps) {
   return (
@@ -73,6 +84,62 @@ function StateCard({ title, message, action }: StateCardProps) {
   );
 }
 
+function parseDateKey(dateKey: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+    return null;
+  }
+
+  const [yearValue, monthValue, dayValue] = dateKey.split("-").map(Number);
+  const parsed = new Date(yearValue, monthValue - 1, dayValue);
+
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getFullYear() !== yearValue ||
+    parsed.getMonth() !== monthValue - 1 ||
+    parsed.getDate() !== dayValue
+  ) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function addDays(date: Date, count: number): Date {
+  const next = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  next.setDate(next.getDate() + count);
+  return next;
+}
+
+function formatDateKey(date: Date): string {
+  const yearValue = String(date.getFullYear());
+  const monthValue = String(date.getMonth() + 1).padStart(2, "0");
+  const dayValue = String(date.getDate()).padStart(2, "0");
+  return `${yearValue}-${monthValue}-${dayValue}`;
+}
+
+function formatWeekLabel(startDate: Date, customLabel?: string): string {
+  if (customLabel) {
+    return customLabel;
+  }
+
+  return `Week of ${weekLabelFormatter.format(startDate)}`;
+}
+
+function isDateKeyInRange(dateKey: string, startDate: Date, endDate: Date): boolean {
+  const parsed = parseDateKey(dateKey);
+  if (!parsed) {
+    return false;
+  }
+
+  return parsed >= startDate && parsed <= endDate;
+}
+
+function getStartOfWeek(date: Date): Date {
+  const dayOfWeek = date.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  return addDays(date, mondayOffset);
+}
+
 export function ClientHistoryRouteSurface({
   activePath,
   backHref,
@@ -83,6 +150,7 @@ export function ClientHistoryRouteSurface({
   sectionDescription,
   showHistoryUtility = true,
   showDateArchive = false,
+  showTypeFilter = true,
   historyUtilityVariant = "default",
 }: ClientHistoryRouteSurfaceProps) {
   const { status, user } = useSessionBootstrap({
@@ -95,8 +163,17 @@ export function ClientHistoryRouteSurface({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<ClientHistoryModeFilter>("all");
   const [searchValue, setSearchValue] = useState("");
-  const [archiveDateFilter, setArchiveDateFilter] = useState("");
+  const [archiveStartDate, setArchiveStartDate] = useState("");
+  const [archiveEndDate, setArchiveEndDate] = useState("");
+  const [openArchiveBlockId, setOpenArchiveBlockId] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
+  const effectiveTypeFilter = showTypeFilter ? typeFilter : "all";
+
+  useEffect(() => {
+    if (!showTypeFilter && typeFilter !== "all") {
+      setTypeFilter("all");
+    }
+  }, [showTypeFilter, typeFilter]);
 
   useEffect(() => {
     if (status !== "authenticated" || !user || user.role !== "client") {
@@ -117,8 +194,8 @@ export function ClientHistoryRouteSurface({
         });
         const normalizedSearch = searchValue.trim();
 
-        if (typeFilter !== "all") {
-          params.set("mode", typeFilter);
+        if (effectiveTypeFilter !== "all") {
+          params.set("mode", effectiveTypeFilter);
         }
 
         if (normalizedSearch.length > 0) {
@@ -162,18 +239,124 @@ export function ClientHistoryRouteSurface({
       active = false;
       controller.abort();
     };
-  }, [offset, searchValue, status, typeFilter, user]);
+  }, [effectiveTypeFilter, offset, searchValue, status, user]);
 
   const historyView = useMemo(() => adaptClientHistoryView(historyData), [historyData]);
   const shouldShowHistoryUtility =
     historyUtilityVariant !== "hidden" && showHistoryUtility;
-  const visibleRows = useMemo(
-    () =>
-      archiveDateFilter
-        ? historyView.rows.filter((row) => row.performedAtDateKey === archiveDateFilter)
-        : historyView.rows,
-    [archiveDateFilter, historyView.rows],
-  );
+  const archiveRangeState = useMemo(() => {
+    const hasStartDate = archiveStartDate.length > 0;
+    const hasEndDate = archiveEndDate.length > 0;
+
+    if (!hasStartDate && !hasEndDate) {
+      return {
+        helperMessage: null,
+        rangeStart: null as Date | null,
+        rangeEnd: null as Date | null,
+        useCustomRange: false,
+      };
+    }
+
+    if (!hasStartDate || !hasEndDate) {
+      return {
+        helperMessage: "Select both start and end dates to build archive weeks.",
+        rangeStart: null as Date | null,
+        rangeEnd: null as Date | null,
+        useCustomRange: false,
+      };
+    }
+
+    const parsedStartDate = parseDateKey(archiveStartDate);
+    const parsedEndDate = parseDateKey(archiveEndDate);
+
+    if (!parsedStartDate || !parsedEndDate || parsedStartDate > parsedEndDate) {
+      return {
+        helperMessage: "Start date must be before end date.",
+        rangeStart: null as Date | null,
+        rangeEnd: null as Date | null,
+        useCustomRange: false,
+      };
+    }
+
+    return {
+      helperMessage: null,
+      rangeStart: parsedStartDate,
+      rangeEnd: parsedEndDate,
+      useCustomRange: true,
+    };
+  }, [archiveEndDate, archiveStartDate]);
+  const archiveBlocks = useMemo<HistoryArchiveBlockView[]>(() => {
+    if (!showDateArchive) {
+      return [];
+    }
+
+    const buildBlock = ({
+      id,
+      label,
+      startDate,
+      endDate,
+    }: {
+      id: string;
+      label: string;
+      startDate: Date;
+      endDate: Date;
+    }): HistoryArchiveBlockView => ({
+      id,
+      label,
+      rows: historyView.rows.filter((row) => isDateKeyInRange(row.performedAtDateKey, startDate, endDate)),
+    });
+
+    if (archiveRangeState.useCustomRange && archiveRangeState.rangeStart && archiveRangeState.rangeEnd) {
+      const blocks: HistoryArchiveBlockView[] = [];
+      let blockStartDate = archiveRangeState.rangeStart;
+
+      while (blockStartDate <= archiveRangeState.rangeEnd) {
+        const blockEndDateCandidate = addDays(blockStartDate, 6);
+        const blockEndDate =
+          blockEndDateCandidate <= archiveRangeState.rangeEnd
+            ? blockEndDateCandidate
+            : archiveRangeState.rangeEnd;
+
+        blocks.push(
+          buildBlock({
+            id: `archive-week-${formatDateKey(blockStartDate)}`,
+            label: formatWeekLabel(blockStartDate),
+            startDate: blockStartDate,
+            endDate: blockEndDate,
+          }),
+        );
+
+        blockStartDate = addDays(blockStartDate, 7);
+      }
+
+      return blocks;
+    }
+
+    const today = new Date();
+    const thisWeekStart = getStartOfWeek(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
+    const lastWeekStart = addDays(thisWeekStart, -7);
+
+    return [
+      buildBlock({
+        id: "archive-this-week",
+        label: formatWeekLabel(thisWeekStart, "This Week"),
+        startDate: thisWeekStart,
+        endDate: addDays(thisWeekStart, 6),
+      }),
+      buildBlock({
+        id: "archive-last-week",
+        label: formatWeekLabel(lastWeekStart, "Last Week"),
+        startDate: lastWeekStart,
+        endDate: addDays(lastWeekStart, 6),
+      }),
+    ];
+  }, [archiveRangeState, historyView.rows, showDateArchive]);
+
+  useEffect(() => {
+    if (openArchiveBlockId && !archiveBlocks.some((block) => block.id === openArchiveBlockId)) {
+      setOpenArchiveBlockId(null);
+    }
+  }, [archiveBlocks, openArchiveBlockId]);
 
   if (status === "loading") {
     return <LoadingBlock title="Loading workout history" message="Validating your client session." />;
@@ -259,34 +442,36 @@ export function ClientHistoryRouteSurface({
             title="Workout history"
             description="Review and filter saved workout entries from newest to oldest."
           >
-            <div
-              className="mobile-training-pill-row"
-              role="radiogroup"
-              aria-label="Workout type filter"
-            >
-              {FILTER_OPTIONS.map((option) => {
-                const active = typeFilter === option.value;
+            {showTypeFilter ? (
+              <div
+                className="mobile-training-pill-row"
+                role="radiogroup"
+                aria-label="Workout type filter"
+              >
+                {FILTER_OPTIONS.map((option) => {
+                  const active = typeFilter === option.value;
 
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={[
-                      "mobile-pill",
-                      active ? "mobile-pill--yellow" : "mobile-pill--purple",
-                      "mobile-focus-ring",
-                    ].join(" ")}
-                    onClick={() => {
-                      setTypeFilter(option.value);
-                      setOffset(0);
-                    }}
-                    aria-pressed={active}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={[
+                        "mobile-pill",
+                        active ? "mobile-pill--yellow" : "mobile-pill--purple",
+                        "mobile-focus-ring",
+                      ].join(" ")}
+                      onClick={() => {
+                        setTypeFilter(option.value);
+                        setOffset(0);
+                      }}
+                      aria-pressed={active}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
 
             <div className="field">
               <label htmlFor="history-search">Search</label>
@@ -312,29 +497,48 @@ export function ClientHistoryRouteSurface({
                 <div className="mobile-section__copy">
                   <h3 className="mobile-section__title">Log Archive By Date</h3>
                   <p className="mobile-section__description">
-                    Select a date to show matching workout logs from the loaded archive.
+                    Select a date range to build weekly archive blocks from the loaded history.
                   </p>
                 </div>
                 <div className="client-history-date-archive__controls">
-                  <div className="field">
-                    <label htmlFor="archive-date">Archive date</label>
-                    <input
-                      id="archive-date"
-                      className="mobile-focus-ring"
-                      type="date"
-                      value={archiveDateFilter}
-                      onChange={(event) => {
-                        setArchiveDateFilter(event.target.value);
-                        setOffset(0);
-                      }}
-                    />
+                  <div className="client-history-date-range-grid">
+                    <div className="field">
+                      <label htmlFor="archive-start-date">Start date</label>
+                      <input
+                        id="archive-start-date"
+                        className="mobile-focus-ring"
+                        type="date"
+                        value={archiveStartDate}
+                        onChange={(event) => {
+                          setArchiveStartDate(event.target.value);
+                          setOffset(0);
+                        }}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="archive-end-date">End date</label>
+                      <input
+                        id="archive-end-date"
+                        className="mobile-focus-ring"
+                        type="date"
+                        value={archiveEndDate}
+                        onChange={(event) => {
+                          setArchiveEndDate(event.target.value);
+                          setOffset(0);
+                        }}
+                      />
+                    </div>
                   </div>
-                  {archiveDateFilter ? (
+                  {archiveRangeState.helperMessage ? (
+                    <p className="mobile-section__description">{archiveRangeState.helperMessage}</p>
+                  ) : null}
+                  {archiveStartDate || archiveEndDate ? (
                     <button
                       type="button"
                       className="mobile-pill mobile-pill--purple mobile-focus-ring client-history-date-archive__clear"
                       onClick={() => {
-                        setArchiveDateFilter("");
+                        setArchiveStartDate("");
+                        setArchiveEndDate("");
                         setOffset(0);
                       }}
                     >
@@ -345,9 +549,92 @@ export function ClientHistoryRouteSurface({
               </MobileCard>
             ) : null}
 
-            {historyView.rows.length > 0 && visibleRows.length > 0 ? (
+            {historyView.rows.length <= 0 ? (
+              <StateCard
+                title="No logged workouts yet."
+                message="Saved workout entries will appear here once you use the current client workout logging flow."
+              />
+            ) : showDateArchive ? (
               <div className="stacked-list">
-                {visibleRows.map((row, index) => (
+                {archiveBlocks.map((block) => {
+                  const panelId = `${block.id}-panel`;
+                  const isOpen = openArchiveBlockId === block.id;
+
+                  return (
+                    <MobileCard
+                      key={block.id}
+                      as="article"
+                      variant="soft"
+                      className="client-history-week-archive"
+                    >
+                      <div className="client-history-week-archive__header">
+                        <div className="mobile-section__copy">
+                          <h3 className="mobile-section__title">{block.label}</h3>
+                          <p className="mobile-section__description">
+                            {block.rows.length === 1
+                              ? "1 log in the loaded archive."
+                              : `${block.rows.length} logs in the loaded archive.`}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="utility-icon-link mobile-focus-ring client-history-week-archive__toggle"
+                          aria-expanded={isOpen}
+                          aria-controls={panelId}
+                          aria-label={`Toggle ${block.label} archive block`}
+                          onClick={() => {
+                            setOpenArchiveBlockId((current) => (current === block.id ? null : block.id));
+                          }}
+                        >
+                          <span aria-hidden="true">{isOpen ? "v" : ">"}</span>
+                        </button>
+                      </div>
+
+                      {isOpen ? (
+                        <div id={panelId} className="client-history-week-archive__panel">
+                          {block.rows.length > 0 ? (
+                            <div className="stacked-list">
+                              {block.rows.map((row) => (
+                                <article key={`${block.id}-${row.id}`} className="client-history-week-data-grid">
+                                  <div className="client-history-week-data-cell">
+                                    <span className="mobile-section__eyebrow">Date</span>
+                                    <span className="mobile-section__description">{row.performedAtLabel}</span>
+                                  </div>
+                                  <div className="client-history-week-data-cell">
+                                    <span className="mobile-section__eyebrow">Exercise</span>
+                                    <span className="mobile-section__description">{row.exerciseName}</span>
+                                  </div>
+                                  <div className="client-history-week-data-cell">
+                                    <span className="mobile-section__eyebrow">Sets</span>
+                                    <span className="mobile-section__description">{row.sets}</span>
+                                  </div>
+                                  <div className="client-history-week-data-cell">
+                                    <span className="mobile-section__eyebrow">Reps</span>
+                                    <span className="mobile-section__description">{row.reps}</span>
+                                  </div>
+                                  <div className="client-history-week-data-cell">
+                                    <span className="mobile-section__eyebrow">Weight</span>
+                                    <span className="mobile-section__description">{row.weight}</span>
+                                  </div>
+                                  <div className="client-history-week-data-cell">
+                                    <span className="mobile-section__eyebrow">Time</span>
+                                    <span className="mobile-section__description">{row.duration}</span>
+                                  </div>
+                                </article>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="mobile-section__description">No logs in this range.</p>
+                          )}
+                        </div>
+                      ) : null}
+                    </MobileCard>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="stacked-list">
+                {historyView.rows.map((row, index) => (
                   <MobileCard
                     key={row.id}
                     as="article"
@@ -372,28 +659,6 @@ export function ClientHistoryRouteSurface({
                   </MobileCard>
                 ))}
               </div>
-            ) : historyView.rows.length > 0 && archiveDateFilter ? (
-              <StateCard
-                title="No logs found for this date."
-                message="Try another archive date or clear the date filter."
-                action={(
-                  <button
-                    type="button"
-                    className="mobile-pill mobile-pill--purple mobile-focus-ring client-history-date-archive__clear"
-                    onClick={() => {
-                      setArchiveDateFilter("");
-                      setOffset(0);
-                    }}
-                  >
-                    Clear date
-                  </button>
-                )}
-              />
-            ) : (
-              <StateCard
-                title="No logged workouts yet."
-                message="Saved workout entries will appear here once you use the current client workout logging flow."
-              />
             )}
 
             <div className="mobile-training-action-row">
