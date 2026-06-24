@@ -139,3 +139,15 @@
   - No backend, `app/api`, auth/session, or dependency changes.
 - Note:
   - Recent History uses existing loaded workout history only; no new API calls.
+
+## Phase 12B.7 - Add-log modal tab alignment polish
+
+- Route: `/client/add-log`
+- Changes:
+  - Fixed modal vertical jump when switching between Log and Recent History tabs.
+  - Top-anchored the entry modal within the overlay so both tab views align consistently.
+- Preserved:
+  - Existing workout-log BFF behavior.
+  - Existing recent-history filtering.
+  - Existing Rep/Set hidden sets cleanup and General Workout sets behavior.
+  - No backend, `app/api`, auth/session, or dependency changes.
