@@ -28,6 +28,7 @@ export type ClientHistoryRouteSurfaceProps = {
   sectionDescription: string;
   showHistoryUtility?: boolean;
   showDateArchive?: boolean;
+  historyUtilityVariant?: "default" | "hidden";
 };
 
 type ActionPillProps = {
@@ -82,6 +83,7 @@ export function ClientHistoryRouteSurface({
   sectionDescription,
   showHistoryUtility = true,
   showDateArchive = false,
+  historyUtilityVariant = "default",
 }: ClientHistoryRouteSurfaceProps) {
   const { status, user } = useSessionBootstrap({
     requiredRole: "client",
@@ -163,6 +165,8 @@ export function ClientHistoryRouteSurface({
   }, [offset, searchValue, status, typeFilter, user]);
 
   const historyView = useMemo(() => adaptClientHistoryView(historyData), [historyData]);
+  const shouldShowHistoryUtility =
+    historyUtilityVariant !== "hidden" && showHistoryUtility;
   const visibleRows = useMemo(
     () =>
       archiveDateFilter
@@ -213,7 +217,7 @@ export function ClientHistoryRouteSurface({
 
       {!loading && !errorMessage ? (
         <>
-          {showHistoryUtility ? (
+          {shouldShowHistoryUtility ? (
             <MobileSection
               eyebrow="History utility"
               title={sectionTitle}

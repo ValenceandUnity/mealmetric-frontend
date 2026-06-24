@@ -151,9 +151,21 @@ describe("Client history routes mobile experience", () => {
     );
     expect(screen.getByRole("link", { name: "Back to log workout" }).getAttribute("href")).toBe("/client/add-log");
     expect(screen.queryByText("History utility")).toBeNull();
+    expect(screen.queryByText("Full workout history")).toBeNull();
+    expect(
+      screen.queryByText(
+        "This route preserves the existing client workout-history utility surface for the add-log flow.",
+      ),
+    ).toBeNull();
     expect(screen.queryByText("Protected client route")).toBeNull();
+    expect(
+      screen.queryByText(
+        "Filters, search, and older-entry pagination remain sourced only from the current client workout-log BFF route.",
+      ),
+    ).toBeNull();
     expect(screen.queryByText("Returned logs")).toBeNull();
-    expect(screen.queryByText("Older entries available")).toBeNull();
+    expect(screen.queryByText("Older entries")).toBeNull();
+    expect(screen.queryByText("Use the current older-entries control to advance.")).toBeNull();
     expect(screen.getByText("Log Archive By Date")).toBeTruthy();
     expect(screen.getByLabelText("Archive date")).toHaveProperty("type", "date");
     expect(screen.getByText("Bench Press")).toBeTruthy();
@@ -199,6 +211,7 @@ describe("Client history routes mobile experience", () => {
       }),
     );
     expect(screen.getByText("History utility")).toBeTruthy();
+    expect(screen.getByText("Training history")).toBeTruthy();
     expect(screen.getByText("Protected client route")).toBeTruthy();
   });
 

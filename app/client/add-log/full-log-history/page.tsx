@@ -12,6 +12,7 @@ export default function AddLogFullHistoryPage() {
       sectionDescription="This route preserves the existing client workout-history utility surface for the add-log flow."
       showHistoryUtility={false}
       showDateArchive={true}
+      historyUtilityVariant="hidden"
     />
   );
 }
