@@ -13,6 +13,7 @@ export type ClientHistoryModeFilter = "all" | WorkoutLogMode;
 export type MobileClientWorkoutLogCardView = {
   id: string;
   performedAtLabel: string;
+  performedAtDateKey: string;
   typeLabel: string;
   exerciseName: string;
   sets: string;
@@ -63,6 +64,19 @@ function formatPerformedAt(value: string | null): string {
   }
 
   return performedAtFormatter.format(parsed);
+}
+
+function formatPerformedDateKey(value: string | null): string {
+  if (!value) {
+    return "";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  return parsed.toISOString().slice(0, 10);
 }
 
 function formatDuration(value: number | null): string {
@@ -121,6 +135,7 @@ function buildTableRow({
   return {
     id: `${log.id}-${entry.id}-${entryIndex}-${logIndex}`,
     performedAtLabel,
+    performedAtDateKey: formatPerformedDateKey(log.performedAt),
     performedAtTimestamp,
     typeLabel: formatWorkoutType(log.mode),
     exerciseName,
@@ -141,6 +156,7 @@ function flattenExerciseEntries(logs: WorkoutHistoryItemView[]): SortableWorkout
       return [{
         id: `${log.id}-entryless-${logIndex}`,
         performedAtLabel,
+        performedAtDateKey: formatPerformedDateKey(log.performedAt),
         performedAtTimestamp,
         typeLabel: formatWorkoutType(log.mode),
         exerciseName: "-",

@@ -227,3 +227,20 @@
   - Rep/Set hidden sets cleanup.
   - General Workout sets behavior.
   - No backend/app-api/auth/session/dependency changes.
+
+## Phase 12B.16 - Full log history date archive filter
+
+- Route: `/client/add-log/full-log-history`
+- Changes:
+  - Removed the History Utility section from the add-log full-history route.
+  - Added Log Archive By Date calendar/date input.
+  - Added frontend-only date filtering over loaded workout-history rows.
+  - Added clear-date control and date-filter empty state.
+- Preserved:
+  - Existing workout-history BFF fetch route.
+  - Existing type filter/search/pagination behavior.
+  - Existing client session gating.
+  - No backend, `app/api`, auth/session, or dependency changes.
+- Note:
+  - Date archive filtering is frontend-only over currently loaded BFF rows in this phase.
+  - True all-history date archive can be added later only with an explicit backend/BFF contract.

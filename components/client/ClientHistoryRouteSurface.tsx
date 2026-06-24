@@ -26,6 +26,9 @@ export type ClientHistoryRouteSurfaceProps = {
   pageSubtitle: string;
   sectionTitle: string;
   sectionDescription: string;
+  showHistoryUtility?: boolean;
+  showDateArchive?: boolean;
+  historyUtilityVariant?: "default" | "hidden";
 };
 
 type ActionPillProps = {
@@ -78,6 +81,9 @@ export function ClientHistoryRouteSurface({
   pageSubtitle,
   sectionTitle,
   sectionDescription,
+  showHistoryUtility = true,
+  showDateArchive = false,
+  historyUtilityVariant = "default",
 }: ClientHistoryRouteSurfaceProps) {
   const { status, user } = useSessionBootstrap({
     requiredRole: "client",
@@ -89,6 +95,7 @@ export function ClientHistoryRouteSurface({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<ClientHistoryModeFilter>("all");
   const [searchValue, setSearchValue] = useState("");
+  const [archiveDateFilter, setArchiveDateFilter] = useState("");
   const [offset, setOffset] = useState(0);
 
   useEffect(() => {
@@ -158,6 +165,15 @@ export function ClientHistoryRouteSurface({
   }, [offset, searchValue, status, typeFilter, user]);
 
   const historyView = useMemo(() => adaptClientHistoryView(historyData), [historyData]);
+  const shouldShowHistoryUtility =
+    historyUtilityVariant !== "hidden" && showHistoryUtility;
+  const visibleRows = useMemo(
+    () =>
+      archiveDateFilter
+        ? historyView.rows.filter((row) => row.performedAtDateKey === archiveDateFilter)
+        : historyView.rows,
+    [archiveDateFilter, historyView.rows],
+  );
 
   if (status === "loading") {
     return <LoadingBlock title="Loading workout history" message="Validating your client session." />;
@@ -201,40 +217,42 @@ export function ClientHistoryRouteSurface({
 
       {!loading && !errorMessage ? (
         <>
-          <MobileSection
-            eyebrow="History utility"
-            title={sectionTitle}
-            description={sectionDescription}
-          >
-            <MobileCard as="article" variant="action" className="mobile-training-log-card">
-              <div className="mobile-section__copy">
-                <p className="mobile-section__eyebrow">Protected client route</p>
-                <h2 className="mobile-section__title">Workout history</h2>
-                <p className="mobile-section__description">
-                  Filters, search, and older-entry pagination remain sourced only from the current client workout-log BFF route.
-                </p>
-              </div>
-            </MobileCard>
+          {shouldShowHistoryUtility ? (
+            <MobileSection
+              eyebrow="History utility"
+              title={sectionTitle}
+              description={sectionDescription}
+            >
+              <MobileCard as="article" variant="action" className="mobile-training-log-card">
+                <div className="mobile-section__copy">
+                  <p className="mobile-section__eyebrow">Protected client route</p>
+                  <h2 className="mobile-section__title">Workout history</h2>
+                  <p className="mobile-section__description">
+                    Filters, search, and older-entry pagination remain sourced only from the current client workout-log BFF route.
+                  </p>
+                </div>
+              </MobileCard>
 
-            {historyView.count !== null ? (
-              <div className="mobile-training-meta-grid">
-                <MobileStatCard
-                  label="Returned logs"
-                  value={historyView.countLabel}
-                  progressText={historyView.pageWindowLabel}
-                />
-                <MobileStatCard
-                  label="Older entries"
-                  value={historyView.olderEntriesLabel}
-                  progressText={
-                    historyView.hasMore
-                      ? "Use the current older-entries control to advance."
-                      : "This history page has no next offset."
-                  }
-                />
-              </div>
-            ) : null}
-          </MobileSection>
+              {historyView.count !== null ? (
+                <div className="mobile-training-meta-grid">
+                  <MobileStatCard
+                    label="Returned logs"
+                    value={historyView.countLabel}
+                    progressText={historyView.pageWindowLabel}
+                  />
+                  <MobileStatCard
+                    label="Older entries"
+                    value={historyView.olderEntriesLabel}
+                    progressText={
+                      historyView.hasMore
+                        ? "Use the current older-entries control to advance."
+                        : "This history page has no next offset."
+                    }
+                  />
+                </div>
+              ) : null}
+            </MobileSection>
+          ) : null}
 
           <MobileSection
             eyebrow="Log history"
@@ -285,9 +303,51 @@ export function ClientHistoryRouteSurface({
               />
             </div>
 
-            {historyView.rows.length > 0 ? (
+            {showDateArchive ? (
+              <MobileCard
+                as="article"
+                variant="soft"
+                className="client-history-date-archive"
+              >
+                <div className="mobile-section__copy">
+                  <h3 className="mobile-section__title">Log Archive By Date</h3>
+                  <p className="mobile-section__description">
+                    Select a date to show matching workout logs from the loaded archive.
+                  </p>
+                </div>
+                <div className="client-history-date-archive__controls">
+                  <div className="field">
+                    <label htmlFor="archive-date">Archive date</label>
+                    <input
+                      id="archive-date"
+                      className="mobile-focus-ring"
+                      type="date"
+                      value={archiveDateFilter}
+                      onChange={(event) => {
+                        setArchiveDateFilter(event.target.value);
+                        setOffset(0);
+                      }}
+                    />
+                  </div>
+                  {archiveDateFilter ? (
+                    <button
+                      type="button"
+                      className="mobile-pill mobile-pill--purple mobile-focus-ring client-history-date-archive__clear"
+                      onClick={() => {
+                        setArchiveDateFilter("");
+                        setOffset(0);
+                      }}
+                    >
+                      Clear date
+                    </button>
+                  ) : null}
+                </div>
+              </MobileCard>
+            ) : null}
+
+            {historyView.rows.length > 0 && visibleRows.length > 0 ? (
               <div className="stacked-list">
-                {historyView.rows.map((row, index) => (
+                {visibleRows.map((row, index) => (
                   <MobileCard
                     key={row.id}
                     as="article"
@@ -312,6 +372,23 @@ export function ClientHistoryRouteSurface({
                   </MobileCard>
                 ))}
               </div>
+            ) : historyView.rows.length > 0 && archiveDateFilter ? (
+              <StateCard
+                title="No logs found for this date."
+                message="Try another archive date or clear the date filter."
+                action={(
+                  <button
+                    type="button"
+                    className="mobile-pill mobile-pill--purple mobile-focus-ring client-history-date-archive__clear"
+                    onClick={() => {
+                      setArchiveDateFilter("");
+                      setOffset(0);
+                    }}
+                  >
+                    Clear date
+                  </button>
+                )}
+              />
             ) : (
               <StateCard
                 title="No logged workouts yet."

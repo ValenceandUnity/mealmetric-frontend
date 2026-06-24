@@ -2074,6 +2074,19 @@ html[data-theme="light"] .mobile-bottom-nav {
   grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
 }
 
+.client-history-date-archive {
+  gap: var(--mobile-space-3);
+}
+
+.client-history-date-archive__controls {
+  display: grid;
+  gap: var(--mobile-space-3);
+}
+
+.client-history-date-archive__clear {
+  justify-self: start;
+}
+
 .mobile-training-meta-card__value,
 .mobile-training-exercise-card__title,
 .mobile-training-checklist-item__label {

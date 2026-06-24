@@ -10,6 +10,9 @@ export default function AddLogFullHistoryPage() {
       pageSubtitle="Review and filter saved workout entries from newest to oldest."
       sectionTitle="Full workout history"
       sectionDescription="This route preserves the existing client workout-history utility surface for the add-log flow."
+      showHistoryUtility={false}
+      showDateArchive={true}
+      historyUtilityVariant="hidden"
     />
   );
 }
