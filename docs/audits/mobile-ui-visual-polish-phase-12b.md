@@ -151,3 +151,18 @@
   - Existing recent-history filtering.
   - Existing Rep/Set hidden sets cleanup and General Workout sets behavior.
   - No backend, `app/api`, auth/session, or dependency changes.
+
+## Phase 12B.8 - Add-log modal hard top anchor
+
+- Route: `/client/add-log`
+- Changes:
+  - Replaced the overlay grid alignment with a fixed-position modal anchor.
+  - Anchored the modal top edge to a stable safe-area-aware offset so toggling Log and Recent History does not move the modal vertically.
+  - Kept the tab panel minimum height to reduce layout churn between modal sections.
+- Preserved:
+  - Existing Log / Recent History tabs.
+  - Existing recent-history filtering by selected log type.
+  - Existing workout-log BFF POST behavior.
+  - Existing Rep/Set hidden sets cleanup and General Workout sets behavior.
+  - Existing recent-exercises drawer and localStorage-only goal-template behavior.
+  - No backend, `app/api`, auth/session, dependency, or lockfile changes.
