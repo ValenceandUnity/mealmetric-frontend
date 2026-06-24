@@ -98,6 +98,7 @@ type StateCardProps = {
 
 const GOAL_TEMPLATE_STORAGE_KEY = "mealmetric:add-log:goal-templates";
 const GOAL_TEMPLATE_PAGE_SIZE = 4;
+const EXERCISE_SUGGESTIONS_LIST_ID = "client-add-log-exercise-suggestions";
 const GOAL_TEMPLATE_THEMES: GoalTemplateTheme[] = [
   "emerald",
   "lime",
@@ -481,17 +482,36 @@ function getQuadPageAriaLabel(pageIndex: number): string {
   return `Show goal template page ${pageIndex - 1}`;
 }
 
+function buildExerciseSuggestions(rows: WorkoutHistoryTableRow[]): string[] {
+  const seen = new Set<string>();
+
+  for (const row of rows) {
+    const name = row.exerciseName.trim();
+    if (name.length > 0 && name !== "-") {
+      seen.add(name);
+    }
+  }
+
+  return Array.from(seen).sort((left, right) => left.localeCompare(right));
+}
+
 function normalizeExerciseEntries(
   exercises: ExerciseInputRowState[],
   contextMode: ContextMode,
+  selectedExerciseName: string,
 ): WorkoutLogExerciseEntryInput[] {
   const scopedExercises = contextMode === "rep" ? exercises.slice(0, 1) : exercises;
+  const normalizedSelectedExerciseName = normalizeOptionalText(selectedExerciseName);
 
   return scopedExercises.flatMap((exercise, index) => {
-    const exerciseName = normalizeOptionalText(exercise.name);
+    const exerciseName =
+      contextMode === "general"
+        ? normalizeOptionalText(exercise.name)
+        : normalizedSelectedExerciseName;
     const sets =
       contextMode === "general" ? normalizeOptionalInteger(exercise.sets) : undefined;
-    const reps = normalizeOptionalInteger(exercise.reps);
+    const reps =
+      contextMode === "rep" ? undefined : normalizeOptionalInteger(exercise.reps);
     const weight = normalizeOptionalNumber(exercise.weight);
     const durationMinutes = normalizeOptionalNumber(exercise.time);
     const durationSeconds =
@@ -714,7 +734,6 @@ function AddLogPageContent() {
   const initialRoutineName = searchParams.get("routineName")?.trim() ?? "";
   const initialRoutineId = searchParams.get("routineId")?.trim() ?? "";
   const initialAssignmentId = searchParams.get("assignmentId")?.trim() ?? "";
-  const initialRoutineLabel = searchParams.get("routineLabel")?.trim() ?? "";
 
   const [contextMode, setContextMode] = useState<ContextMode>(
     initialRoutineName ? "rep" : "general",
@@ -744,18 +763,28 @@ function AddLogPageContent() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyErrorMessage, setHistoryErrorMessage] = useState<string | null>(null);
 
-  const hasPrefilledRoutine = initialRoutineName.length > 0;
   const hasValidAnchor = initialAssignmentId.length > 0;
+  const showsTopExerciseSelector = contextMode !== "general";
   const showsSetsField = contextMode === "general";
+  const showsRepsField = contextMode !== "rep";
   const visibleExercises = contextMode === "rep" ? exercises.slice(0, 1) : exercises;
+  const topExerciseSelectorLabel = contextMode === "set" ? "Set" : "Rep";
+  const topExerciseSelectorPlaceholder =
+    contextMode === "set" ? "Enter set name" : "Enter rep name";
+  const requiresTopExerciseSelector =
+    showsTopExerciseSelector && isBlank(routineName);
   const hasInvalidExerciseIntegers = visibleExercises.some(
     (exercise) =>
       (showsSetsField && hasInvalidIntegerValue(exercise.sets)) ||
-      hasInvalidIntegerValue(exercise.reps),
+      (showsRepsField && hasInvalidIntegerValue(exercise.reps)),
   );
-  const blockingMessage = hasInvalidExerciseIntegers
-    ? "Sets and reps must be non-negative whole numbers before saving."
-    : null;
+  const blockingMessage = requiresTopExerciseSelector
+    ? "Exercise name is required before saving."
+    : hasInvalidExerciseIntegers
+      ? showsSetsField
+        ? "Sets and reps must be non-negative whole numbers before saving."
+        : "Reps must be non-negative whole numbers before saving."
+      : null;
   const userTemplatePages = chunkGoalTemplates(goalTemplates);
   const userTemplatePageCount = userTemplatePages.length;
   const totalQuadPages = 2 + userTemplatePageCount;
@@ -918,7 +947,7 @@ function AddLogPageContent() {
   function openEntryForm(mode: ContextMode) {
     setEntryModalTab("log");
     setContextMode(mode);
-    setRoutineName(initialRoutineName);
+    setRoutineName(mode === "general" ? "" : initialRoutineName);
     setExercises(createExercisesForMode(mode));
     setEntryFormOpen(true);
     setSubmitError(null);
@@ -998,7 +1027,11 @@ function AddLogPageContent() {
     setSubmitSuccess(null);
 
     try {
-      const exerciseEntries = normalizeExerciseEntries(visibleExercises, contextMode);
+      const exerciseEntries = normalizeExerciseEntries(
+        visibleExercises,
+        contextMode,
+        routineName,
+      );
       const requestBody: CreateWorkoutLogInput = {
         assignment_id: hasValidAnchor ? initialAssignmentId : undefined,
         routine_id: contextMode === "rep" && initialRoutineId ? initialRoutineId : undefined,
@@ -1047,6 +1080,7 @@ function AddLogPageContent() {
       }
 
       setSubmitSuccess("Workout Saved");
+      setRoutineName(contextMode === "general" ? "" : initialRoutineName);
       setExercises(createExercisesForMode(contextMode));
       closeEntryForm();
       historySectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1087,6 +1121,7 @@ function AddLogPageContent() {
 
   const historyPage = adaptWorkoutHistoryPage(historyData);
   const allHistoryRows = flattenExerciseEntries(historyPage.items);
+  const exerciseSuggestions = buildExerciseSuggestions(allHistoryRows);
   const historyRows = allHistoryRows.slice(0, 3);
   const recentHistoryMode = getWorkoutModePayload(contextMode);
   const recentHistoryRows = allHistoryRows
@@ -1211,19 +1246,15 @@ function AddLogPageContent() {
                   onSubmit={handleSubmit}
                 >
                   <div className="mobile-training-form__grid">
-                    {contextMode === "rep" ? (
+                    {showsTopExerciseSelector ? (
                       <div className="field">
-                        <label htmlFor="routine-context-name">Rep</label>
+                        <label htmlFor="routine-context-name">{topExerciseSelectorLabel}</label>
                         <input
                           id="routine-context-name"
                           value={routineName}
                           onChange={(event) => setRoutineName(event.target.value)}
-                          placeholder={
-                            initialRoutineLabel.length > 0
-                              ? initialRoutineLabel
-                              : "Enter rep name"
-                          }
-                          readOnly={hasPrefilledRoutine}
+                          placeholder={topExerciseSelectorPlaceholder}
+                          list={EXERCISE_SUGGESTIONS_LIST_ID}
                           disabled={submitting}
                         />
                       </div>
@@ -1240,6 +1271,13 @@ function AddLogPageContent() {
                       />
                     </div>
                   </div>
+                  {showsTopExerciseSelector ? (
+                    <datalist id={EXERCISE_SUGGESTIONS_LIST_ID}>
+                      {exerciseSuggestions.map((name) => (
+                        <option key={name} value={name} />
+                      ))}
+                    </datalist>
+                  ) : null}
 
                   {visibleExercises.length > 0 ? (
                     <div className="mobile-training-exercise-grid">
@@ -1255,7 +1293,10 @@ function AddLogPageContent() {
                             <div className="mobile-section__copy">
                               <p className="mobile-section__eyebrow">Exercise row {index + 1}</p>
                               <h3 className="mobile-training-exercise-card__title">
-                                {exercise.name.trim() || `Exercise ${index + 1}`}
+                                {contextMode === "general"
+                                  ? exercise.name.trim() || `Exercise ${index + 1}`
+                                  : routineName.trim() ||
+                                    (contextMode === "rep" ? "Rep entry" : "Set entry")}
                               </h3>
                               <p className="mobile-section__description">Track this movement for today.</p>
                             </div>
@@ -1270,18 +1311,20 @@ function AddLogPageContent() {
                           </div>
 
                           <div className="mobile-training-form__grid">
-                            <div className="field">
-                              <label htmlFor={`exercise-name-${exercise.id}`}>Exercise name</label>
-                              <input
-                                id={`exercise-name-${exercise.id}`}
-                                value={exercise.name}
-                                onChange={(event) =>
-                                  handleExerciseChange(exercise.id, "name", event.target.value)
-                                }
-                                placeholder="Bench press"
-                                disabled={submitting}
-                              />
-                            </div>
+                            {contextMode === "general" ? (
+                              <div className="field">
+                                <label htmlFor={`exercise-name-${exercise.id}`}>Exercise name</label>
+                                <input
+                                  id={`exercise-name-${exercise.id}`}
+                                  value={exercise.name}
+                                  onChange={(event) =>
+                                    handleExerciseChange(exercise.id, "name", event.target.value)
+                                  }
+                                  placeholder="Bench press"
+                                  disabled={submitting}
+                                />
+                              </div>
+                            ) : null}
                             {contextMode === "general" ? (
                               <div className="field">
                                 <label htmlFor={`exercise-sets-${exercise.id}`}>Sets</label>
@@ -1299,21 +1342,23 @@ function AddLogPageContent() {
                                 />
                               </div>
                             ) : null}
-                            <div className="field">
-                              <label htmlFor={`exercise-reps-${exercise.id}`}>Reps</label>
-                              <input
-                                id={`exercise-reps-${exercise.id}`}
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={exercise.reps}
-                                onChange={(event) =>
-                                  handleExerciseChange(exercise.id, "reps", event.target.value)
-                                }
-                                placeholder="10"
-                                disabled={submitting}
-                              />
-                            </div>
+                            {showsRepsField ? (
+                              <div className="field">
+                                <label htmlFor={`exercise-reps-${exercise.id}`}>Reps</label>
+                                <input
+                                  id={`exercise-reps-${exercise.id}`}
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={exercise.reps}
+                                  onChange={(event) =>
+                                    handleExerciseChange(exercise.id, "reps", event.target.value)
+                                  }
+                                  placeholder="10"
+                                  disabled={submitting}
+                                />
+                              </div>
+                            ) : null}
                             <div className="field">
                               <label htmlFor={`exercise-weight-${exercise.id}`}>Weight</label>
                               <input
