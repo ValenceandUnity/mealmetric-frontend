@@ -1433,6 +1433,7 @@ function AddLogPageContent() {
                     id="client-add-log-entry-panel-log"
                     role="tabpanel"
                     aria-labelledby="client-add-log-entry-tab-log"
+                    className="client-add-log-entry-tab-panel"
                   >
                     <div className="mobile-training-form__grid">
                       {contextMode === "rep" ? (
@@ -1609,7 +1610,7 @@ function AddLogPageContent() {
                     id="client-add-log-entry-panel-recent-history"
                     role="tabpanel"
                     aria-labelledby="client-add-log-entry-tab-recent-history"
-                    className="client-add-log-recent-history-panel"
+                    className="client-add-log-entry-tab-panel client-add-log-recent-history-panel"
                   >
                     <div className="mobile-section__copy">
                       <h3 className="mobile-section__title">Recent History</h3>

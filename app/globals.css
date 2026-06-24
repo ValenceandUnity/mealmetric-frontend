@@ -2832,20 +2832,21 @@ html[data-theme="light"] .mobile-training-form textarea {
   inset: 0;
   z-index: 75;
   display: grid;
-  place-items: start center;
+  align-items: flex-start;
+  justify-content: center;
   padding:
-    calc(env(safe-area-inset-top, 0px) + 1rem)
+    calc(env(safe-area-inset-top, 0px) + 4.5rem)
     1rem
-    calc(var(--mobile-bottom-nav-height) + 1rem);
+    calc(var(--mobile-bottom-nav-height) + 1rem + env(safe-area-inset-bottom, 0px));
   background: rgba(3, 7, 18, 0.76);
   backdrop-filter: blur(12px);
 }
 
 .client-training-parity-shell--add-log .client-add-log-entry-modal {
   align-self: start;
-  width: min(100%, 27rem);
-  max-height: min(86dvh, calc(100dvh - var(--mobile-bottom-nav-height) - 1.5rem));
-  overflow: auto;
+  width: min(100%, 21rem);
+  max-height: calc(100dvh - var(--mobile-bottom-nav-height) - 6rem);
+  overflow-y: auto;
   border: 1px solid rgba(173, 187, 255, 0.18);
   border-radius: 1.6rem;
   padding: 1.1rem;
@@ -2904,6 +2905,10 @@ html[data-theme="light"] .mobile-training-form textarea {
     rgba(255, 248, 196, 0.92);
   color: #23150a;
   box-shadow: 0 16px 30px rgba(250, 204, 21, 0.18);
+}
+
+.client-training-parity-shell--add-log .client-add-log-entry-tab-panel {
+  min-height: 22rem;
 }
 
 .client-training-parity-shell--add-log .client-add-log-recent-history-panel {
