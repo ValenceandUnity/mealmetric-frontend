@@ -2532,8 +2532,136 @@ html[data-theme="light"] .mobile-training-form textarea {
 }
 
 .client-training-parity-shell--add-log .client-add-log-template-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 12.75rem;
   border-width: 1px;
   border-style: solid;
+  overflow: hidden;
+}
+
+.client-training-parity-shell--add-log .client-add-log-template-card__copy {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.client-training-parity-shell--add-log .client-add-log-template-card__label {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.client-training-parity-shell--add-log .client-add-log-template-card__value {
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.02;
+}
+
+.client-training-parity-shell--add-log .client-add-log-template-card__progress {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.42;
+}
+
+.client-training-parity-shell--add-log .client-add-log-template-card__icon {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 0.6rem;
+}
+
+.client-training-parity-shell--add-log .client-add-log-template-card__icon-svg {
+  width: 3.3rem;
+  height: 3.3rem;
+}
+
+.client-training-parity-shell--add-log .client-add-log-staple-card {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 12.75rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 1.35rem;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease;
+}
+
+.client-training-parity-shell--add-log .client-add-log-staple-card:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.03);
+}
+
+.client-training-parity-shell--add-log .client-add-log-staple-card--blue {
+  border-color: rgba(177, 214, 255, 0.26);
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.2), transparent 34%),
+    linear-gradient(165deg, rgba(56, 97, 198, 0.98), rgba(45, 111, 221, 0.88));
+  box-shadow: 0 18px 34px rgba(27, 57, 122, 0.32);
+}
+
+.client-training-parity-shell--add-log .client-add-log-staple-card--orange {
+  border-color: rgba(255, 214, 170, 0.28);
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.2), transparent 34%),
+    linear-gradient(165deg, rgba(198, 88, 37, 0.98), rgba(242, 131, 58, 0.88));
+  box-shadow: 0 18px 34px rgba(122, 52, 18, 0.3);
+}
+
+.client-training-parity-shell--add-log .client-add-log-staple-card--lavender {
+  border-color: rgba(224, 214, 255, 0.3);
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.22), transparent 34%),
+    linear-gradient(165deg, rgba(126, 98, 214, 0.96), rgba(176, 154, 241, 0.88));
+  box-shadow: 0 18px 34px rgba(92, 62, 170, 0.28);
+}
+
+.client-training-parity-shell--add-log .client-add-log-staple-card .client-add-log-template-card__label,
+.client-training-parity-shell--add-log .client-add-log-staple-card .client-add-log-template-card__value,
+.client-training-parity-shell--add-log .client-add-log-staple-card .client-add-log-template-card__progress,
+.client-training-parity-shell--add-log .client-add-log-template-card .client-add-log-template-card__label,
+.client-training-parity-shell--add-log .client-add-log-template-card .client-add-log-template-card__value,
+.client-training-parity-shell--add-log .client-add-log-template-card .client-add-log-template-card__progress {
+  color: #fff7ed;
+}
+
+.client-training-parity-shell--add-log .client-add-log-staple-card .client-add-log-template-card__label {
+  font-size: 0.95rem;
+  letter-spacing: 0.2em;
+}
+
+.client-training-parity-shell--add-log .client-add-log-staple-card .client-add-log-template-card__value {
+  font-size: 1.72rem;
+  line-height: 1.04;
+}
+
+.client-training-parity-shell--add-log .client-add-log-staple-card .client-add-log-template-card__icon {
+  justify-content: center;
+  padding-top: 0.85rem;
+}
+
+.client-training-parity-shell--add-log .client-add-log-staple-card .client-add-log-template-card__icon-svg {
+  width: 4.4rem;
+  height: 4.4rem;
+}
+
+.client-training-parity-shell--add-log .client-add-log-staple-card .client-add-log-template-card__icon-svg,
+.client-training-parity-shell--add-log .client-add-log-template-card .client-add-log-template-card__icon-svg {
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .client-training-parity-shell--add-log .client-add-log-template-card--emerald {
@@ -2582,12 +2710,6 @@ html[data-theme="light"] .mobile-training-form textarea {
     radial-gradient(circle at top right, rgba(254, 215, 170, 0.2), transparent 35%),
     linear-gradient(160deg, rgba(159, 61, 46, 0.96), rgba(244, 114, 82, 0.88));
   box-shadow: 0 18px 36px rgba(159, 61, 46, 0.24);
-}
-
-.client-training-parity-shell--add-log .client-add-log-template-card .mobile-stat-card__label,
-.client-training-parity-shell--add-log .client-add-log-template-card .mobile-stat-card__value,
-.client-training-parity-shell--add-log .client-add-log-template-card .mobile-stat-card__progress-text {
-  color: #fff7ed;
 }
 
 .client-training-parity-shell--add-log .client-add-log-template-placeholder {
@@ -2710,7 +2832,7 @@ html[data-theme="light"] .mobile-training-form textarea {
   inset: 0;
   z-index: 75;
   display: grid;
-  place-items: center;
+  place-items: start center;
   padding:
     calc(env(safe-area-inset-top, 0px) + 1rem)
     1rem
@@ -2720,6 +2842,7 @@ html[data-theme="light"] .mobile-training-form textarea {
 }
 
 .client-training-parity-shell--add-log .client-add-log-entry-modal {
+  align-self: start;
   width: min(100%, 27rem);
   max-height: min(86dvh, calc(100dvh - var(--mobile-bottom-nav-height) - 1.5rem));
   overflow: auto;
@@ -2740,6 +2863,7 @@ html[data-theme="light"] .mobile-training-form textarea {
   align-items: flex-start;
   margin-bottom: 1rem;
 }
+
 .client-training-parity-shell--add-log .client-add-log-entry-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2799,15 +2923,65 @@ html[data-theme="light"] .mobile-training-form textarea {
     rgba(10, 12, 20, 0.86);
 }
 
-.client-training-parity-shell--add-log .client-add-log-best-performance-card {
+.client-training-parity-shell--add-log .client-add-log-icon-picker {
+  margin: 0;
+  padding: 0;
+  border: 0;
   display: grid;
-  gap: 0.85rem;
-  margin-bottom: 1rem;
-  border-color: rgba(173, 187, 255, 0.14);
+  gap: 0.65rem;
+}
+
+.client-training-parity-shell--add-log .client-add-log-icon-picker legend {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.client-training-parity-shell--add-log .client-add-log-icon-picker__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.client-training-parity-shell--add-log .client-add-log-icon-picker__option {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  min-height: 5.8rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  color: #e5eefc;
   background:
-    radial-gradient(circle at top right, rgba(96, 165, 250, 0.12), transparent 30%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(14, 16, 26, 0.82)),
-    rgba(10, 12, 20, 0.86);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(17, 24, 39, 0.92)),
+    rgba(10, 12, 20, 0.82);
+  text-align: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.client-training-parity-shell--add-log .client-add-log-icon-picker__option input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.client-training-parity-shell--add-log .client-add-log-icon-picker__option--active {
+  transform: translateY(-1px);
+  border-color: rgba(196, 211, 255, 0.4);
+  box-shadow: 0 14px 28px rgba(30, 41, 59, 0.28);
+}
+
+.client-training-parity-shell--add-log .client-add-log-icon-picker__icon {
+  width: 2.6rem;
+  height: 2.6rem;
+  color: #ffffff;
 }
 
 .client-training-parity-shell--add-log .client-add-log-goal-theme-picker {

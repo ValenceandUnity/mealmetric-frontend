@@ -681,8 +681,40 @@ describe("AddLogPage mobile experience", () => {
     expect(within(dialog).getByLabelText("Goal label")).toBeTruthy();
     expect(within(dialog).getByLabelText("Goal target")).toBeTruthy();
     expect(within(dialog).getByLabelText("Goal note")).toBeTruthy();
+    expect(within(dialog).getByLabelText("Push-up")).toBeTruthy();
+    expect(within(dialog).getByLabelText("Running")).toBeTruthy();
+    expect(within(dialog).getByLabelText("Bench press")).toBeTruthy();
+    expect(within(dialog).getByLabelText("Jump rope")).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: "Create Goal" })).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeTruthy();
+  });
+
+  it("opens the staple goal quad and prefills the modal from the 100 PUSH UP card", async () => {
+    mockHistoryOnly(mixedHistoryItems);
+
+    render(<AddLogPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Show staple goal templates" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Show staple goal templates" }));
+    expect(screen.getByText("100")).toBeTruthy();
+    expect(screen.getByText("PUSH UP")).toBeTruthy();
+    expect(screen.getByText("RUN A")).toBeTruthy();
+    expect(screen.getByText("MILE")).toBeTruthy();
+    expect(screen.getByText("BENCH")).toBeTruthy();
+    expect(screen.getByText("200LBS")).toBeTruthy();
+    expect(screen.getByText("10 MINS STRAIGHT")).toBeTruthy();
+    expect(screen.getByText("JUMP ROPE")).toBeTruthy();
+    expect(screen.queryByText("Template slot open")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Use staple goal 100 PUSH UP" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Create Goal Template" });
+    expect(screen.getByDisplayValue("100")).toBeTruthy();
+    expect(screen.getByDisplayValue("PUSH UP")).toBeTruthy();
+    expect((within(dialog).getByLabelText("Push-up") as HTMLInputElement).checked).toBe(true);
   });
 
   it("creates a local goal template and navigates to the template quad page", async () => {
@@ -717,19 +749,74 @@ describe("AddLogPage mobile experience", () => {
     expect(screen.getByText("1 Mile Run")).toBeTruthy();
     expect(screen.getByText("Complete every Monday and Thursday")).toBeTruthy();
     const starterPageButton = screen.getByRole("button", { name: "Show starter quad" });
+    const staplePageButton = screen.getByRole("button", { name: "Show staple goal templates" });
     const firstTemplatePageButton = screen.getByRole("button", { name: "Show goal template page 1" });
     expect(within(starterPageButton).getByText("1")).toBeTruthy();
-    expect(within(firstTemplatePageButton).getByText("2")).toBeTruthy();
+    expect(within(staplePageButton).getByText("2")).toBeTruthy();
+    expect(within(firstTemplatePageButton).getByText("3")).toBeTruthy();
     expect(firstTemplatePageButton.getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("button", { name: "Create Goal" })).toBeTruthy();
 
     const storedTemplates = JSON.parse(
       window.localStorage.getItem(GOAL_TEMPLATE_STORAGE_KEY) ?? "[]",
-    ) as Array<{ label: string; value: string; theme: string }>;
+    ) as Array<{ label: string; value: string; theme: string; iconName: string }>;
     expect(storedTemplates[0]).toMatchObject({
       label: "Running",
       value: "1 Mile Run",
       theme: "coral",
+      iconName: "pushup",
+    });
+  });
+
+  it("creates a prefilled staple goal template and navigates to page 3", async () => {
+    mockHistoryOnly(mixedHistoryItems);
+
+    render(<AddLogPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Show staple goal templates" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Show staple goal templates" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use staple goal 100 PUSH UP" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Create Goal Template" });
+    fireEvent.change(within(dialog).getByLabelText("Goal label"), {
+      target: { value: "150" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Goal target"), {
+      target: { value: "PUSH UPS" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Goal note"), {
+      target: { value: "Complete after every workout" },
+    });
+    fireEvent.click(within(dialog).getByLabelText("Coral"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create Goal" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Create Goal Template" })).toBeNull();
+    });
+
+    expect(screen.getByText("150")).toBeTruthy();
+    expect(screen.getByText("PUSH UPS")).toBeTruthy();
+    expect(screen.getByText("Complete after every workout")).toBeTruthy();
+    const starterPageButton = screen.getByRole("button", { name: "Show starter quad" });
+    const staplePageButton = screen.getByRole("button", { name: "Show staple goal templates" });
+    const firstTemplatePageButton = screen.getByRole("button", { name: "Show goal template page 1" });
+    expect(within(starterPageButton).getByText("1")).toBeTruthy();
+    expect(within(staplePageButton).getByText("2")).toBeTruthy();
+    expect(within(firstTemplatePageButton).getByText("3")).toBeTruthy();
+    expect(firstTemplatePageButton.getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("button", { name: "Create Goal" })).toBeTruthy();
+
+    const storedTemplates = JSON.parse(
+      window.localStorage.getItem(GOAL_TEMPLATE_STORAGE_KEY) ?? "[]",
+    ) as Array<{ label: string; value: string; theme: string; iconName: string }>;
+    expect(storedTemplates[0]).toMatchObject({
+      label: "150",
+      value: "PUSH UPS",
+      theme: "coral",
+      iconName: "pushup",
     });
   });
 
@@ -774,12 +861,14 @@ describe("AddLogPage mobile experience", () => {
     });
 
     const starterPageButton = screen.getByRole("button", { name: "Show starter quad" });
+    const staplePageButton = screen.getByRole("button", { name: "Show staple goal templates" });
     const firstTemplatePageButton = screen.getByRole("button", { name: "Show goal template page 1" });
     const secondTemplatePageButton = screen.getByRole("button", { name: "Show goal template page 2" });
 
     expect(within(starterPageButton).getByText("1")).toBeTruthy();
-    expect(within(firstTemplatePageButton).getByText("2")).toBeTruthy();
-    expect(within(secondTemplatePageButton).getByText("3")).toBeTruthy();
+    expect(within(staplePageButton).getByText("2")).toBeTruthy();
+    expect(within(firstTemplatePageButton).getByText("3")).toBeTruthy();
+    expect(within(secondTemplatePageButton).getByText("4")).toBeTruthy();
     expect(firstTemplatePageButton.getAttribute("aria-current")).toBe("page");
     expect(screen.getByText("Goal 5")).toBeTruthy();
     expect(screen.getByText("Goal 4")).toBeTruthy();
@@ -805,17 +894,23 @@ describe("AddLogPage mobile experience", () => {
     });
 
     const starterPageButton = screen.getByRole("button", { name: "Show starter quad" });
-    const firstTemplatePageButton = screen.getByRole("button", { name: "Show goal template page 1" });
+    const staplePageButton = screen.getByRole("button", { name: "Show staple goal templates" });
 
     expect(within(starterPageButton).getByText("1")).toBeTruthy();
-    expect(within(firstTemplatePageButton).getByText("2")).toBeTruthy();
+    expect(within(staplePageButton).getByText("2")).toBeTruthy();
     expect(starterPageButton.getAttribute("aria-current")).toBe("page");
+    expect(screen.queryByRole("button", { name: "Previous quad page" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Next quad page" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show goal template page 1" })).toBeNull();
     expect(screen.getByText("Log A Rep")).toBeTruthy();
 
-    fireEvent.click(firstTemplatePageButton);
+    fireEvent.click(staplePageButton);
 
-    expect(firstTemplatePageButton.getAttribute("aria-current")).toBe("page");
-    expect(screen.getAllByText("Template slot open").length).toBe(4);
+    expect(staplePageButton.getAttribute("aria-current")).toBe("page");
+    expect(screen.getByText("100")).toBeTruthy();
+    expect(screen.getByText("PUSH UP")).toBeTruthy();
+    expect(screen.getByText("JUMP ROPE")).toBeTruthy();
+    expect(screen.queryByText("Template slot open")).toBeNull();
     expect(screen.queryByText("Log A Rep")).toBeNull();
 
     fireEvent.click(starterPageButton);
