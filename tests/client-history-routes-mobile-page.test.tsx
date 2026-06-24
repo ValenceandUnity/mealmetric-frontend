@@ -80,8 +80,27 @@ function historyPayload(args?: {
             },
           ],
         },
+        {
+          id: "log-2",
+          performed_at: "2026-06-01T09:00:00Z",
+          mode: "set",
+          client_notes: null,
+          pt_notes: null,
+          exercise_entries: [
+            {
+              id: "entry-2",
+              exercise_name: "Goblet Squat",
+              sets: 3,
+              reps: 10,
+              weight: 50,
+              duration_seconds: 60,
+              notes: null,
+              position: 0,
+            },
+          ],
+        },
       ],
-      count: args?.count ?? 1,
+      count: args?.count ?? 2,
       limit: args?.limit ?? 30,
       offset: args?.offset ?? 0,
       next_offset: args?.nextOffset ?? null,
@@ -106,7 +125,7 @@ describe("Client history routes mobile experience", () => {
     vi.stubGlobal("fetch", fetchMock);
   });
 
-  it("renders /client/add-log/full-log-history on the mobile foundation and preserves the existing workout-history BFF fetch", async () => {
+  it("renders /client/add-log/full-log-history without the utility section and preserves the existing workout-history BFF fetch", async () => {
     fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
@@ -131,7 +150,14 @@ describe("Client history routes mobile experience", () => {
       }),
     );
     expect(screen.getByRole("link", { name: "Back to log workout" }).getAttribute("href")).toBe("/client/add-log");
+    expect(screen.queryByText("History utility")).toBeNull();
+    expect(screen.queryByText("Protected client route")).toBeNull();
+    expect(screen.queryByText("Returned logs")).toBeNull();
+    expect(screen.queryByText("Older entries available")).toBeNull();
+    expect(screen.getByText("Log Archive By Date")).toBeTruthy();
+    expect(screen.getByLabelText("Archive date")).toHaveProperty("type", "date");
     expect(screen.getByText("Bench Press")).toBeTruthy();
+    expect(screen.getByText("Goblet Squat")).toBeTruthy();
     expect(screen.getByText("Notes: Entry note Client note PT note")).toBeTruthy();
     expect(screen.getByText("Sets 4")).toBeTruthy();
     expect(screen.getByText("Reps 8")).toBeTruthy();
@@ -172,6 +198,57 @@ describe("Client history routes mobile experience", () => {
         cache: "no-store",
       }),
     );
+    expect(screen.getByText("History utility")).toBeTruthy();
+    expect(screen.getByText("Protected client route")).toBeTruthy();
+  });
+
+  it("filters the add-log full history page by archive date without changing the BFF query", async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (url === "/api/client/training/workout-logs?limit=30&offset=0" && method === "GET") {
+        return jsonResponse(historyPayload());
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+
+    render(React.createElement(AddLogFullHistoryPage));
+
+    await waitFor(() => {
+      expect(screen.getByText("Bench Press")).toBeTruthy();
+    });
+
+    expect(screen.getByText("Goblet Squat")).toBeTruthy();
+
+    const archiveDateInput = screen.getByLabelText("Archive date");
+    const initialFetchCallCount = fetchMock.mock.calls.length;
+
+    fireEvent.change(archiveDateInput, {
+      target: { value: "2026-06-08" },
+    });
+
+    expect(screen.getByText("Bench Press")).toBeTruthy();
+    expect(screen.queryByText("Goblet Squat")).toBeNull();
+    expect(fetchMock.mock.calls).toHaveLength(initialFetchCallCount);
+
+    fireEvent.change(archiveDateInput, {
+      target: { value: "2026-06-01" },
+    });
+
+    expect(screen.getByText("Goblet Squat")).toBeTruthy();
+    expect(screen.queryByText("Bench Press")).toBeNull();
+    expect(fetchMock.mock.calls).toHaveLength(initialFetchCallCount);
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear date" }));
+
+    expect((screen.getByLabelText("Archive date") as HTMLInputElement).value).toBe("");
+    expect(screen.getByText("Bench Press")).toBeTruthy();
+    expect(screen.getByText("Goblet Squat")).toBeTruthy();
+
+    const requestedUrls = fetchMock.mock.calls.map(([url]) => String(url));
+    expect(requestedUrls.every((url) => !url.includes("date="))).toBe(true);
   });
 
   for (const [label, Page] of [
