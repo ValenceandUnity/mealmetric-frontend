@@ -2508,6 +2508,19 @@ html[data-theme="light"] .mobile-training-form textarea {
   text-align: left;
 }
 
+.client-training-parity-shell--add-log .client-add-log-entry-trigger {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.client-training-parity-shell--add-log .client-add-log-entry-trigger .mobile-stat-card,
 .client-training-parity-shell--add-log .client-add-log-goals-card-button .mobile-stat-card {
   height: 100%;
 }
@@ -2812,6 +2825,102 @@ html[data-theme="light"] .mobile-training-form textarea {
 .client-training-parity-shell--add-log .client-add-log-goal-modal__form {
   display: grid;
   gap: 1rem;
+}
+
+.client-training-parity-shell--add-log .client-add-log-entry-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  display: grid;
+  place-items: start center;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 1rem)
+    1rem
+    calc(var(--mobile-bottom-nav-height) + 1rem);
+  background: rgba(3, 7, 18, 0.76);
+  backdrop-filter: blur(12px);
+}
+
+.client-training-parity-shell--add-log .client-add-log-entry-modal {
+  align-self: start;
+  width: min(100%, 27rem);
+  max-height: min(86dvh, calc(100dvh - var(--mobile-bottom-nav-height) - 1.5rem));
+  overflow: auto;
+  border: 1px solid rgba(173, 187, 255, 0.18);
+  border-radius: 1.6rem;
+  padding: 1.1rem;
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.16), transparent 32%),
+    radial-gradient(circle at top left, rgba(124, 92, 255, 0.14), transparent 30%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(7, 10, 18, 0.98));
+  box-shadow: 0 34px 82px rgba(2, 6, 23, 0.56);
+}
+
+.client-training-parity-shell--add-log .client-add-log-entry-modal__header {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.client-training-parity-shell--add-log .client-add-log-entry-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+  padding: 0.28rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.client-training-parity-shell--add-log .client-add-log-entry-tab {
+  min-height: 2.9rem;
+  padding: 0.72rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(148, 163, 184, 0.16);
+  box-shadow: none;
+  color: rgba(226, 232, 240, 0.92);
+  font-size: 0.92rem;
+  font-weight: 700;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.client-training-parity-shell--add-log .client-add-log-entry-tab:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.client-training-parity-shell--add-log .client-add-log-entry-tab--active {
+  border-color: rgba(255, 248, 196, 0.22);
+  background:
+    linear-gradient(135deg, rgba(255, 242, 184, 0.96), rgba(250, 204, 21, 0.86)),
+    rgba(255, 248, 196, 0.92);
+  color: #23150a;
+  box-shadow: 0 16px 30px rgba(250, 204, 21, 0.18);
+}
+
+.client-training-parity-shell--add-log .client-add-log-recent-history-panel {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.client-training-parity-shell--add-log .client-add-log-recent-history-row {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(173, 187, 255, 0.14);
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(14, 16, 26, 0.82)),
+    rgba(10, 12, 20, 0.86);
 }
 
 .client-training-parity-shell--add-log .client-add-log-icon-picker {
