@@ -324,3 +324,19 @@
   - No backend/app-api/auth/session/dependency changes.
 - Note:
   - Autosuggest is frontend-only over loaded rows; no new endpoint was added.
+
+## Phase 12B.21 - Full log search button static position
+
+- Route: `/client/add-log/full-log-history`
+- Changes:
+  - Locked the magnifying-glass search button position inside the search input across hover, focus, and active states.
+  - Removed the standalone older-entry pagination arrow below the weekly archive blocks on add-log full-history.
+  - Preserved the weekly archive block dropdown arrows.
+- Preserved:
+  - Existing workout-history BFF fetch route.
+  - Existing submitted search query behavior.
+  - Existing search results overlay.
+  - Existing Start date / End date archive controls.
+  - Existing weekly archive blocks.
+  - Existing `/client/training/history` behavior.
+  - No backend/app-api/auth/session/dependency changes.

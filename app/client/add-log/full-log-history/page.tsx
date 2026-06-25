@@ -13,6 +13,7 @@ export default function AddLogFullHistoryPage() {
       showHistoryUtility={false}
       showDateArchive={true}
       showTypeFilter={false}
+      showOlderEntriesControl={false}
       showSearchResultsOverlay={true}
       searchMode="submit"
       historyUtilityVariant="hidden"

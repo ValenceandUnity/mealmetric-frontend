@@ -2167,14 +2167,25 @@ html[data-theme="light"] .mobile-bottom-nav {
   place-items: center;
   width: 2.35rem;
   height: 2.35rem;
+  min-width: 2.35rem;
+  min-height: 2.35rem;
   padding: 0;
+  line-height: 1;
   border-radius: 999px;
   border: 1px solid rgba(173, 187, 255, 0.18);
   background: rgba(124, 92, 255, 0.2);
   color: #f8fafc;
 }
 
+.client-history-search-field__button:hover:not(:disabled),
+.client-history-search-field__button:focus,
+.client-history-search-field__button:focus-visible,
+.client-history-search-field__button:active {
+  transform: translateY(-50%);
+}
+
 .client-history-search-field__icon {
+  display: block;
   width: 1.05rem;
   height: 1.05rem;
   fill: currentColor;
