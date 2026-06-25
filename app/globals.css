@@ -2637,23 +2637,29 @@ html[data-theme="light"] .mobile-training-form textarea {
   align-items: center;
 }
 
+.client-add-log-timer-picker__search-shell {
+  position: relative;
+}
+
 .client-add-log-timer-picker__search-input {
   min-height: 2.95rem;
-  padding: 0.8rem 0.95rem;
+  padding: 0.8rem 3.55rem 0.8rem 0.95rem;
   border-radius: 1rem;
   border: 1px solid rgba(173, 187, 255, 0.18);
   background: rgba(5, 10, 24, 0.78);
   color: #f8fafc;
 }
 
-.client-add-log-timer-picker__search-button {
-  min-width: 2.95rem;
-  min-height: 2.95rem;
+.client-add-log-timer-picker__search-submit,
+.client-add-log-timer-picker__filter-button {
+  min-width: 2.8rem;
+  width: 2.8rem;
+  min-height: 2.8rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  border-radius: 999px;
+  border-radius: 0.9rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background:
     linear-gradient(135deg, rgba(96, 165, 250, 0.3), rgba(124, 58, 237, 0.42)),
@@ -2661,9 +2667,68 @@ html[data-theme="light"] .mobile-training-form textarea {
   color: #f8fafc;
 }
 
-.client-add-log-timer-picker__search-button svg {
+.client-add-log-timer-picker__search-submit {
+  position: absolute;
+  top: 50%;
+  right: 0.35rem;
+  transform: translateY(-50%);
+}
+
+.client-add-log-timer-picker__search-submit svg,
+.client-add-log-timer-picker__filter-button svg {
   width: 1.1rem;
   height: 1.1rem;
+}
+
+.client-add-log-timer-picker__filter {
+  position: relative;
+}
+
+.client-add-log-timer-picker__filter-popover {
+  position: absolute;
+  top: calc(100% + 0.55rem);
+  right: 0;
+  width: min(12rem, calc(100vw - 3rem));
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(173, 187, 255, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.14), transparent 36%),
+    linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(7, 10, 18, 0.98));
+  box-shadow: 0 20px 40px rgba(2, 6, 23, 0.4);
+}
+
+.client-add-log-timer-picker__filter-title {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.client-add-log-timer-picker__filter-group {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.client-add-log-timer-picker__filter-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: rgba(226, 232, 240, 0.9);
+  font-size: 0.92rem;
+}
+
+.client-add-log-timer-picker__filter-option input {
+  width: 1rem;
+  min-width: 1rem;
+  height: 1rem;
+  margin: 0;
+  padding: 0;
 }
 
 .client-add-log-timer-picker__list {
@@ -2734,21 +2799,32 @@ html[data-theme="light"] .mobile-training-form textarea {
   color: #bbf7d0;
 }
 
-.client-add-log-timer-session__clock-button {
+.client-add-log-timer-session__primary-button {
   margin-top: auto;
   min-height: 3.35rem;
   border-radius: 1rem;
-  border: 1px solid rgba(248, 113, 113, 0.16);
-  background: linear-gradient(135deg, #ef4444, #b91c1c);
-  color: #fff7f7;
   font-size: 0.98rem;
   font-weight: 800;
   letter-spacing: 0.08em;
 }
 
+.client-add-log-timer-session__primary-button--start {
+  border: 1px solid rgba(74, 222, 128, 0.16);
+  background: linear-gradient(135deg, #22c55e, #15803d);
+  color: #f0fdf4;
+}
+
+.client-add-log-timer-session__primary-button--clock {
+  border: 1px solid rgba(248, 113, 113, 0.16);
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  color: #fff7f7;
+}
+
 .client-add-log-timer-button-reset:hover:not(:disabled),
 .client-add-log-timer-picker__item:hover:not(:disabled),
-.client-add-log-timer-session__clock-button:hover:not(:disabled) {
+.client-add-log-timer-picker__search-submit:hover:not(:disabled),
+.client-add-log-timer-picker__filter-button:hover:not(:disabled),
+.client-add-log-timer-session__primary-button:hover:not(:disabled) {
   transform: none;
 }
 

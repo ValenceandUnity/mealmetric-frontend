@@ -34,6 +34,7 @@ type WorkoutLogResponse = ApiResponse<JsonValue>;
 type ContextMode = "rep" | "set" | "general";
 type EntryModalTab = "log" | "recent-history";
 type WorkoutTypeFilter = "all" | WorkoutLogMode;
+type TimerTypeFilter = "all" | "rep" | "set" | "routine";
 type ExerciseInputRowState = {
   id: string;
   name: string;
@@ -103,6 +104,7 @@ const GOAL_TEMPLATE_STORAGE_KEY = "mealmetric:add-log:goal-templates";
 const GOAL_TEMPLATE_PAGE_SIZE = 4;
 const EXERCISE_SUGGESTIONS_LIST_ID = "client-add-log-exercise-suggestions";
 const TIMER_EXERCISE_ROW_LIMIT = 5;
+const TIMER_FILTER_POPOVER_ID = "client-add-log-timer-filter-popover";
 const GOAL_TEMPLATE_THEMES: GoalTemplateTheme[] = [
   "emerald",
   "lime",
@@ -534,10 +536,14 @@ function matchesTimerSearch(row: WorkoutHistoryTableRow, query: string): boolean
     return true;
   }
 
+  const typeLabels =
+    row.mode === "general_workout"
+      ? [row.typeLabel, "Routine", "Workout Routine"]
+      : [row.typeLabel];
   const searchableValues = [
     row.exerciseName,
     row.performedAtLabel,
-    row.typeLabel,
+    ...typeLabels,
     `Sets ${row.sets}`,
     `Reps ${row.reps}`,
     `Weight ${row.weight}`,
@@ -549,10 +555,18 @@ function matchesTimerSearch(row: WorkoutHistoryTableRow, query: string): boolean
 
 function buildTimerExerciseRows(
   rows: WorkoutHistoryTableRow[],
+  timerTypeFilter: TimerTypeFilter,
   activeQuery: string,
 ): WorkoutHistoryTableRow[] {
   const filteredRows = rows.filter(
-    (row) => row.exerciseName.trim().length > 0 && row.exerciseName !== "-" && matchesTimerSearch(row, activeQuery),
+    (row) =>
+      row.exerciseName.trim().length > 0 &&
+      row.exerciseName !== "-" &&
+      (timerTypeFilter === "all" ||
+        (timerTypeFilter === "routine"
+          ? row.mode === "general_workout"
+          : row.mode === timerTypeFilter)) &&
+      matchesTimerSearch(row, activeQuery),
   );
   const selectedIds = new Set<string>();
   const selectedNames = new Set<string>();
@@ -698,6 +712,14 @@ function formatWorkoutType(mode: WorkoutLogMode): string {
     default:
       return "General Workout";
   }
+}
+
+function formatTimerWorkoutType(mode: WorkoutLogMode): string {
+  if (mode === "general_workout") {
+    return "Routine";
+  }
+
+  return formatWorkoutType(mode);
 }
 
 function flattenExerciseEntries(logs: WorkoutHistoryItemView[]): WorkoutHistoryTableRow[] {
@@ -854,6 +876,8 @@ function AddLogPageContent() {
   );
   const [timerDraftSearchQuery, setTimerDraftSearchQuery] = useState("");
   const [timerActiveSearchQuery, setTimerActiveSearchQuery] = useState("");
+  const [timerTypeFilter, setTimerTypeFilter] = useState<TimerTypeFilter>("all");
+  const [timerFilterPopoverOpen, setTimerFilterPopoverOpen] = useState(false);
   const [timerStartTimestamp, setTimerStartTimestamp] = useState<number | null>(null);
   const [timerElapsedSeconds, setTimerElapsedSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
@@ -985,6 +1009,11 @@ function AddLogPageContent() {
         return;
       }
 
+      if (timerFilterPopoverOpen) {
+        setTimerFilterPopoverOpen(false);
+        return;
+      }
+
       if (timerSessionOpen) {
         setTimerRunning(false);
         setTimerSessionOpen(false);
@@ -1003,7 +1032,7 @@ function AddLogPageContent() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [timerPickerOpen, timerSessionOpen]);
+  }, [timerFilterPopoverOpen, timerPickerOpen, timerSessionOpen]);
 
   useEffect(() => {
     if ((!entryFormOpen && !timerPickerOpen && !timerSessionOpen) || typeof document === "undefined") {
@@ -1128,6 +1157,7 @@ function AddLogPageContent() {
     setTimerWeight("");
     setTimerSubmitError(null);
     setTimerSubmitting(false);
+    setTimerFilterPopoverOpen(false);
   }
 
   function openTimerPicker() {
@@ -1135,6 +1165,8 @@ function AddLogPageContent() {
     setTimerSessionOpen(false);
     setTimerDraftSearchQuery("");
     setTimerActiveSearchQuery("");
+    setTimerTypeFilter("all");
+    setTimerFilterPopoverOpen(false);
     setTimerSubmitError(null);
     setTimerSubmitSuccess(null);
   }
@@ -1143,6 +1175,7 @@ function AddLogPageContent() {
     setTimerPickerOpen(false);
     setTimerDraftSearchQuery("");
     setTimerActiveSearchQuery("");
+    setTimerFilterPopoverOpen(false);
   }
 
   function applyTimerSearch() {
@@ -1156,10 +1189,103 @@ function AddLogPageContent() {
     setTimerRepName(row.exerciseName);
     setTimerWeight(row.weightValue === null ? "" : String(row.weightValue));
     setTimerElapsedSeconds(0);
-    setTimerStartTimestamp(Date.now());
-    setTimerRunning(true);
+    setTimerStartTimestamp(null);
+    setTimerRunning(false);
+    setTimerFilterPopoverOpen(false);
     setTimerSubmitError(null);
     setTimerSubmitSuccess(null);
+  }
+
+  function handleTimerStart() {
+    setTimerSubmitError(null);
+    setTimerStartTimestamp(Date.now() - timerElapsedSeconds * 1000);
+    setTimerRunning(true);
+  }
+
+  async function handleTimerSave() {
+    const elapsedSeconds =
+      timerStartTimestamp === null
+        ? timerElapsedSeconds
+        : Math.max(0, Math.floor((Date.now() - timerStartTimestamp) / 1000));
+    const normalizedRepName = normalizeOptionalText(timerRepName);
+    const normalizedWeight = normalizeOptionalNumber(timerWeight);
+
+    setTimerElapsedSeconds(elapsedSeconds);
+    setTimerRunning(false);
+    setTimerStartTimestamp(null);
+    setTimerSubmitting(true);
+    setTimerSubmitError(null);
+    setTimerSubmitSuccess(null);
+
+    if (!normalizedRepName) {
+      setTimerSubmitError("Rep name is required before saving.");
+      setTimerSubmitting(false);
+      return;
+    }
+
+    if (timerWeight.trim().length > 0 && normalizedWeight === undefined) {
+      setTimerSubmitError("Weight must be a non-negative number.");
+      setTimerSubmitting(false);
+      return;
+    }
+
+    const durationSeconds = Math.max(1, elapsedSeconds);
+
+    try {
+      const requestBody: CreateWorkoutLogInput = {
+        mode: "rep",
+        performed_at: new Date().toISOString(),
+        completion_status: "completed",
+        exercise_entries: [{
+          exercise_name: normalizedRepName,
+          weight: normalizedWeight,
+          duration_seconds: durationSeconds,
+          position: 0,
+        }],
+      };
+
+      const response = await fetch("/api/client/training/workout-logs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+      const payload = (await response.json()) as WorkoutLogResponse;
+
+      if (!payload.ok) {
+        setTimerSubmitError(payload.error.message);
+        return;
+      }
+
+      const confirmedSavedLog = await refreshConfirmedHistory(getId(payload.data));
+      if (!confirmedSavedLog) {
+        setTimerSubmitError(
+          "The workout request completed, but the refreshed log history could not confirm the saved entry.",
+        );
+        return;
+      }
+
+      setTimerSubmitSuccess("Timed workout saved.");
+      resetTimerSession();
+    } catch (error) {
+      setTimerSubmitError(
+        error instanceof Error
+          ? error.message
+          : "Unable to complete the timed workout save confirmation.",
+      );
+    } finally {
+      setTimerSubmitting(false);
+    }
+  }
+
+  function handleTimerPrimaryAction() {
+    if (timerRunning) {
+      void handleTimerSave();
+      return;
+    }
+
+    handleTimerStart();
   }
 
   function openGoalModal(prefill?: Partial<GoalTemplateFormState>) {
@@ -1302,77 +1428,6 @@ function AddLogPageContent() {
     }
   }
 
-  async function handleTimerClock(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setTimerRunning(false);
-    setTimerSubmitting(true);
-    setTimerSubmitError(null);
-    setTimerSubmitSuccess(null);
-
-    const normalizedRepName = normalizeOptionalText(timerRepName);
-    if (!normalizedRepName) {
-      setTimerSubmitError("Rep name is required before saving.");
-      setTimerSubmitting(false);
-      return;
-    }
-
-    const normalizedWeight = normalizeOptionalNumber(timerWeight);
-    if (timerWeight.trim().length > 0 && normalizedWeight === undefined) {
-      setTimerSubmitError("Weight must be a non-negative number.");
-      setTimerSubmitting(false);
-      return;
-    }
-
-    const durationSeconds = Math.max(1, timerElapsedSeconds);
-
-    try {
-      const requestBody: CreateWorkoutLogInput = {
-        mode: "rep",
-        performed_at: new Date().toISOString(),
-        completion_status: "completed",
-        exercise_entries: [{
-          exercise_name: normalizedRepName,
-          weight: normalizedWeight,
-          duration_seconds: durationSeconds,
-          position: 0,
-        }],
-      };
-
-      const response = await fetch("/api/client/training/workout-logs", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
-      const payload = (await response.json()) as WorkoutLogResponse;
-
-      if (!payload.ok) {
-        setTimerSubmitError(payload.error.message);
-        return;
-      }
-
-      const confirmedSavedLog = await refreshConfirmedHistory(getId(payload.data));
-      if (!confirmedSavedLog) {
-        setTimerSubmitError(
-          "The workout request completed, but the refreshed log history could not confirm the saved entry.",
-        );
-        return;
-      }
-
-      setTimerSubmitSuccess("Timed workout saved.");
-      resetTimerSession();
-    } catch (error) {
-      setTimerSubmitError(
-        error instanceof Error
-          ? error.message
-          : "Unable to complete the timed workout save confirmation.",
-      );
-    } finally {
-      setTimerSubmitting(false);
-    }
-  }
-
   function handleExerciseChange(
     id: string,
     key: keyof Omit<ExerciseInputRowState, "id">,
@@ -1401,7 +1456,11 @@ function AddLogPageContent() {
   const allHistoryRows = flattenExerciseEntries(historyPage.items);
   const exerciseSuggestions = buildExerciseSuggestions(allHistoryRows);
   const historyRows = allHistoryRows.slice(0, 3);
-  const timerExerciseRows = buildTimerExerciseRows(allHistoryRows, timerActiveSearchQuery);
+  const timerExerciseRows = buildTimerExerciseRows(
+    allHistoryRows,
+    timerTypeFilter,
+    timerActiveSearchQuery,
+  );
   const timerDisplay = formatStopwatchDisplay(timerElapsedSeconds);
   const timerDialogsOpen = timerPickerOpen || timerSessionOpen;
   const recentHistoryMode = getWorkoutModePayload(contextMode);
@@ -1421,7 +1480,7 @@ function AddLogPageContent() {
       ? "Log A Rep"
       : contextMode === "set"
         ? "Log A Set"
-        : "Log a General Workout";
+        : "Log a Workout Routine";
   const entryModalMarkup = entryFormOpen ? (
     <div
       className="client-add-log-entry-modal-portal-backdrop"
@@ -1802,41 +1861,107 @@ function AddLogPageContent() {
           </button>
         </div>
 
-        <form
-          className="client-add-log-timer-picker__search"
-          onSubmit={(event) => {
-            event.preventDefault();
-            applyTimerSearch();
-          }}
-        >
+        <div className="client-add-log-timer-picker__search">
           <label htmlFor="client-add-log-timer-search" className="sr-only">
             Search timer exercises
           </label>
-          <input
-            id="client-add-log-timer-search"
-            className="client-add-log-timer-picker__search-input mobile-focus-ring"
-            type="search"
-            value={timerDraftSearchQuery}
-            onChange={(event) => setTimerDraftSearchQuery(event.target.value)}
-            placeholder="Search recent exercises"
-          />
-          <button
-            type="submit"
-            className="client-add-log-timer-picker__search-button mobile-focus-ring client-add-log-timer-button-reset"
-            aria-label="Search timer exercises"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path
-                d="m20 20-4.2-4.2M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Z"
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.8"
-              />
-            </svg>
-          </button>
-        </form>
+          <div className="client-add-log-timer-picker__search-shell">
+            <input
+              id="client-add-log-timer-search"
+              className="client-add-log-timer-picker__search-input mobile-focus-ring"
+              type="search"
+              value={timerDraftSearchQuery}
+              onChange={(event) => setTimerDraftSearchQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                }
+              }}
+              placeholder="Search recent exercises"
+            />
+            <button
+              type="button"
+              className="client-add-log-timer-picker__search-submit mobile-focus-ring client-add-log-timer-button-reset"
+              aria-label="Search timer exercises"
+              onClick={applyTimerSearch}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  d="m20 20-4.2-4.2M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                />
+              </svg>
+            </button>
+          </div>
+          <div className="client-add-log-timer-picker__filter">
+            <button
+              type="button"
+              className="client-add-log-timer-picker__filter-button mobile-focus-ring client-add-log-timer-button-reset"
+              aria-label="Open timer exercise filters"
+              aria-haspopup="dialog"
+              aria-expanded={timerFilterPopoverOpen}
+              aria-controls={TIMER_FILTER_POPOVER_ID}
+              onClick={() => setTimerFilterPopoverOpen((current) => !current)}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  d="M12 3.75a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5Zm0 12a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5ZM4.5 9.75a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5Zm15 0a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5ZM12 6v2.25m0 7.5V18m-5.25-6H4.5m15 0h-2.25"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                />
+              </svg>
+            </button>
+            {timerFilterPopoverOpen ? (
+              <div
+                id={TIMER_FILTER_POPOVER_ID}
+                role="dialog"
+                aria-modal="false"
+                aria-labelledby="client-add-log-timer-filter-title"
+                className="client-add-log-timer-picker__filter-popover"
+              >
+                <p
+                  id="client-add-log-timer-filter-title"
+                  className="client-add-log-timer-picker__filter-title"
+                >
+                  Filter exercises
+                </p>
+                <fieldset
+                  className="client-add-log-timer-picker__filter-group"
+                  aria-label="Filter exercises by workout type"
+                >
+                  <legend className="sr-only">Filter exercises by workout type</legend>
+                  {([
+                    ["all", "All"],
+                    ["rep", "Rep"],
+                    ["set", "Set"],
+                    ["routine", "Routine"],
+                  ] as const).map(([value, label]) => (
+                    <label
+                      key={value}
+                      className="client-add-log-timer-picker__filter-option"
+                    >
+                      <input
+                        type="radio"
+                        name="client-add-log-timer-type-filter"
+                        value={value}
+                        checked={timerTypeFilter === value}
+                        onChange={() => setTimerTypeFilter(value)}
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </fieldset>
+              </div>
+            ) : null}
+          </div>
+        </div>
 
         {historyLoading ? (
           <p className="mobile-section__description">Loading recent exercises...</p>
@@ -1854,12 +1979,12 @@ function AddLogPageContent() {
                 type="button"
                 className="client-add-log-timer-picker__item mobile-focus-ring client-add-log-timer-button-reset"
                 onClick={() => handleTimerExerciseSelect(row)}
-                aria-label={`Start timer for ${row.exerciseName} from ${row.performedAtLabel}`}
+                aria-label={`Open timer session for ${row.exerciseName} from ${row.performedAtLabel}`}
               >
                 <div className="mobile-section__copy">
                   <p className="mobile-section__eyebrow">{row.performedAtLabel}</p>
                   <h3 className="mobile-section__title">{row.exerciseName}</h3>
-                  <p className="mobile-section__description">{row.typeLabel}</p>
+                  <p className="mobile-section__description">{formatTimerWorkoutType(row.mode)}</p>
                 </div>
                 <div
                   className="mobile-training-pill-row"
@@ -1920,7 +2045,7 @@ function AddLogPageContent() {
             {timerDisplay}
           </div>
 
-          <form className="client-add-log-timer-session__form" onSubmit={handleTimerClock}>
+          <div className="client-add-log-timer-session__form">
             <div className="field">
               <label htmlFor="client-add-log-timer-rep">Rep</label>
               <input
@@ -1948,13 +2073,21 @@ function AddLogPageContent() {
               <p className="client-add-log-timer-session__error">{timerSubmitError}</p>
             ) : null}
             <button
-              type="submit"
-              className="client-add-log-timer-session__clock-button mobile-focus-ring client-add-log-timer-button-reset"
+              type="button"
+              className={[
+                "client-add-log-timer-session__primary-button",
+                timerRunning
+                  ? "client-add-log-timer-session__primary-button--clock"
+                  : "client-add-log-timer-session__primary-button--start",
+                "mobile-focus-ring",
+                "client-add-log-timer-button-reset",
+              ].join(" ")}
               disabled={timerSubmitting}
+              onClick={handleTimerPrimaryAction}
             >
-              {timerSubmitting ? "SAVING..." : "CLOCK IT"}
+              {timerSubmitting ? "SAVING..." : timerRunning ? "CLOCK IT" : "START"}
             </button>
-          </form>
+          </div>
         </section>
       </div>
     ) : null;
@@ -2247,12 +2380,12 @@ function AddLogPageContent() {
                   type="button"
                   className="client-add-log-entry-trigger mobile-focus-ring"
                   onClick={() => openEntryForm("general")}
-                  aria-label="Open Log a General Workout form"
+                  aria-label="Open Log a Workout Routine form"
                 >
                   <MobileStatCard
                     className="client-add-log-option-card"
-                    label="General Workout"
-                    value="Log a General Workout"
+                    label="Workout Routine"
+                    value="Log a Workout Routine"
                     progressText="Log Your Entire Routine"
                   />
                 </button>
