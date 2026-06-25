@@ -16,6 +16,7 @@ type MobileAppShellProps = {
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   avatarInitials?: string;
+  avatarContent?: ReactNode;
   avatarLabel?: string;
   onAvatarClick?: () => void;
   avatarControls?: string;
@@ -54,6 +55,7 @@ export function MobileAppShell({
   searchValue,
   onSearchChange,
   avatarInitials,
+  avatarContent,
   avatarLabel,
   onAvatarClick,
   avatarControls,
@@ -70,7 +72,16 @@ export function MobileAppShell({
   const resolvedTitle = title ?? "MealMetric";
   const shouldRenderTopHub =
     showTopHub &&
-    Boolean(title || subtitle || greeting || searchPlaceholder || resolvedInitials || notificationSlot || topHubAction);
+    Boolean(
+      title ||
+        subtitle ||
+        greeting ||
+        searchPlaceholder ||
+        resolvedInitials ||
+        avatarContent ||
+        notificationSlot ||
+        topHubAction,
+    );
 
   return (
     <div
@@ -95,6 +106,7 @@ export function MobileAppShell({
             searchValue={searchValue}
             onSearchChange={onSearchChange}
             avatarInitials={resolvedInitials}
+            avatarContent={avatarContent}
             avatarLabel={avatarLabel}
             onAvatarClick={onAvatarClick}
             avatarControls={avatarControls}

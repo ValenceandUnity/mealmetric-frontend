@@ -2539,6 +2539,12 @@ html[data-theme="light"] .mobile-training-form textarea {
   cursor: pointer;
 }
 
+.client-training-parity-shell--add-log .client-add-log-timer-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #f8fafc;
+}
+
 .client-training-parity-shell--add-log .client-add-log-option-card {
   height: 10.25rem;
   min-height: 10.25rem;
@@ -2557,61 +2563,193 @@ html[data-theme="light"] .mobile-training-form textarea {
   line-height: 1.28;
 }
 
-.client-training-parity-shell--add-log .client-add-log-recent-drawer {
+.client-add-log-timer-picker-backdrop,
+.client-add-log-timer-session-backdrop {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 1rem);
-  right: max(0.8rem, calc((100vw - min(100vw, var(--page-width))) / 2 + 0.8rem));
-  z-index: 50;
-  width: min(75vw, 20rem);
-  max-height: calc(100dvh - var(--mobile-bottom-nav-height) - 2rem);
-  overflow: auto;
-  padding: 1rem;
-  border-radius: 1.4rem 0 0 1.4rem;
-  border: 1px solid rgba(125, 211, 252, 0.28);
-  background:
-    radial-gradient(circle at top right, rgba(125, 211, 252, 0.2), transparent 32%),
-    linear-gradient(160deg, rgba(13, 18, 35, 0.98), rgba(8, 10, 22, 0.98));
-  box-shadow: -18px 22px 44px rgba(2, 6, 18, 0.42);
-  animation: client-add-log-drawer-in 180ms ease-out;
+  inset: 0;
+  z-index: 104;
+  display: grid;
+  place-items: start center;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 4.5rem)
+    1rem
+    calc(var(--mobile-bottom-nav-height) + 1rem);
+  background: rgba(2, 6, 23, 0.68);
+  backdrop-filter: blur(14px);
 }
 
-@keyframes client-add-log-drawer-in {
+.client-add-log-timer-session-backdrop {
+  z-index: 105;
+}
+
+.client-add-log-timer-picker,
+.client-add-log-timer-session {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 4.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(100vw - 2rem), 21rem);
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 1.6rem;
+  border: 1px solid rgba(173, 187, 255, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.16), transparent 34%),
+    radial-gradient(circle at top left, rgba(124, 58, 237, 0.16), transparent 30%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(7, 10, 18, 0.98));
+  box-shadow: 0 34px 82px rgba(2, 6, 23, 0.56);
+  animation: client-add-log-timer-float-in 180ms ease-out;
+}
+
+.client-add-log-timer-picker {
+  max-height: min(33rem, calc(100dvh - var(--mobile-bottom-nav-height) - 6rem));
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.client-add-log-timer-session {
+  max-height: min(34rem, calc(100dvh - var(--mobile-bottom-nav-height) - 6rem));
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+@keyframes client-add-log-timer-float-in {
   from {
-    transform: translateX(110%);
+    transform: translate3d(-50%, 18px, 0);
     opacity: 0;
   }
   to {
-    transform: translateX(0);
+    transform: translate3d(-50%, 0, 0);
     opacity: 1;
   }
 }
 
-.client-training-parity-shell--add-log .client-add-log-recent-drawer__header,
-.client-training-parity-shell--add-log .client-add-log-recent-drawer__summary {
+.client-add-log-timer-picker__header {
   display: flex;
   gap: 0.75rem;
   justify-content: space-between;
   align-items: flex-start;
 }
 
-.client-training-parity-shell--add-log .client-add-log-recent-drawer__header {
-  margin-bottom: 0.95rem;
+.client-add-log-timer-picker__search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
 }
 
-.client-training-parity-shell--add-log .client-add-log-recent-drawer__list {
+.client-add-log-timer-picker__search-input {
+  min-height: 2.95rem;
+  padding: 0.8rem 0.95rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(173, 187, 255, 0.18);
+  background: rgba(5, 10, 24, 0.78);
+  color: #f8fafc;
+}
+
+.client-add-log-timer-picker__search-button {
+  min-width: 2.95rem;
+  min-height: 2.95rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    linear-gradient(135deg, rgba(96, 165, 250, 0.3), rgba(124, 58, 237, 0.42)),
+    rgba(15, 23, 42, 0.84);
+  color: #f8fafc;
+}
+
+.client-add-log-timer-picker__search-button svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.client-add-log-timer-picker__list {
   display: grid;
   gap: 0.8rem;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 0.15rem;
 }
 
-.client-training-parity-shell--add-log .client-add-log-recent-drawer__item {
+.client-add-log-timer-picker__item {
   display: grid;
   gap: 0.75rem;
+  width: 100%;
   padding: 0.9rem;
   border-radius: 1.1rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(173, 187, 255, 0.14);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(14, 16, 26, 0.78)),
-    rgba(10, 12, 20, 0.84);
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(14, 16, 26, 0.82)),
+    rgba(10, 12, 20, 0.86);
+  color: inherit;
+  text-align: left;
+}
+
+.client-add-log-timer-picker__empty {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.82);
+  line-height: 1.5;
+}
+
+.client-add-log-timer-session__display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 5.75rem;
+  border-radius: 1.3rem;
+  border: 1px solid rgba(196, 181, 253, 0.18);
+  background:
+    radial-gradient(circle at top, rgba(167, 139, 250, 0.26), transparent 42%),
+    linear-gradient(180deg, rgba(29, 22, 58, 0.92), rgba(10, 12, 26, 0.92));
+  color: #f5f3ff;
+  font-size: clamp(2rem, 9vw, 2.65rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+
+.client-add-log-timer-session__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  min-height: 0;
+}
+
+.client-add-log-timer-session__error,
+.client-add-log-timer-session__success {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.client-add-log-timer-session__error {
+  color: #fecaca;
+}
+
+.client-add-log-timer-session__success {
+  color: #bbf7d0;
+}
+
+.client-add-log-timer-session__clock-button {
+  margin-top: auto;
+  min-height: 3.35rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(248, 113, 113, 0.16);
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  color: #fff7f7;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.client-add-log-timer-button-reset:hover:not(:disabled),
+.client-add-log-timer-picker__item:hover:not(:disabled),
+.client-add-log-timer-session__clock-button:hover:not(:disabled) {
+  transform: none;
 }
 
 .client-training-parity-shell--add-log .client-add-log-goals-card {

@@ -1,7 +1,8 @@
 import React, { type ReactNode } from "react";
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   fetchMock,
@@ -222,7 +223,11 @@ describe("AddLogPage mobile experience", () => {
     HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
   });
 
-  it("renders the route and preserves the existing history BFF fetch and GO recent-exercises drawer", async () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("renders the route and replaces the GO control with the workout timer picker", async () => {
     mockHistoryOnly(mixedHistoryItems, true);
 
     render(<AddLogPage />);
@@ -246,13 +251,18 @@ describe("AddLogPage mobile experience", () => {
     expect(screen.getByText("Log a General Workout")).toBeTruthy();
     expect(screen.getByText("Goals and Aspirations")).toBeTruthy();
 
-    const recentExercisesButton = screen.getByRole("button", { name: "Show recent exercises" });
-    fireEvent.click(recentExercisesButton);
-    const recentExercisesDialog = screen.getByRole("dialog", { name: "Recent Exercises" });
-    expect(within(recentExercisesDialog).getByText("Morning Circuit")).toBeTruthy();
-    expect(within(recentExercisesDialog).getByRole("button", { name: "Close" })).toBeTruthy();
-    fireEvent.click(within(recentExercisesDialog).getByRole("button", { name: "Close" }));
-    expect(screen.queryByRole("dialog", { name: "Recent Exercises" })).toBeNull();
+    expect(screen.queryByText(/^GO$/)).toBeNull();
+    const timerButton = screen.getByRole("button", { name: "Open workout timer" });
+    fireEvent.click(timerButton);
+    const timerDialog = screen.getByRole("dialog", { name: "SET TIMER" });
+    expect(within(timerDialog).getByRole("searchbox")).toBeTruthy();
+    expect(
+      within(timerDialog).getByRole("button", { name: "Search timer exercises" }),
+    ).toBeTruthy();
+    expect(within(timerDialog).getByRole("button", { name: "Close" })).toBeTruthy();
+    expect(within(timerDialog).getByRole("button", { name: /Morning Circuit/ })).toBeTruthy();
+    fireEvent.click(within(timerDialog).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name: "SET TIMER" })).toBeNull();
 
     expect(screen.getByRole("link", { name: "Full History" }).getAttribute("href")).toBe(
       "/client/add-log/full-log-history",
@@ -274,6 +284,212 @@ describe("AddLogPage mobile experience", () => {
 
     expect(screen.getByText("Loading log workout")).toBeTruthy();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("prioritizes timed exercise rows, caps the picker at five rows, and filters locally", async () => {
+    const user = userEvent.setup();
+    mockHistoryOnly([
+      createHistoryItem({
+        id: "log-1",
+        mode: "rep",
+        exerciseName: "Push Up",
+        durationSeconds: null,
+        performedAt: "2026-06-10T10:00:00Z",
+      }),
+      createHistoryItem({
+        id: "log-2",
+        mode: "rep",
+        exerciseName: "Bench Press",
+        durationSeconds: 120,
+        performedAt: "2026-06-09T10:00:00Z",
+      }),
+      createHistoryItem({
+        id: "log-3",
+        mode: "set",
+        exerciseName: "Bench Press",
+        durationSeconds: 60,
+        performedAt: "2026-06-08T10:00:00Z",
+      }),
+      createHistoryItem({
+        id: "log-4",
+        mode: "set",
+        exerciseName: "Deadlift",
+        durationSeconds: 45,
+        performedAt: "2026-06-07T10:00:00Z",
+      }),
+      createHistoryItem({
+        id: "log-5",
+        mode: "general_workout",
+        exerciseName: "Row",
+        durationSeconds: null,
+        performedAt: "2026-06-06T10:00:00Z",
+      }),
+      createHistoryItem({
+        id: "log-6",
+        mode: "rep",
+        exerciseName: "Sprint",
+        durationSeconds: 30,
+        performedAt: "2026-06-05T10:00:00Z",
+      }),
+    ]);
+
+    render(<AddLogPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open workout timer" })).toBeTruthy();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Open workout timer" }));
+    const timerDialog = screen.getByRole("dialog", { name: "SET TIMER" });
+    const exerciseButtons = within(timerDialog).getAllByRole("button", {
+      name: /Start timer for/,
+    });
+    const exerciseButtonNames = exerciseButtons.map((button) => button.getAttribute("aria-label"));
+
+    expect(exerciseButtons).toHaveLength(5);
+    expect(exerciseButtonNames.filter((name) => name?.includes("Bench Press"))).toHaveLength(1);
+    expect(exerciseButtonNames.slice(0, 3)).toEqual([
+      expect.stringContaining("Bench Press"),
+      expect.stringContaining("Deadlift"),
+      expect.stringContaining("Sprint"),
+    ]);
+
+    const initialHistoryFetches = fetchMock.mock.calls.filter(
+      ([url, init]) => String(url) === HISTORY_URL && (init?.method ?? "GET") === "GET",
+    );
+    await user.type(within(timerDialog).getByRole("searchbox"), "Row");
+    await user.click(within(timerDialog).getByRole("button", { name: "Search timer exercises" }));
+
+    const filteredButtons = within(screen.getByRole("dialog", { name: "SET TIMER" })).getAllByRole(
+      "button",
+      { name: /Start timer for/ },
+    );
+    expect(filteredButtons).toHaveLength(1);
+    expect(filteredButtons[0].getAttribute("aria-label")).toContain("Row");
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url, init]) => String(url) === HISTORY_URL && (init?.method ?? "GET") === "GET",
+      ),
+    ).toHaveLength(initialHistoryFetches.length);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "SET TIMER" })).toBeNull();
+  });
+
+  it("opens the timer session, advances the stopwatch, posts CLOCK IT through the existing BFF route, and refreshes history", async () => {
+    const user = userEvent.setup();
+    mockHistoryAndPost({
+      initialItems: mixedHistoryItems,
+      refreshedItems: [
+        createHistoryItem({
+          id: "saved-log-1",
+          mode: "rep",
+          exerciseName: "Bench Press",
+          weight: 135.5,
+          durationSeconds: 3,
+        }),
+      ],
+    });
+
+    render(<AddLogPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open workout timer" })).toBeTruthy();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Open workout timer" }));
+    vi.useFakeTimers();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Start timer for Bench Press/ }));
+    });
+
+    const timerSession = screen.getByRole("dialog", { name: "SET TIMER" });
+    expect(within(timerSession).getByText("00:00:00")).toBeTruthy();
+    expect((within(timerSession).getByLabelText("Rep") as HTMLInputElement).value).toBe(
+      "Bench Press",
+    );
+    expect((within(timerSession).getByLabelText("Weight") as HTMLInputElement).value).toBe(
+      "135.5",
+    );
+    expect(within(timerSession).getByRole("button", { name: "CLOCK IT" })).toBeTruthy();
+
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(
+      within(screen.getByRole("dialog", { name: "SET TIMER" })).getByText("00:00:03"),
+    ).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(
+        within(screen.getByRole("dialog", { name: "SET TIMER" })).getByRole("button", {
+          name: "CLOCK IT",
+        }),
+      );
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        POST_URL,
+        expect.objectContaining({
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }),
+      );
+    });
+
+    const requestBody = getLatestPostBody();
+    expect(requestBody.mode).toBe("rep");
+    expect(requestBody.completion_status).toBe("completed");
+    expect(requestBody.exercise_entries).toEqual([{
+      exercise_name: "Bench Press",
+      weight: 135.5,
+      duration_seconds: 3,
+      position: 0,
+    }]);
+    expect(requestBody.assignment_id).toBeUndefined();
+    expect(requestBody.routine_id).toBeUndefined();
+    expect(typeof requestBody.performed_at).toBe("string");
+
+    await waitFor(() => {
+      expect(screen.getByText("Timed workout saved.")).toBeTruthy();
+    });
+
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url, init]) => String(url) === HISTORY_URL && (init?.method ?? "GET") === "GET",
+      ),
+    ).toHaveLength(2);
+    expect(screen.queryByRole("dialog", { name: "SET TIMER" })).toBeNull();
+  });
+
+  it("closes the active timer session without posting when cancelled or dismissed with Escape", async () => {
+    const user = userEvent.setup();
+    mockHistoryOnly(mixedHistoryItems);
+
+    render(<AddLogPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open workout timer" })).toBeTruthy();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Open workout timer" }));
+    await user.click(screen.getByRole("button", { name: /Start timer for Bench Press/ }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "SET TIMER" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Open workout timer" }));
+    await user.click(screen.getByRole("button", { name: /Start timer for Bench Press/ }));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "SET TIMER" })).toBeNull();
+
+    const workoutLogCalls = fetchMock.mock.calls.filter(
+      ([url, init]) => String(url) === POST_URL && init?.method === "POST",
+    );
+    expect(workoutLogCalls).toHaveLength(0);
   });
 
   it("opens the starter quad cards as entry-form modals and preserves close behavior", async () => {

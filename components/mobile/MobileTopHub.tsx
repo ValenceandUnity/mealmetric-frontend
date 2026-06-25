@@ -11,6 +11,7 @@ type MobileTopHubProps = {
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   avatarInitials?: string;
+  avatarContent?: ReactNode;
   avatarLabel?: string;
   onAvatarClick?: () => void;
   avatarControls?: string;
@@ -31,6 +32,7 @@ export function MobileTopHub({
   searchValue,
   onSearchChange,
   avatarInitials,
+  avatarContent,
   avatarLabel,
   onAvatarClick,
   avatarControls,
@@ -41,6 +43,8 @@ export function MobileTopHub({
   statusStrip,
 }: MobileTopHubProps) {
   const searchId = useId();
+  const resolvedAvatarLabel =
+    avatarButtonLabel ?? avatarLabel ?? (avatarInitials ? `${avatarInitials} avatar` : "Avatar");
 
   const handleChange: ChangeEventHandler<HTMLInputElement> | undefined = onSearchChange
     ? (event) => {
@@ -63,24 +67,24 @@ export function MobileTopHub({
           </div>
           <div className="mobile-top-hub__utility">
             {notificationSlot}
-            {avatarInitials && onAvatarClick ? (
+            {(avatarContent || avatarInitials) && onAvatarClick ? (
               <button
                 type="button"
                 className="mobile-top-hub__avatar mobile-focus-ring"
-                aria-label={avatarButtonLabel ?? avatarLabel ?? `${avatarInitials} avatar`}
+                aria-label={resolvedAvatarLabel}
                 aria-controls={avatarControls}
                 aria-expanded={avatarExpanded}
                 onClick={onAvatarClick}
               >
-                {avatarInitials}
+                {avatarContent ?? avatarInitials}
               </button>
-            ) : avatarInitials ? (
+            ) : avatarContent || avatarInitials ? (
               <span
                 className="mobile-top-hub__avatar"
                 role="img"
-                aria-label={avatarLabel ?? `${avatarInitials} avatar`}
+                aria-label={resolvedAvatarLabel}
               >
-                {avatarInitials}
+                {avatarContent ?? avatarInitials}
               </span>
             ) : null}
           </div>
