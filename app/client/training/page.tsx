@@ -5,6 +5,7 @@ import { startTransition, useDeferredValue, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 import { MobileAppShell } from "@/components/mobile/MobileAppShell";
+import { MobileHeaderUtilities } from "@/components/mobile/MobileHeaderUtilities";
 import { MobileCard } from "@/components/mobile/MobileCard";
 import { MobileRoutineCard } from "@/components/mobile/MobileRoutineCard";
 import { MobileSection } from "@/components/mobile/MobileSection";
@@ -186,9 +187,16 @@ export default function ClientTrainingHubPage() {
           setSearchValue(nextValue);
         });
       }}
-      notificationSlot={<ActionPill href="/client/training/history" tone="purple">History</ActionPill>}
+      notificationSlot={(
+        <MobileHeaderUtilities
+          role="client"
+          settingsHref="/client/settings"
+          leadingSlot={<ActionPill href="/client/training/history" tone="purple">History</ActionPill>}
+        />
+      )}
       topHubAction={<ActionPill href="/client/add-log">Log your reps</ActionPill>}
       activePath="/client/training"
+      showAvatar={false}
       statusStrip={(
         <>
           <span className="mobile-pill mobile-pill--purple">

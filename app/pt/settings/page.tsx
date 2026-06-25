@@ -5,6 +5,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { LogoutButton } from "@/components/LogoutButton";
 import { MobileAppShell } from "@/components/mobile/MobileAppShell";
 import { MobileCard } from "@/components/mobile/MobileCard";
+import { MobileHeaderBackgroundSettings } from "@/components/mobile/MobileHeaderBackgroundSettings";
 import { MobileSection } from "@/components/mobile/MobileSection";
 import { MobileStatCard } from "@/components/mobile/MobileStatCard";
 import { DebugPreview } from "@/components/ui/DebugPreview";
@@ -198,6 +199,8 @@ export default function PTSettingsPage() {
       title="Settings"
       subtitle="PT profile and session settings through the authenticated BFF workflow."
     >
+      <MobileHeaderBackgroundSettings role="pt" />
+
       {loading ? (
         <MobileSection
           eyebrow="Loading"

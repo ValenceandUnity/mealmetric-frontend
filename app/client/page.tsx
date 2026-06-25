@@ -4,8 +4,8 @@ import Link from "next/link";
 import { startTransition, useDeferredValue, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
-import { LogoutButton } from "@/components/LogoutButton";
 import { MobileAppShell } from "@/components/mobile/MobileAppShell";
+import { MobileHeaderUtilities } from "@/components/mobile/MobileHeaderUtilities";
 import { MobileCard } from "@/components/mobile/MobileCard";
 import { MobileMealPlanRow } from "@/components/mobile/MobileMealPlanRow";
 import { MobileRoutineCard } from "@/components/mobile/MobileRoutineCard";
@@ -264,9 +264,15 @@ export default function ClientDashboardPage() {
         });
       }}
       notificationSlot={(
-        <ActionPill href="/client/bookmarks" tone="purple">
-          <PillLabel icon={getShortcutIcon("bookmarks")}>Bookmarks</PillLabel>
-        </ActionPill>
+        <MobileHeaderUtilities
+          role="client"
+          settingsHref="/client/settings"
+          leadingSlot={(
+            <ActionPill href="/client/bookmarks" tone="purple">
+              <PillLabel icon={getShortcutIcon("bookmarks")}>Bookmarks</PillLabel>
+            </ActionPill>
+          )}
+        />
       )}
       topHubAction={(
         <>
@@ -279,6 +285,7 @@ export default function ClientDashboardPage() {
         </>
       )}
       activePath="/client"
+      showAvatar={false}
       statusStrip={(
         <>
           <span className="mobile-pill mobile-pill--purple">{routineCountLabel}</span>
@@ -476,15 +483,6 @@ export default function ClientDashboardPage() {
           </MobileSection>
         </>
       )}
-
-      <MobileSection
-        className="client-home-section client-home-section--account"
-        eyebrow="Session"
-        title="Account"
-        description="Sign-out continues to use the existing protected client auth flow."
-      >
-        <LogoutButton />
-      </MobileSection>
     </MobileAppShell>
   );
 }

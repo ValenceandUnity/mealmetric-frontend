@@ -93,6 +93,11 @@ describe("Client settings mobile experience", () => {
       expect(screen.getByRole("heading", { name: "Client Settings" })).toBeTruthy();
     });
 
+    expect(screen.getByRole("heading", { name: "Header Background" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Default" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Dark Grid" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Purple Gradient" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Custom Local Image" })).toBeTruthy();
     expect(screen.getByText("Settings overview")).toBeTruthy();
     expect(screen.getAllByText("client@example.com").length).toBeGreaterThan(0);
     expect(screen.getAllByText("client").length).toBeGreaterThan(0);
@@ -113,6 +118,11 @@ describe("Client settings mobile experience", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Light" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Purple Gradient" }));
+    await waitFor(() => {
+      expect(screen.getByText("Purple Gradient saved locally.")).toBeTruthy();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Light" }));

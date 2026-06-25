@@ -5,6 +5,7 @@ import { startTransition, useDeferredValue, useEffect, useMemo, useState } from 
 import type { ReactNode } from "react";
 
 import { MobileAppShell } from "@/components/mobile/MobileAppShell";
+import { MobileHeaderUtilities } from "@/components/mobile/MobileHeaderUtilities";
 import { MobileCard } from "@/components/mobile/MobileCard";
 import { MobileMealPlanRow } from "@/components/mobile/MobileMealPlanRow";
 import { MobileSection } from "@/components/mobile/MobileSection";
@@ -754,7 +755,13 @@ export default function ClientMealPlansPage() {
           setSearchValue(nextValue);
         });
       }}
-      notificationSlot={<ActionPill href="/client" tone="purple">Client home</ActionPill>}
+      notificationSlot={(
+        <MobileHeaderUtilities
+          role="client"
+          settingsHref="/client/settings"
+          leadingSlot={<ActionPill href="/client" tone="purple">Client home</ActionPill>}
+        />
+      )}
       topHubAction={
         <ActionPillButton
           onClick={() => {
@@ -771,6 +778,7 @@ export default function ClientMealPlansPage() {
         </ActionPillButton>
       }
       activePath="/client/meal-plans"
+      showAvatar={false}
     >
       {allSectionsFailed ? (
         <MobileSection

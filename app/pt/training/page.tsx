@@ -5,6 +5,7 @@ import { startTransition, useDeferredValue, useEffect, useMemo, useState } from 
 import type { CSSProperties, ReactNode } from "react";
 
 import { MobileAppShell } from "@/components/mobile/MobileAppShell";
+import { MobileHeaderUtilities } from "@/components/mobile/MobileHeaderUtilities";
 import { MobileCard } from "@/components/mobile/MobileCard";
 import { MobileSection } from "@/components/mobile/MobileSection";
 import { MobileStatCard } from "@/components/mobile/MobileStatCard";
@@ -290,9 +291,16 @@ export default function PTTrainingPage() {
           setSearchValue(nextValue);
         });
       }}
-      notificationSlot={<ActionPill href="/pt" tone="purple">PT home</ActionPill>}
+      notificationSlot={(
+        <MobileHeaderUtilities
+          role="pt"
+          settingsHref="/pt/settings"
+          leadingSlot={<ActionPill href="/pt" tone="purple">PT home</ActionPill>}
+        />
+      )}
       topHubAction={<ActionPill href="/pt/clients">Open clients</ActionPill>}
       activePath="/pt/training"
+      showAvatar={false}
     >
       {allSectionsFailed ? (
         <MobileSection

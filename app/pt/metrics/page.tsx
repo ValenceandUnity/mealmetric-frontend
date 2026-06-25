@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 import { MobileAppShell } from "@/components/mobile/MobileAppShell";
+import { MobileHeaderUtilities } from "@/components/mobile/MobileHeaderUtilities";
 import { MobileCard } from "@/components/mobile/MobileCard";
 import { MobileSection } from "@/components/mobile/MobileSection";
 import { MobileStatCard } from "@/components/mobile/MobileStatCard";
@@ -209,9 +210,16 @@ export default function PTMetricsPage() {
       greeting={formatDisplayNameFromUser(user)}
       title="Progress Reports"
       subtitle="PT metrics stay inside the current dashboard and linked-client BFF routes, with no direct backend access from the browser."
-      notificationSlot={<ActionPill href="/pt" tone="purple">PT home</ActionPill>}
+      notificationSlot={(
+        <MobileHeaderUtilities
+          role="pt"
+          settingsHref="/pt/settings"
+          leadingSlot={<ActionPill href="/pt" tone="purple">PT home</ActionPill>}
+        />
+      )}
       topHubAction={<ActionPill href="/pt/clients">Open clients</ActionPill>}
       activePath="/pt/metrics"
+      showAvatar={false}
     >
       {allSectionsFailed ? (
         <MobileSection

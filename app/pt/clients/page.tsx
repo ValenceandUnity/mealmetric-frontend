@@ -5,6 +5,7 @@ import { FormEvent, startTransition, useDeferredValue, useEffect, useMemo, useSt
 import type { ReactNode } from "react";
 
 import { MobileAppShell } from "@/components/mobile/MobileAppShell";
+import { MobileHeaderUtilities } from "@/components/mobile/MobileHeaderUtilities";
 import { MobileCard } from "@/components/mobile/MobileCard";
 import { MobileSection } from "@/components/mobile/MobileSection";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
@@ -397,7 +398,13 @@ export default function PTClientsPage() {
           setSearchValue(nextValue);
         });
       }}
-      notificationSlot={<ActionPill href="/pt" tone="purple">Dashboard</ActionPill>}
+      notificationSlot={(
+        <MobileHeaderUtilities
+          role="pt"
+          settingsHref="/pt/settings"
+          leadingSlot={<ActionPill href="/pt" tone="purple">Dashboard</ActionPill>}
+        />
+      )}
       topHubAction={(
         <ActionPillButton
           onClick={() => setShowInviteForm((current) => !current)}
@@ -407,6 +414,7 @@ export default function PTClientsPage() {
         </ActionPillButton>
       )}
       activePath="/pt/clients"
+      showAvatar={false}
     >
       {feedback ? (
         <FeedbackBanner

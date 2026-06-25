@@ -66,7 +66,7 @@ export type MobileClientHomeView = {
 function adaptHomeHeader(user?: SessionUser | null): MobileHomeHeaderView {
   return {
     greeting: formatDisplayNameFromUser(user),
-    title: "Fuel the next session",
+    title: "Welcome",
     subtitle:
       "A mobile-ready home summary built from the current protected client overview, training, and meal-plan responses.",
   };

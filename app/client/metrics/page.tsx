@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 import { MobileAppShell } from "@/components/mobile/MobileAppShell";
+import { MobileHeaderUtilities } from "@/components/mobile/MobileHeaderUtilities";
 import { MobileCard } from "@/components/mobile/MobileCard";
 import { MobileSection } from "@/components/mobile/MobileSection";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
@@ -376,9 +377,16 @@ export default function ClientMetricsPage() {
       greeting={formatDisplayNameFromUser(user)}
       title="Metrics"
       subtitle="Track intake, output, deficit, and targets from your current client metrics snapshot."
-      notificationSlot={<ActionPill href="/client" tone="purple">Client home</ActionPill>}
+      notificationSlot={(
+        <MobileHeaderUtilities
+          role="client"
+          settingsHref="/client/settings"
+          leadingSlot={<ActionPill href="/client" tone="purple">Client home</ActionPill>}
+        />
+      )}
       topHubAction={<ActionPill href="/client/add-log">Add log</ActionPill>}
       activePath="/client/metrics"
+      showAvatar={false}
     >
       {allSectionsFailed ? (
         <MobileSection

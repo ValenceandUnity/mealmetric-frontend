@@ -104,12 +104,13 @@ describe("ClientDashboardPage mobile home", () => {
     render(React.createElement(ClientDashboardPage));
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Fuel the next session" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Welcome" })).toBeTruthy();
     });
 
     expect(fetchMock).toHaveBeenCalledWith("/api/client/home", { cache: "no-store" });
     expect(screen.getByRole("searchbox", { name: "Search client home" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Bookmarks" }).getAttribute("href")).toBe("/client/bookmarks");
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Add log" }).getAttribute("href")).toBe("/client/add-log");
     expect(screen.getByRole("heading", { name: "Lower body strength" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Lean Fuel Week" })).toBeTruthy();
