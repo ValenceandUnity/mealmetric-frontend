@@ -349,7 +349,7 @@ describe("AddLogPage mobile experience", () => {
     expect(screen.getByRole("dialog", { name: "Log A Rep" })).toBe(dialog);
     expect(document.getElementById("client-add-log-entry-log-panel")?.getAttribute("aria-hidden")).toBe("false");
     expect(document.getElementById("client-add-log-entry-history-panel")?.getAttribute("aria-hidden")).toBe("true");
-    expect(within(dialog).getByLabelText("Exercise name")).toBeTruthy();
+    expect(within(dialog).getByLabelText("Rep")).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
   });
 
@@ -400,7 +400,7 @@ describe("AddLogPage mobile experience", () => {
     expect(within(dialog).queryByText("Best from recent logs")).toBeNull();
   });
 
-  it("removes the Sets field and Add Exercise button from rep mode and omits sets from the POST payload", async () => {
+  it("uses the top Rep selector with history autosuggest and omits hidden rep/set fields from the POST payload", async () => {
     searchParamsMock.mockReturnValue(
       new URLSearchParams(
         "routineName=Bench%20Day&routineId=routine-1&assignmentId=assignment-9&routineLabel=Bench%20Press",
@@ -427,20 +427,21 @@ describe("AddLogPage mobile experience", () => {
     });
 
     const dialog = openEntryModal("Open Log A Rep form");
-    expect(within(dialog).getByDisplayValue("Bench Day")).toHaveProperty("readOnly", true);
+    const repInput = within(dialog).getByLabelText("Rep") as HTMLInputElement;
+    expect(repInput.value).toBe("Bench Day");
+    expect(repInput.getAttribute("list")).toBe("client-add-log-exercise-suggestions");
+    expect(document.querySelector("#client-add-log-exercise-suggestions option[value='Bench Press']")).toBeTruthy();
+    expect(within(dialog).queryByLabelText("Exercise name")).toBeNull();
     expect(within(dialog).queryByLabelText("Sets")).toBeNull();
     expect(within(dialog).queryByRole("button", { name: "Add Exercise" })).toBeNull();
-    expect(within(dialog).getByLabelText("Exercise name")).toBeTruthy();
-    expect(within(dialog).getByLabelText("Reps")).toBeTruthy();
+    expect(within(dialog).queryByLabelText("Reps")).toBeNull();
     expect(within(dialog).getByLabelText("Weight")).toBeTruthy();
     expect(within(dialog).getByLabelText("Time (minutes)")).toBeTruthy();
     expect(within(dialog).getByLabelText("Performed at")).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
 
-    fireEvent.change(within(dialog).getByLabelText("Exercise name"), {
+    fireEvent.change(repInput, {
       target: { value: "Bench Press" },
-    });
-    fireEvent.change(within(dialog).getByLabelText("Reps"), {
-      target: { value: "8" },
     });
     fireEvent.change(within(dialog).getByLabelText("Weight"), {
       target: { value: "135.5" },
@@ -474,13 +475,13 @@ describe("AddLogPage mobile experience", () => {
       completion_status: "completed",
       exercise_entries: [{
         exercise_name: "Bench Press",
-        reps: 8,
         weight: 135.5,
         duration_seconds: 90,
         position: 0,
       }],
     });
     expect(requestBody.exercise_entries[0].sets).toBeUndefined();
+    expect(requestBody.exercise_entries[0].reps).toBeUndefined();
     expect(requestBody.exercise_entries[0].notes).toBeUndefined();
 
     await waitFor(() => {
@@ -494,10 +495,10 @@ describe("AddLogPage mobile experience", () => {
     expect(scrollIntoViewMock).toHaveBeenCalled();
     expect(screen.queryByRole("dialog", { name: "Log A Rep" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Open Log A Rep form" }));
-    expect((screen.getByLabelText("Exercise name") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("Rep") as HTMLInputElement).value).toBe("Bench Day");
   });
 
-  it("removes the Sets field from set mode and omits sets from the POST payload", async () => {
+  it("uses the top Set selector with history autosuggest and omits hidden sets from the POST payload", async () => {
     mockHistoryAndPost({
       initialItems: mixedHistoryItems,
       refreshedItems: [
@@ -519,16 +520,21 @@ describe("AddLogPage mobile experience", () => {
     });
 
     const dialog = openEntryModal("Open Log A Set form");
+    const setInput = within(dialog).getByLabelText("Set") as HTMLInputElement;
+    expect(setInput.getAttribute("list")).toBe("client-add-log-exercise-suggestions");
+    expect(document.querySelector("#client-add-log-exercise-suggestions option[value='Bench Press']")).toBeTruthy();
+    expect(within(dialog).queryByLabelText("Exercise name")).toBeNull();
     expect(within(dialog).queryByLabelText("Sets")).toBeNull();
     expect(within(dialog).getByRole("button", { name: "Add Rep" })).toBeTruthy();
-    expect(within(dialog).getByLabelText("Exercise name")).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: "Add Exercise" })).toBeNull();
     expect(within(dialog).getByLabelText("Reps")).toBeTruthy();
     expect(within(dialog).getByLabelText("Weight")).toBeTruthy();
     expect(within(dialog).getByLabelText("Time (minutes)")).toBeTruthy();
     expect(within(dialog).getByLabelText("Performed at")).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Save Log Entry" })).toBeTruthy();
 
-    fireEvent.change(within(dialog).getByLabelText("Exercise name"), {
-      target: { value: "Deadlift" },
+    fireEvent.change(setInput, {
+      target: { value: "Bench Press" },
     });
     fireEvent.change(within(dialog).getByLabelText("Reps"), {
       target: { value: "3" },
@@ -554,7 +560,7 @@ describe("AddLogPage mobile experience", () => {
     const requestBody = getLatestPostBody();
     expect(requestBody.mode).toBe("set");
     expect(requestBody.exercise_entries).toEqual([{
-      exercise_name: "Deadlift",
+      exercise_name: "Bench Press",
       reps: 3,
       weight: 225,
       duration_seconds: 120,
@@ -586,7 +592,9 @@ describe("AddLogPage mobile experience", () => {
     });
 
     const dialog = openEntryModal("Open Log a General Workout form");
+    expect(within(dialog).getByLabelText("Exercise name")).toBeTruthy();
     expect(within(dialog).getByLabelText("Sets")).toBeTruthy();
+    expect(within(dialog).getByLabelText("Reps")).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: "Add Exercise" })).toBeTruthy();
 
     fireEvent.change(within(dialog).getByLabelText("Exercise name"), {
@@ -660,6 +668,9 @@ describe("AddLogPage mobile experience", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Open Log A Rep form" }));
+    fireEvent.change(screen.getByLabelText("Rep"), {
+      target: { value: "Bench Press" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Save Log Entry" }));
 
     await waitFor(() => {

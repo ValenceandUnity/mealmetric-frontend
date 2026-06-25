@@ -261,3 +261,25 @@
   - No backend, `app/api`, auth/session, or dependency changes.
 - Note:
   - Weekly archive grouping remains frontend-only over currently loaded BFF rows in this phase.
+
+## Phase 12B.18 - Add-log rep/set exercise autosuggest
+
+- Route: `/client/add-log`
+- Changes:
+  - Rep mode now uses the top Rep input as the exercise selector/name.
+  - Rep mode removes the duplicate lower Exercise name and numeric Reps input fields.
+  - Set mode now has a top Set selector input.
+  - Rep and Set selector inputs use frontend-only autosuggest from loaded workout history.
+  - Autosuggest uses native `datalist` with no dependencies.
+  - Rep/Set payloads avoid hidden stale fields.
+- Preserved:
+  - Existing workout-log BFF fetch and mutation routes.
+  - Existing workout-log POST URL.
+  - Existing General Workout behavior.
+  - Existing Recent History tab behavior.
+  - Existing recent-exercises drawer.
+  - Existing goal-template localStorage behavior.
+  - No backend/app-api/auth/session/dependency changes.
+- Note:
+  - Autosuggest is frontend-only over loaded workout-history rows in this phase.
+  - Metrics/search benefits come from saving consistent exercise names; no metrics feature is added here.
