@@ -29,6 +29,9 @@ export type MobileMetricHistoryView = {
   rangeLabel: string;
   progressLabel: string;
   metrics: Array<{ label: string; value: string }>;
+  weekStartDate?: string | null;
+  weekEndDate?: string | null;
+  asOfDate?: string | null;
   hasData: boolean;
 };
 
@@ -324,6 +327,9 @@ function adaptHistoryMetrics(history: JsonValue | null): MobileMetricHistoryView
       rangeLabel: `As of ${formatMetricDate(pickOptionalText(item, ["as_of_date"]))}`,
       progressLabel: formatMetricPercentage(getProgressValue(item)),
       metrics,
+      weekStartDate: pickOptionalText(item, ["week_start_date"]),
+      weekEndDate: pickOptionalText(item, ["week_end_date"]),
+      asOfDate: pickOptionalText(item, ["as_of_date"]),
       hasData: metrics.length > 0,
     }];
   });

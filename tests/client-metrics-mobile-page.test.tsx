@@ -1,7 +1,7 @@
 import React from "react";
 import type { ReactNode } from "react";
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -139,11 +139,17 @@ describe("ClientMetricsPage mobile experience", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/client/metrics/history", { cache: "no-store" });
     expect(screen.queryByText("Week summary")).toBeNull();
     expect(screen.queryByRole("heading", { name: "My Week" })).toBeNull();
+    expect(screen.queryByText("History and log summary")).toBeNull();
+    expect(screen.queryByText("No history yet")).toBeNull();
     expect(screen.getByRole("link", { name: "Client home" }).getAttribute("href")).toBe("/client");
     expect(screen.getByRole("link", { name: "Add log" }).getAttribute("href")).toBe("/client/add-log");
     expect(screen.getAllByText("1,400 cal").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Jun 1 - Jun 7").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("May 25 - May 31").length).toBeGreaterThan(0);
+    expect(screen.queryByText("May 25 - May 31")).toBeNull();
+    expect(screen.queryByText("snapshot")).toBeNull();
+
+    const performanceHistoryButton = screen.getByRole("button", { name: "Full Performance History" });
+    expect(performanceHistoryButton).toBeTruthy();
 
     const intakeButton = screen.getByRole("button", { name: /^intake$/i });
     const expenditureButton = screen.getByRole("button", { name: /^expenditure$/i });
@@ -155,6 +161,64 @@ describe("ClientMetricsPage mobile experience", () => {
     expect(deficitButton.getAttribute("aria-expanded")).toBe("false");
     expect(targetButton.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByRole("button", { name: /^freshness$/i })).toBeNull();
+
+    await user.click(performanceHistoryButton);
+
+    const dialog = screen.getByRole("dialog", { name: "Full Performance History" });
+    const dialogQueries = within(dialog);
+    const searchInput = dialogQueries.getByLabelText("Search history");
+    const searchButton = dialogQueries.getByRole("button", { name: "Search performance history" });
+    const startDateInput = dialogQueries.getByLabelText("Start date");
+    const endDateInput = dialogQueries.getByLabelText("End date");
+
+    expect(searchInput).toBeTruthy();
+    expect(searchButton).toBeTruthy();
+    expect(startDateInput).toBeTruthy();
+    expect(endDateInput).toBeTruthy();
+    expect(dialogQueries.getByText("May 25 - May 31")).toBeTruthy();
+    expect(dialogQueries.getByText("As of May 31")).toBeTruthy();
+    expect(dialogQueries.queryByText("snapshot")).toBeNull();
+
+    const fetchCountAfterOpen = fetchMock.mock.calls.length;
+
+    await user.type(searchInput, "May");
+    expect(dialogQueries.getByText("May 25 - May 31")).toBeTruthy();
+    expect(dialogQueries.getByText("Jun 1 - Jun 7")).toBeTruthy();
+
+    await user.keyboard("{Enter}");
+    expect(dialogQueries.getByText("May 25 - May 31")).toBeTruthy();
+    expect(dialogQueries.getByText("Jun 1 - Jun 7")).toBeTruthy();
+
+    await user.click(searchButton);
+    expect(dialogQueries.getByText("May 25 - May 31")).toBeTruthy();
+    expect(dialogQueries.queryByText("Jun 1 - Jun 7")).toBeNull();
+
+    await user.clear(searchInput);
+    await user.click(searchButton);
+    expect(dialogQueries.getByText("May 25 - May 31")).toBeTruthy();
+    expect(dialogQueries.getByText("Jun 1 - Jun 7")).toBeTruthy();
+
+    await user.type(startDateInput, "2026-06-01");
+    expect(dialogQueries.queryByText("May 25 - May 31")).toBeNull();
+    expect(dialogQueries.getByText("Jun 1 - Jun 7")).toBeTruthy();
+    expect(fetchMock.mock.calls.length).toBe(fetchCountAfterOpen);
+
+    await user.click(dialogQueries.getByRole("button", { name: "Clear filters" }));
+    expect(dialogQueries.getByText("May 25 - May 31")).toBeTruthy();
+    expect(dialogQueries.getByText("Jun 1 - Jun 7")).toBeTruthy();
+
+    await user.type(endDateInput, "2026-05-31");
+    expect(dialogQueries.getByText("May 25 - May 31")).toBeTruthy();
+    expect(dialogQueries.queryByText("Jun 1 - Jun 7")).toBeNull();
+    expect(fetchMock.mock.calls.length).toBe(fetchCountAfterOpen);
+
+    await user.click(dialogQueries.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name: "Full Performance History" })).toBeNull();
+
+    await user.click(performanceHistoryButton);
+    expect(screen.getByRole("dialog", { name: "Full Performance History" })).toBeTruthy();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Full Performance History" })).toBeNull();
 
     await user.click(intakeButton);
 
@@ -218,9 +282,10 @@ describe("ClientMetricsPage mobile experience", () => {
     });
 
     expect(screen.queryByText("Week summary")).toBeNull();
+    expect(screen.queryByText("History and log summary")).toBeNull();
+    expect(screen.queryByText("No history yet")).toBeNull();
     expect(screen.getByRole("heading", { name: "Deficit progress unavailable" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "No weekly highlights yet" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "No history yet" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "No metrics available yet" })).toBeTruthy();
   });
 
