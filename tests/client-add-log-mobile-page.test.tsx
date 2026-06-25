@@ -158,7 +158,7 @@ function openEntryModal(buttonName: string) {
         ? "Log A Rep"
         : buttonName === "Open Log A Set form"
           ? "Log A Set"
-          : "Log a General Workout",
+          : "Log a Workout Routine",
   });
 }
 
@@ -248,19 +248,31 @@ describe("AddLogPage mobile experience", () => {
     expect(screen.getByText("Capture a workout quickly")).toBeTruthy();
     expect(screen.getByText("Log A Rep")).toBeTruthy();
     expect(screen.getByText("Log A Set")).toBeTruthy();
-    expect(screen.getByText("Log a General Workout")).toBeTruthy();
+    expect(screen.queryByText("Log a General Workout")).toBeNull();
+    expect(screen.getByText("Log a Workout Routine")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open Log a Workout Routine form" })).toBeTruthy();
     expect(screen.getByText("Goals and Aspirations")).toBeTruthy();
 
     expect(screen.queryByText(/^GO$/)).toBeNull();
     const timerButton = screen.getByRole("button", { name: "Open workout timer" });
     fireEvent.click(timerButton);
     const timerDialog = screen.getByRole("dialog", { name: "SET TIMER" });
-    expect(within(timerDialog).getByRole("searchbox")).toBeTruthy();
+    const searchInput = within(timerDialog).getByRole("searchbox");
+    const searchButton = within(timerDialog).getByRole("button", {
+      name: "Search timer exercises",
+    });
+    expect(searchInput).toBeTruthy();
+    expect(searchButton).toBeTruthy();
+    expect(searchButton.parentElement?.className).toContain(
+      "client-add-log-timer-picker__search-shell",
+    );
     expect(
-      within(timerDialog).getByRole("button", { name: "Search timer exercises" }),
+      within(timerDialog).getByRole("button", { name: "Open timer exercise filters" }),
     ).toBeTruthy();
     expect(within(timerDialog).getByRole("button", { name: "Close" })).toBeTruthy();
-    expect(within(timerDialog).getByRole("button", { name: /Morning Circuit/ })).toBeTruthy();
+    expect(
+      within(timerDialog).getByRole("button", { name: /Open timer session for Morning Circuit/ }),
+    ).toBeTruthy();
     fireEvent.click(within(timerDialog).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog", { name: "SET TIMER" })).toBeNull();
 
@@ -342,7 +354,7 @@ describe("AddLogPage mobile experience", () => {
     await user.click(screen.getByRole("button", { name: "Open workout timer" }));
     const timerDialog = screen.getByRole("dialog", { name: "SET TIMER" });
     const exerciseButtons = within(timerDialog).getAllByRole("button", {
-      name: /Start timer for/,
+      name: /Open timer session for/,
     });
     const exerciseButtonNames = exerciseButtons.map((button) => button.getAttribute("aria-label"));
 
@@ -357,12 +369,58 @@ describe("AddLogPage mobile experience", () => {
     const initialHistoryFetches = fetchMock.mock.calls.filter(
       ([url, init]) => String(url) === HISTORY_URL && (init?.method ?? "GET") === "GET",
     );
+    await user.click(
+      within(timerDialog).getByRole("button", { name: "Open timer exercise filters" }),
+    );
+    const filterPopover = within(timerDialog).getByRole("dialog", { name: "Filter exercises" });
+    expect(within(filterPopover).getByLabelText("All")).toBeTruthy();
+    expect(within(filterPopover).getByLabelText("Rep")).toBeTruthy();
+    expect(within(filterPopover).getByLabelText("Set")).toBeTruthy();
+    expect(within(filterPopover).getByLabelText("Routine")).toBeTruthy();
+
+    await user.click(within(filterPopover).getByLabelText("Set"));
+    const setButtons = within(screen.getByRole("dialog", { name: "SET TIMER" })).getAllByRole(
+      "button",
+      { name: /Open timer session for/ },
+    );
+    expect(setButtons).toHaveLength(2);
+    expect(setButtons[0].getAttribute("aria-label")).toContain("Bench Press");
+    expect(setButtons[1].getAttribute("aria-label")).toContain("Deadlift");
+
+    await user.click(within(screen.getByRole("dialog", { name: "SET TIMER" })).getByLabelText("Routine"));
+    const routineButtons = within(screen.getByRole("dialog", { name: "SET TIMER" })).getAllByRole(
+      "button",
+      { name: /Open timer session for/ },
+    );
+    expect(routineButtons).toHaveLength(1);
+    expect(routineButtons[0].getAttribute("aria-label")).toContain("Row");
+    expect(within(routineButtons[0]).getByText("Routine")).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(within(timerDialog).queryByRole("dialog", { name: "Filter exercises" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "SET TIMER" })).toBeTruthy();
+
+    await user.click(
+      within(screen.getByRole("dialog", { name: "SET TIMER" })).getByRole("button", {
+        name: "Open timer exercise filters",
+      }),
+    );
+    await user.click(
+      within(screen.getByRole("dialog", { name: "SET TIMER" })).getByLabelText("All"),
+    );
     await user.type(within(timerDialog).getByRole("searchbox"), "Row");
+
+    expect(
+      within(screen.getByRole("dialog", { name: "SET TIMER" })).getAllByRole("button", {
+        name: /Open timer session for/,
+      }),
+    ).toHaveLength(5);
+
     await user.click(within(timerDialog).getByRole("button", { name: "Search timer exercises" }));
 
     const filteredButtons = within(screen.getByRole("dialog", { name: "SET TIMER" })).getAllByRole(
       "button",
-      { name: /Start timer for/ },
+      { name: /Open timer session for/ },
     );
     expect(filteredButtons).toHaveLength(1);
     expect(filteredButtons[0].getAttribute("aria-label")).toContain("Row");
@@ -372,6 +430,8 @@ describe("AddLogPage mobile experience", () => {
       ),
     ).toHaveLength(initialHistoryFetches.length);
 
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByRole("dialog", { name: "SET TIMER" })).toBeTruthy();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "SET TIMER" })).toBeNull();
   });
@@ -400,7 +460,7 @@ describe("AddLogPage mobile experience", () => {
     await user.click(screen.getByRole("button", { name: "Open workout timer" }));
     vi.useFakeTimers();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Start timer for Bench Press/ }));
+      fireEvent.click(screen.getByRole("button", { name: /Open timer session for Bench Press/ }));
     });
 
     const timerSession = screen.getByRole("dialog", { name: "SET TIMER" });
@@ -411,7 +471,26 @@ describe("AddLogPage mobile experience", () => {
     expect((within(timerSession).getByLabelText("Weight") as HTMLInputElement).value).toBe(
       "135.5",
     );
-    expect(within(timerSession).getByRole("button", { name: "CLOCK IT" })).toBeTruthy();
+    const startButton = within(timerSession).getByRole("button", { name: "START" });
+    expect(startButton.className).toContain(
+      "client-add-log-timer-session__primary-button--start",
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(within(screen.getByRole("dialog", { name: "SET TIMER" })).getByText("00:00:00")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(startButton);
+    });
+    const clockButton = within(screen.getByRole("dialog", { name: "SET TIMER" })).getByRole(
+      "button",
+      { name: "CLOCK IT" },
+    );
+    expect(clockButton.className).toContain(
+      "client-add-log-timer-session__primary-button--clock",
+    );
 
     await act(async () => {
       vi.advanceTimersByTime(3000);
@@ -421,11 +500,7 @@ describe("AddLogPage mobile experience", () => {
     ).toBeTruthy();
 
     await act(async () => {
-      fireEvent.click(
-        within(screen.getByRole("dialog", { name: "SET TIMER" })).getByRole("button", {
-          name: "CLOCK IT",
-        }),
-      );
+      fireEvent.click(clockButton);
     });
     vi.useRealTimers();
 
@@ -477,12 +552,12 @@ describe("AddLogPage mobile experience", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Open workout timer" }));
-    await user.click(screen.getByRole("button", { name: /Start timer for Bench Press/ }));
+    await user.click(screen.getByRole("button", { name: /Open timer session for Bench Press/ }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("dialog", { name: "SET TIMER" })).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Open workout timer" }));
-    await user.click(screen.getByRole("button", { name: /Start timer for Bench Press/ }));
+    await user.click(screen.getByRole("button", { name: /Open timer session for Bench Press/ }));
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "SET TIMER" })).toBeNull();
 
@@ -521,8 +596,8 @@ describe("AddLogPage mobile experience", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog", { name: "Log A Set" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Log a General Workout form" }));
-    expect(screen.getByRole("dialog", { name: "Log a General Workout" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Open Log a Workout Routine form" }));
+    expect(screen.getByRole("dialog", { name: "Log a Workout Routine" })).toBeTruthy();
   });
 
   it("replaces the old modal mode pills with Log and Recent History tabs", async () => {
@@ -594,7 +669,7 @@ describe("AddLogPage mobile experience", () => {
     expect(within(setDialog).queryByText("Morning Circuit")).toBeNull();
     fireEvent.click(within(setDialog).getByRole("button", { name: "Close" }));
 
-    const generalDialog = openEntryModal("Open Log a General Workout form");
+    const generalDialog = openEntryModal("Open Log a Workout Routine form");
     fireEvent.click(within(generalDialog).getByRole("tab", { name: "Show recent history" }));
     expect(within(generalDialog).getByText("Recent general workout logs")).toBeTruthy();
     expect(within(generalDialog).getByText("Morning Circuit")).toBeTruthy();
@@ -804,10 +879,10 @@ describe("AddLogPage mobile experience", () => {
     render(<AddLogPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Open Log a General Workout form" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Open Log a Workout Routine form" })).toBeTruthy();
     });
 
-    const dialog = openEntryModal("Open Log a General Workout form");
+    const dialog = openEntryModal("Open Log a Workout Routine form");
     expect(within(dialog).getByLabelText("Exercise name")).toBeTruthy();
     expect(within(dialog).getByLabelText("Sets")).toBeTruthy();
     expect(within(dialog).getByLabelText("Reps")).toBeTruthy();
