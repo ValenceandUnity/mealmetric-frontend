@@ -2,6 +2,7 @@ import React from "react";
 import type { ReactNode } from "react";
 
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { fetchMock, useSessionBootstrapMock } = vi.hoisted(() => ({
@@ -64,6 +65,8 @@ describe("ClientMetricsPage mobile experience", () => {
   });
 
   it("renders the mobile client metrics surface from the existing overview and history BFF routes", async () => {
+    const user = userEvent.setup();
+
     fetchMock.mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
 
@@ -129,18 +132,59 @@ describe("ClientMetricsPage mobile experience", () => {
     render(React.createElement(ClientMetricsPage));
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "My Week" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Metrics" })).toBeTruthy();
     });
 
     expect(fetchMock).toHaveBeenCalledWith("/api/client/metrics/overview", { cache: "no-store" });
     expect(fetchMock).toHaveBeenCalledWith("/api/client/metrics/history", { cache: "no-store" });
+    expect(screen.queryByText("Week summary")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "My Week" })).toBeNull();
     expect(screen.getByRole("link", { name: "Client home" }).getAttribute("href")).toBe("/client");
     expect(screen.getByRole("link", { name: "Add log" }).getAttribute("href")).toBe("/client/add-log");
-    expect(screen.getAllByText("2,100 cal").length).toBeGreaterThan(0);
     expect(screen.getAllByText("1,400 cal").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Jun 1 - Jun 7").length).toBeGreaterThan(0);
     expect(screen.getAllByText("May 25 - May 31").length).toBeGreaterThan(0);
-    expect(screen.getByText("snapshot")).toBeTruthy();
+
+    const intakeButton = screen.getByRole("button", { name: /^intake$/i });
+    const expenditureButton = screen.getByRole("button", { name: /^expenditure$/i });
+    const deficitButton = screen.getByRole("button", { name: /^deficit$/i });
+    const targetButton = screen.getByRole("button", { name: /^target$/i });
+
+    expect(intakeButton.getAttribute("aria-expanded")).toBe("false");
+    expect(expenditureButton.getAttribute("aria-expanded")).toBe("false");
+    expect(deficitButton.getAttribute("aria-expanded")).toBe("false");
+    expect(targetButton.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("button", { name: /^freshness$/i })).toBeNull();
+
+    await user.click(intakeButton);
+
+    expect(intakeButton.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("Total Calorie Intake")).toBeTruthy();
+    expect(screen.getByText("Current Intake Ceiling")).toBeTruthy();
+
+    await user.click(expenditureButton);
+
+    expect(intakeButton.getAttribute("aria-expanded")).toBe("false");
+    expect(expenditureButton.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.queryByText("Total Calorie Intake")).toBeNull();
+    expect(screen.getByText("Total Calorie Expenditure")).toBeTruthy();
+    expect(screen.getByText("Current Expenditure Floor")).toBeTruthy();
+
+    await user.click(deficitButton);
+
+    expect(expenditureButton.getAttribute("aria-expanded")).toBe("false");
+    expect(deficitButton.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("Net Calorie Balance")).toBeTruthy();
+    expect(screen.getByText("Weekly Target Deficit")).toBeTruthy();
+    expect(screen.getByText("Deficit Progress")).toBeTruthy();
+
+    await user.click(targetButton);
+
+    expect(deficitButton.getAttribute("aria-expanded")).toBe("false");
+    expect(targetButton.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("Week Range")).toBeTruthy();
+    expect(screen.getByText("As Of Date")).toBeTruthy();
+    expect(screen.getByText("Timezone")).toBeTruthy();
   });
 
   it("renders safe empty states when overview and history are empty", async () => {
@@ -170,9 +214,10 @@ describe("ClientMetricsPage mobile experience", () => {
     render(React.createElement(ClientMetricsPage));
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "No overview yet" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Metrics" })).toBeTruthy();
     });
 
+    expect(screen.queryByText("Week summary")).toBeNull();
     expect(screen.getByRole("heading", { name: "Deficit progress unavailable" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "No weekly highlights yet" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "No history yet" })).toBeTruthy();

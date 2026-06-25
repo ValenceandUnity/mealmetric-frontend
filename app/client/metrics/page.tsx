@@ -7,7 +7,6 @@ import type { CSSProperties, ReactNode } from "react";
 import { MobileAppShell } from "@/components/mobile/MobileAppShell";
 import { MobileCard } from "@/components/mobile/MobileCard";
 import { MobileSection } from "@/components/mobile/MobileSection";
-import { MobileStatCard } from "@/components/mobile/MobileStatCard";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
@@ -38,6 +37,52 @@ type MetricsStateCardProps = {
   action?: ReactNode;
 };
 
+type MetricAccordionKey = "intake" | "expenditure" | "deficit" | "target";
+
+type MetricAccordionConfig = {
+  key: MetricAccordionKey;
+  sourceTitle: string;
+  title: string;
+  buttonId: string;
+  panelId: string;
+  className: string;
+};
+
+const METRIC_ACCORDION_CONFIG: MetricAccordionConfig[] = [
+  {
+    key: "intake",
+    sourceTitle: "Intake",
+    title: "INTAKE",
+    buttonId: "client-metrics-intake-trigger",
+    panelId: "client-metrics-intake-panel",
+    className: "mobile-client-metrics-accordion-card mobile-client-metrics-accordion-card--intake",
+  },
+  {
+    key: "expenditure",
+    sourceTitle: "Expenditure",
+    title: "EXPENDITURE",
+    buttonId: "client-metrics-expenditure-trigger",
+    panelId: "client-metrics-expenditure-panel",
+    className: "mobile-client-metrics-accordion-card mobile-client-metrics-accordion-card--expenditure",
+  },
+  {
+    key: "deficit",
+    sourceTitle: "Deficit",
+    title: "DEFICIT",
+    buttonId: "client-metrics-deficit-trigger",
+    panelId: "client-metrics-deficit-panel",
+    className: "mobile-client-metrics-accordion-card mobile-client-metrics-accordion-card--deficit",
+  },
+  {
+    key: "target",
+    sourceTitle: "Targets",
+    title: "TARGET",
+    buttonId: "client-metrics-target-trigger",
+    panelId: "client-metrics-target-panel",
+    className: "mobile-client-metrics-accordion-card mobile-client-metrics-accordion-card--target",
+  },
+];
+
 function ActionPill({ href, children, tone = "yellow" }: ActionPillProps) {
   return (
     <Link href={href} className={`mobile-pill mobile-pill--${tone} mobile-focus-ring`}>
@@ -58,36 +103,59 @@ function MetricsStateCard({ title, message, action }: MetricsStateCardProps) {
   );
 }
 
-function getMetricIcon(label: string) {
-  switch (label.toLowerCase()) {
-    case "intake":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M7 6h10l2 4-7 8-7-8 2-4Zm0 0 5 6 5-6" />
-        </svg>
-      );
-    case "expenditure":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 17V9m6 8V6m6 11v-5" />
-        </svg>
-      );
-    case "net balance":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M7 12h10m-5-5 5 5-5 5" />
-        </svg>
-      );
-    case "deficit progress":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 16.5 10 12.5l3 2 5-6" />
-          <path d="M18 8.5v4h-4" />
-        </svg>
-      );
-    default:
-      return null;
+function formatAccordionMetricLabel(groupTitle: string, itemLabel: string) {
+  const normalizedGroupTitle = groupTitle.toLowerCase();
+  const normalizedItemLabel = itemLabel.toLowerCase();
+
+  if (normalizedGroupTitle === "intake") {
+    if (normalizedItemLabel === "total intake calories") {
+      return "Total Calorie Intake";
+    }
+
+    if (normalizedItemLabel === "current intake ceiling") {
+      return "Current Intake Ceiling";
+    }
   }
+
+  if (normalizedGroupTitle === "expenditure") {
+    if (normalizedItemLabel === "total expenditure calories") {
+      return "Total Calorie Expenditure";
+    }
+
+    if (normalizedItemLabel === "current expenditure floor") {
+      return "Current Expenditure Floor";
+    }
+  }
+
+  if (normalizedGroupTitle === "deficit") {
+    if (normalizedItemLabel === "net calorie balance") {
+      return "Net Calorie Balance";
+    }
+
+    if (normalizedItemLabel === "weekly target deficit") {
+      return "Weekly Target Deficit";
+    }
+
+    if (normalizedItemLabel === "deficit progress") {
+      return "Deficit Progress";
+    }
+  }
+
+  if (normalizedGroupTitle === "targets") {
+    if (normalizedItemLabel === "week range") {
+      return "Week Range";
+    }
+
+    if (normalizedItemLabel === "as of date") {
+      return "As Of Date";
+    }
+
+    if (normalizedItemLabel === "timezone") {
+      return "Timezone";
+    }
+  }
+
+  return itemLabel;
 }
 
 export default function ClientMetricsPage() {
@@ -100,6 +168,7 @@ export default function ClientMetricsPage() {
   const [historyData, setHistoryData] = useState<JsonValue | null>(null);
   const [sectionErrors, setSectionErrors] = useState<SectionErrors>(EMPTY_SECTION_ERRORS);
   const [loading, setLoading] = useState(true);
+  const [openAccordion, setOpenAccordion] = useState<MetricAccordionKey | null>(null);
 
   useEffect(() => {
     if (status !== "authenticated" || !user || user.role !== "client") {
@@ -188,13 +257,17 @@ export default function ClientMetricsPage() {
   );
   const allSectionsFailed = !loading && !view.hasAnyData && errorMessages.length === 2;
   const showLoadingState = loading && !view.hasAnyData && errorMessages.length === 0;
+  const accordionGroups = METRIC_ACCORDION_CONFIG.map((item) => ({
+    ...item,
+    group: view.detailGroups.find((group) => group.title === item.sourceTitle) ?? null,
+  })).filter((item) => item.group !== null);
 
   return (
     <MobileAppShell
       user={user}
       greeting={formatDisplayNameFromUser(user)}
-      title="My Week"
-      subtitle="Client metrics stay inside the existing BFF routes and only show overview and history values the backend already provides."
+      title="Metrics"
+      subtitle="Track intake, output, deficit, and targets from your current client metrics snapshot."
       notificationSlot={<ActionPill href="/client" tone="purple">Client home</ActionPill>}
       topHubAction={<ActionPill href="/client/add-log">Add log</ActionPill>}
       activePath="/client/metrics"
@@ -240,32 +313,6 @@ export default function ClientMetricsPage() {
               />
             </MobileSection>
           ) : null}
-
-          <MobileSection
-            eyebrow="My Week"
-            title="Week summary"
-            description="Summary cards reflect only the current client metrics overview or the latest history snapshot already returned by the BFF."
-          >
-            {view.hasOverview ? (
-              view.summaryCards.map((item) => (
-                <MobileStatCard
-                  key={item.label}
-                  label={item.label}
-                  value={item.value}
-                  progressText={item.hint}
-                  icon={getMetricIcon(item.label)}
-                />
-              ))
-            ) : (
-              <MetricsStateCard
-                title={sectionErrors.overview ? "Overview unavailable" : "No overview yet"}
-                message={
-                  sectionErrors.overview ??
-                  "Your current client metrics overview will appear here when the active overview or latest history snapshot exposes real values."
-                }
-              />
-            )}
-          </MobileSection>
 
           <MobileSection
             eyebrow="Deficit"
@@ -385,26 +432,62 @@ export default function ClientMetricsPage() {
           <MobileSection
             eyebrow="All Metrics"
             title="All metrics"
-            description="Grouped metric cards expose the current intake, expenditure, targets, deficit, and freshness fields without inventing unsupported analytics."
+            description="Open each block to inspect the intake, expenditure, deficit, and target values already returned by your current client metrics snapshot."
           >
-            {view.detailGroups.length > 0 ? (
-              <div className="mobile-client-metrics-grid">
-                {view.detailGroups.map((group) => (
-                  <MobileCard key={group.title} as="article" variant="soft" className="mobile-client-metrics-detail-card">
-                    <div className="mobile-section__copy">
-                      <p className="mobile-section__eyebrow">{group.eyebrow}</p>
-                      <h3 className="mobile-section__title">{group.title}</h3>
-                    </div>
-                    <dl className="mobile-client-metrics-detail-list">
-                      {group.items.map((item) => (
-                        <div key={`${group.title}-${item.label}`}>
-                          <dt>{item.label}</dt>
-                          <dd>{item.value}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </MobileCard>
-                ))}
+            {accordionGroups.length > 0 ? (
+              <div className="mobile-client-metrics-accordion">
+                {accordionGroups.map(({ key, title, buttonId, panelId, className, group }) => {
+                  if (!group) {
+                    return null;
+                  }
+
+                  const isOpen = openAccordion === key;
+
+                  return (
+                    <MobileCard key={key} as="article" variant="soft" className={className}>
+                      <button
+                        id={buttonId}
+                        type="button"
+                        className="mobile-client-metrics-accordion-trigger"
+                        aria-expanded={isOpen}
+                        aria-controls={panelId}
+                        onClick={() => {
+                          setOpenAccordion((current) => (current === key ? null : key));
+                        }}
+                      >
+                        <span className="mobile-client-metrics-accordion-title">{title}</span>
+                        <span
+                          className="mobile-client-metrics-accordion-chevron"
+                          aria-hidden="true"
+                          data-open={isOpen ? "true" : "false"}
+                        >
+                          <svg viewBox="0 0 24 24" focusable="false">
+                            <path d="M7 10.5 12 15.5l5-5" />
+                          </svg>
+                        </span>
+                      </button>
+
+                      <div
+                        id={panelId}
+                        role="region"
+                        aria-labelledby={buttonId}
+                        className="mobile-client-metrics-accordion-panel"
+                        data-open={isOpen ? "true" : "false"}
+                      >
+                        {isOpen ? (
+                          <dl className="mobile-client-metrics-accordion-list">
+                            {group.items.map((item) => (
+                              <div key={`${group.title}-${item.label}`}>
+                                <dt>{formatAccordionMetricLabel(group.title, item.label)}</dt>
+                                <dd>{item.value}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        ) : null}
+                      </div>
+                    </MobileCard>
+                  );
+                })}
               </div>
             ) : (
               <MetricsStateCard
