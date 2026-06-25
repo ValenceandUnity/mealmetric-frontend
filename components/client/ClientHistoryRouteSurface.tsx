@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { MobileAppShell } from "@/components/mobile/MobileAppShell";
 import { MobileCard } from "@/components/mobile/MobileCard";
@@ -31,6 +31,7 @@ export type ClientHistoryRouteSurfaceProps = {
   showDateArchive?: boolean;
   showTypeFilter?: boolean;
   showSearchResultsOverlay?: boolean;
+  searchMode?: "live" | "submit";
   historyUtilityVariant?: "default" | "hidden";
 };
 
@@ -141,6 +142,37 @@ function getStartOfWeek(date: Date): Date {
   return addDays(date, mondayOffset);
 }
 
+function buildHistorySearchSuggestions(rows: MobileClientWorkoutLogCardView[]): string[] {
+  const seen = new Set<string>();
+
+  for (const row of rows) {
+    const exerciseName = row.exerciseName.trim();
+
+    if (exerciseName.length > 0 && exerciseName !== "-") {
+      seen.add(exerciseName);
+    }
+  }
+
+  return Array.from(seen).sort((left, right) => left.localeCompare(right));
+}
+
+function mergeHistorySearchSuggestions(
+  currentSuggestions: string[],
+  rows: MobileClientWorkoutLogCardView[],
+): string[] {
+  const nextSuggestions = new Set(currentSuggestions);
+
+  for (const row of rows) {
+    const exerciseName = row.exerciseName.trim();
+
+    if (exerciseName.length > 0 && exerciseName !== "-") {
+      nextSuggestions.add(exerciseName);
+    }
+  }
+
+  return Array.from(nextSuggestions).sort((left, right) => left.localeCompare(right));
+}
+
 export function ClientHistoryRouteSurface({
   activePath,
   backHref,
@@ -153,6 +185,7 @@ export function ClientHistoryRouteSurface({
   showDateArchive = false,
   showTypeFilter = true,
   showSearchResultsOverlay = false,
+  searchMode = "live",
   historyUtilityVariant = "default",
 }: ClientHistoryRouteSurfaceProps) {
   const { status, user } = useSessionBootstrap({
@@ -164,23 +197,23 @@ export function ClientHistoryRouteSurface({
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<ClientHistoryModeFilter>("all");
-  const [searchValue, setSearchValue] = useState("");
+  const [searchInputValue, setSearchInputValue] = useState("");
+  const [submittedSearchValue, setSubmittedSearchValue] = useState("");
   const [searchOverlayDismissed, setSearchOverlayDismissed] = useState(false);
+  const [historySearchSuggestionPool, setHistorySearchSuggestionPool] = useState<string[]>([]);
   const [archiveStartDate, setArchiveStartDate] = useState("");
   const [archiveEndDate, setArchiveEndDate] = useState("");
   const [openArchiveBlockId, setOpenArchiveBlockId] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const effectiveTypeFilter = showTypeFilter ? typeFilter : "all";
+  const isSubmitSearchMode = searchMode === "submit";
+  const effectiveSearchValue = isSubmitSearchMode ? submittedSearchValue : searchInputValue;
 
   useEffect(() => {
     if (!showTypeFilter && typeFilter !== "all") {
       setTypeFilter("all");
     }
   }, [showTypeFilter, typeFilter]);
-
-  useEffect(() => {
-    setSearchOverlayDismissed(false);
-  }, [searchValue]);
 
   useEffect(() => {
     if (status !== "authenticated" || !user || user.role !== "client") {
@@ -199,7 +232,7 @@ export function ClientHistoryRouteSurface({
           limit: String(PAGE_LIMIT),
           offset: String(offset),
         });
-        const normalizedSearch = searchValue.trim();
+        const normalizedSearch = effectiveSearchValue.trim();
 
         if (effectiveTypeFilter !== "all") {
           params.set("mode", effectiveTypeFilter);
@@ -246,12 +279,35 @@ export function ClientHistoryRouteSurface({
       active = false;
       controller.abort();
     };
-  }, [effectiveTypeFilter, offset, searchValue, status, user]);
+  }, [effectiveSearchValue, effectiveTypeFilter, offset, status, user]);
 
   const historyView = useMemo(() => adaptClientHistoryView(historyData), [historyData]);
-  const normalizedSearchValue = searchValue.trim();
+  const normalizedSubmittedSearchValue = submittedSearchValue.trim();
   const shouldShowHistoryUtility =
     historyUtilityVariant !== "hidden" && showHistoryUtility;
+
+  useEffect(() => {
+    if (!isSubmitSearchMode || historyView.rows.length <= 0) {
+      return;
+    }
+
+    setHistorySearchSuggestionPool((currentSuggestions) => {
+      const nextSuggestions = mergeHistorySearchSuggestions(currentSuggestions, historyView.rows);
+
+      if (
+        nextSuggestions.length === currentSuggestions.length &&
+        nextSuggestions.every((suggestion, index) => suggestion === currentSuggestions[index])
+      ) {
+        return currentSuggestions;
+      }
+
+      return nextSuggestions;
+    });
+  }, [historyView.rows, isSubmitSearchMode]);
+
+  const searchSuggestions = isSubmitSearchMode
+    ? historySearchSuggestionPool
+    : buildHistorySearchSuggestions(historyView.rows);
   const archiveRangeState = useMemo(() => {
     const hasStartDate = archiveStartDate.length > 0;
     const hasEndDate = archiveEndDate.length > 0;
@@ -381,10 +437,50 @@ export function ClientHistoryRouteSurface({
   }, [archiveRangeState, historyView.rows, showDateArchive]);
   const searchOverlayVisible =
     showSearchResultsOverlay &&
-    normalizedSearchValue.length > 0 &&
+    normalizedSubmittedSearchValue.length > 0 &&
+    (!isSubmitSearchMode || searchInputValue === submittedSearchValue) &&
     !searchOverlayDismissed;
   const visibleSearchOverlayRows = searchOverlayRows.slice(0, 5);
   const hasMoreSearchOverlayRows = searchOverlayRows.length > visibleSearchOverlayRows.length;
+
+  function handleSearchSubmit() {
+    const normalizedSearchValue = searchInputValue.trim();
+
+    setSearchInputValue(normalizedSearchValue);
+    setSubmittedSearchValue(normalizedSearchValue);
+    setOffset(0);
+    setSearchOverlayDismissed(false);
+  }
+
+  function handleSearchInputChange(nextValue: string) {
+    setSearchInputValue(nextValue);
+
+    if (isSubmitSearchMode) {
+      if (nextValue !== submittedSearchValue) {
+        setSearchOverlayDismissed(true);
+      }
+
+      return;
+    }
+
+    setOffset(0);
+  }
+
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (!isSubmitSearchMode || event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    handleSearchSubmit();
+  }
+
+  function handleClearSearch() {
+    setSearchInputValue("");
+    setSubmittedSearchValue("");
+    setOffset(0);
+    setSearchOverlayDismissed(false);
+  }
 
   useEffect(() => {
     if (openArchiveBlockId && !archiveBlocks.some((block) => block.id === openArchiveBlockId)) {
@@ -424,7 +520,7 @@ export function ClientHistoryRouteSurface({
                 Search Results
               </h2>
               <p className="mobile-section__description">
-                Results for &quot;{normalizedSearchValue}&quot;
+                Results for &quot;{normalizedSubmittedSearchValue}&quot;
               </p>
               {showDateArchive ? (
                 <p className="mobile-section__description">
@@ -443,11 +539,7 @@ export function ClientHistoryRouteSurface({
               <button
                 type="button"
                 className="mobile-pill mobile-pill--yellow mobile-focus-ring"
-                onClick={() => {
-                  setSearchValue("");
-                  setOffset(0);
-                  setSearchOverlayDismissed(false);
-                }}
+                onClick={handleClearSearch}
               >
                 Clear search
               </button>
@@ -603,17 +695,55 @@ export function ClientHistoryRouteSurface({
 
             <div className="field">
               <label htmlFor="history-search">Search</label>
-              <input
-                id="history-search"
-                className="mobile-focus-ring"
-                type="search"
-                placeholder="Search exercises, equipment, or notes"
-                value={searchValue}
-                onChange={(event) => {
-                  setSearchValue(event.target.value);
-                  setOffset(0);
-                }}
-              />
+              {isSubmitSearchMode ? (
+                <>
+                  <div className="client-history-search-field">
+                    <input
+                      id="history-search"
+                      className="client-history-search-field__input mobile-focus-ring"
+                      type="search"
+                      placeholder="Search exercises, equipment, or notes"
+                      value={searchInputValue}
+                      list="client-history-search-suggestions"
+                      onChange={(event) => {
+                        handleSearchInputChange(event.target.value);
+                      }}
+                      onKeyDown={handleSearchKeyDown}
+                    />
+                    <button
+                      type="button"
+                      className="client-history-search-field__button mobile-focus-ring"
+                      aria-label="Search workout history"
+                      title="Search workout history"
+                      onClick={handleSearchSubmit}
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        className="client-history-search-field__icon"
+                      >
+                        <path d="M10.25 4.75a5.5 5.5 0 1 0 3.889 9.389l3.736 3.736a.75.75 0 1 0 1.06-1.06l-3.736-3.736A5.5 5.5 0 0 0 10.25 4.75Zm-4 5.5a4 4 0 1 1 8 0a4 4 0 0 1-8 0Z" />
+                      </svg>
+                    </button>
+                  </div>
+                  <datalist id="client-history-search-suggestions">
+                    {searchSuggestions.map((suggestion) => (
+                      <option key={suggestion} value={suggestion} />
+                    ))}
+                  </datalist>
+                </>
+              ) : (
+                <input
+                  id="history-search"
+                  className="mobile-focus-ring"
+                  type="search"
+                  placeholder="Search exercises, equipment, or notes"
+                  value={searchInputValue}
+                  onChange={(event) => {
+                    handleSearchInputChange(event.target.value);
+                  }}
+                />
+              )}
             </div>
 
             {showDateArchive ? (

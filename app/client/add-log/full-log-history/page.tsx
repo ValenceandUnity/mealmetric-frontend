@@ -14,6 +14,7 @@ export default function AddLogFullHistoryPage() {
       showDateArchive={true}
       showTypeFilter={false}
       showSearchResultsOverlay={true}
+      searchMode="submit"
       historyUtilityVariant="hidden"
     />
   );

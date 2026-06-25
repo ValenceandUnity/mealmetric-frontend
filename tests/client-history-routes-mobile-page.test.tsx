@@ -330,7 +330,7 @@ describe("Client history routes mobile experience", () => {
     ).toBe(true);
   });
 
-  it("shows the search overlay on add-log full-history and lets the user close it without clearing the query", async () => {
+  it("does not trigger add-log full-history search while typing and exposes autosuggest suggestions", async () => {
     fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
@@ -375,31 +375,19 @@ describe("Client history routes mobile experience", () => {
     });
 
     fireEvent.change(screen.getByLabelText("Search"), {
-      target: { value: "bench" },
+      target: { value: "Ben" },
     });
 
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/client/training/workout-logs?limit=30&offset=0&search=bench",
-        expect.objectContaining({ cache: "no-store" }),
-      );
-    });
-
-    const overlay = screen.getByRole("dialog", { name: "Search Results" });
-    expect(within(overlay).getByText('Results for "bench"')).toBeTruthy();
-    expect(within(overlay).getByText("Bench Press")).toBeTruthy();
-    expect(within(overlay).getByText("Sets")).toBeTruthy();
-    expect(within(overlay).getByText("Reps")).toBeTruthy();
-    expect(within(overlay).getByText("Weight")).toBeTruthy();
-    expect(within(overlay).getByText("Time")).toBeTruthy();
-
-    fireEvent.click(within(overlay).getByRole("button", { name: "Close" }));
-
+    expect(fetchMock.mock.calls).toHaveLength(1);
     expect(screen.queryByRole("dialog", { name: "Search Results" })).toBeNull();
-    expect((screen.getByLabelText("Search") as HTMLInputElement).value).toBe("bench");
+    expect(
+      document.querySelector(
+        'datalist#client-history-search-suggestions option[value="Bench Press"]',
+      ),
+    ).toBeTruthy();
   });
 
-  it("clears the add-log full-history search from the overlay action", async () => {
+  it("opens the add-log full-history search overlay only after magnifier submit and lets the user close it without clearing the query", async () => {
     fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
@@ -412,7 +400,79 @@ describe("Client history routes mobile experience", () => {
         return jsonResponse(historyPayload());
       }
 
-      if (url === "/api/client/training/workout-logs?limit=30&offset=0&search=bench") {
+      if (url.startsWith("/api/client/training/workout-logs?limit=30&offset=0&search=")) {
+        return jsonResponse(
+          historyPayload({
+            items: [
+              createHistoryItem({
+                id: "search-overlay-log-1",
+                performedAt: "2026-06-08T10:00:00Z",
+                mode: "rep",
+                exerciseName: "Bench Press",
+                sets: 4,
+                reps: 8,
+                weight: 135.5,
+                durationSeconds: 90,
+              }),
+            ],
+          }),
+        );
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+
+    render(React.createElement(AddLogFullHistoryPage));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Search")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText("Search"), {
+      target: { value: "bench" },
+    });
+
+    expect(screen.queryByRole("dialog", { name: "Search Results" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Search workout history" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/client/training/workout-logs?limit=30&offset=0&search=bench",
+        expect.objectContaining({ cache: "no-store" }),
+      );
+    });
+
+    const overlay = screen.getByRole("dialog", { name: "Search Results" });
+    expect(within(overlay).getByText('Results for "bench"')).toBeTruthy();
+    await waitFor(() => {
+      expect(within(overlay).getByText("Bench Press")).toBeTruthy();
+    });
+    expect(within(overlay).getByText("Sets")).toBeTruthy();
+    expect(within(overlay).getByText("Reps")).toBeTruthy();
+    expect(within(overlay).getByText("Weight")).toBeTruthy();
+    expect(within(overlay).getByText("Time")).toBeTruthy();
+
+    fireEvent.click(within(overlay).getByRole("button", { name: "Close" }));
+
+    expect(screen.queryByRole("dialog", { name: "Search Results" })).toBeNull();
+    expect((screen.getByLabelText("Search") as HTMLInputElement).value).toBe("bench");
+  });
+
+  it("submits add-log full-history search with Enter and keeps the overlay tied to the submitted query", async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (method !== "GET") {
+        throw new Error(`Unexpected mutation: ${method} ${url}`);
+      }
+
+      if (url === "/api/client/training/workout-logs?limit=30&offset=0") {
+        return jsonResponse(historyPayload());
+      }
+
+      if (url.startsWith("/api/client/training/workout-logs?limit=30&offset=0&search=")) {
         return jsonResponse(
           historyPayload({
             items: [
@@ -440,9 +500,89 @@ describe("Client history routes mobile experience", () => {
       expect(screen.getByLabelText("Search")).toBeTruthy();
     });
 
+    const searchInput = screen.getByLabelText("Search");
+
+    fireEvent.change(searchInput, {
+      target: { value: "Bench" },
+    });
+
+    expect(screen.queryByRole("dialog", { name: "Search Results" })).toBeNull();
+
+    fireEvent.keyDown(searchInput, {
+      key: "Enter",
+    });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/client/training/workout-logs?limit=30&offset=0&search=Bench",
+        expect.objectContaining({ cache: "no-store" }),
+      );
+    });
+
+    const overlay = screen.getByRole("dialog", { name: "Search Results" });
+    expect(within(overlay).getByText('Results for "Bench"')).toBeTruthy();
+    await waitFor(() => {
+      expect(within(overlay).getByText("Bench Press")).toBeTruthy();
+    });
+
+    const fetchCallCountAfterSubmit = fetchMock.mock.calls.length;
+    const updatedSearchInput = screen.getByLabelText("Search");
+    fireEvent.change(updatedSearchInput, {
+      target: { value: "Bench Press" },
+    });
+    expect((updatedSearchInput as HTMLInputElement).value).toBe("Bench Press");
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Search Results" })).toBeNull();
+    });
+    expect(fetchMock.mock.calls).toHaveLength(fetchCallCountAfterSubmit);
+  });
+
+  it("clears the add-log full-history search from the overlay action and refetches the unfiltered route", async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (method !== "GET") {
+        throw new Error(`Unexpected mutation: ${method} ${url}`);
+      }
+
+      if (url === "/api/client/training/workout-logs?limit=30&offset=0") {
+        return jsonResponse(historyPayload());
+      }
+
+      if (url === "/api/client/training/workout-logs?limit=30&offset=0&search=bench") {
+        return jsonResponse(
+          historyPayload({
+            items: [
+              createHistoryItem({
+                id: "search-overlay-log-3",
+                performedAt: "2026-06-08T10:00:00Z",
+                mode: "rep",
+                exerciseName: "Bench Press",
+                sets: 4,
+                reps: 8,
+                weight: 135.5,
+                durationSeconds: 90,
+              }),
+            ],
+          }),
+        );
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+
+    render(React.createElement(AddLogFullHistoryPage));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Search")).toBeTruthy();
+    });
+
     fireEvent.change(screen.getByLabelText("Search"), {
       target: { value: "bench" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Search workout history" }));
 
     const overlay = await screen.findByRole("dialog", { name: "Search Results" });
     fireEvent.click(within(overlay).getByRole("button", { name: "Clear search" }));
@@ -450,6 +590,12 @@ describe("Client history routes mobile experience", () => {
     await waitFor(() => {
       expect((screen.getByLabelText("Search") as HTMLInputElement).value).toBe("");
     });
+
+    const unfilteredCalls = fetchMock.mock.calls.filter(
+      ([url]) => String(url) === "/api/client/training/workout-logs?limit=30&offset=0",
+    );
+
+    expect(unfilteredCalls).toHaveLength(2);
     expect(screen.queryByRole("dialog", { name: "Search Results" })).toBeNull();
   });
 
@@ -482,6 +628,7 @@ describe("Client history routes mobile experience", () => {
     fireEvent.change(screen.getByLabelText("Search"), {
       target: { value: "missing" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Search workout history" }));
 
     const overlay = await screen.findByRole("dialog", { name: "Search Results" });
     expect(within(overlay).getByText("No matching logs found.")).toBeTruthy();
@@ -560,6 +707,7 @@ describe("Client history routes mobile experience", () => {
     fireEvent.change(screen.getByLabelText("Search"), {
       target: { value: "bench" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Search workout history" }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -581,7 +729,7 @@ describe("Client history routes mobile experience", () => {
     expect(requestedUrls.every((url) => !url.includes("mode="))).toBe(true);
   });
 
-  it("does not show the search overlay on /client/training/history", async () => {
+  it("preserves live search on /client/training/history without showing the add-log overlay controls", async () => {
     fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
@@ -633,6 +781,7 @@ describe("Client history routes mobile experience", () => {
       );
     });
 
+    expect(screen.queryByRole("button", { name: "Search workout history" })).toBeNull();
     expect(screen.queryByRole("dialog", { name: "Search Results" })).toBeNull();
   });
 
