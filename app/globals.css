@@ -3431,6 +3431,7 @@ html[data-theme="light"] .mobile-training-form textarea {
 .mobile-pt-training-card,
 .mobile-pt-training-management-card,
 .mobile-client-metrics-state-card,
+.mobile-client-metrics-accordion-card,
 .mobile-client-metrics-progress-card,
 .mobile-client-metrics-history-card,
 .mobile-client-metrics-detail-card,
@@ -3592,6 +3593,135 @@ html[data-theme="light"] .mobile-training-form textarea {
 .mobile-client-metrics-history-meta dd {
   margin: 0;
   color: var(--mobile-text);
+  line-height: 1.45;
+}
+
+.mobile-client-metrics-accordion {
+  display: grid;
+  gap: 1rem;
+}
+
+.mobile-client-metrics-accordion-card {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  color: #f8fbff;
+  box-shadow: none;
+}
+
+.mobile-client-metrics-accordion-card--intake {
+  background: linear-gradient(145deg, #5fcf7f 0%, #1f7b54 100%);
+}
+
+.mobile-client-metrics-accordion-card--expenditure {
+  background: linear-gradient(145deg, #f17083 0%, #b73459 100%);
+}
+
+.mobile-client-metrics-accordion-card--deficit {
+  background: linear-gradient(145deg, #9b69ff 0%, #6032c5 100%);
+}
+
+.mobile-client-metrics-accordion-card--target {
+  background: linear-gradient(145deg, #4ab3ff 0%, #235fe4 100%);
+}
+
+.mobile-client-metrics-accordion-trigger {
+  width: 100%;
+  min-height: 5.5rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1rem 1rem 1.2rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  box-shadow: none;
+}
+
+.mobile-client-metrics-accordion-trigger:hover:not(:disabled),
+.mobile-client-metrics-accordion-trigger:focus-visible,
+.mobile-client-metrics-accordion-trigger:active {
+  transform: none;
+  box-shadow: none;
+}
+
+.mobile-client-metrics-accordion-title {
+  display: block;
+  min-width: 0;
+  font-family: "Arial Narrow", "Franklin Gothic Medium", "Impact", sans-serif;
+  font-size: clamp(1.45rem, 6vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.mobile-client-metrics-accordion-chevron {
+  display: inline-grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #152033;
+  box-shadow: 0 12px 24px rgba(8, 15, 31, 0.16);
+}
+
+.mobile-client-metrics-accordion-chevron svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+  transition: transform 160ms ease;
+}
+
+.mobile-client-metrics-accordion-chevron[data-open="true"] svg {
+  transform: rotate(180deg);
+}
+
+.mobile-client-metrics-accordion-panel {
+  padding: 0;
+}
+
+.mobile-client-metrics-accordion-panel[data-open="true"] {
+  padding: 0 1rem 1rem;
+}
+
+.mobile-client-metrics-accordion-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.mobile-client-metrics-accordion-list div {
+  display: grid;
+  gap: 0.22rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.mobile-client-metrics-accordion-list dt {
+  margin: 0;
+  color: rgba(248, 251, 255, 0.8);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.mobile-client-metrics-accordion-list dd {
+  margin: 0;
+  color: #ffffff;
+  font-size: 1rem;
   line-height: 1.45;
 }
 
