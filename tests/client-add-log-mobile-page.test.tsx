@@ -261,14 +261,16 @@ describe("AddLogPage mobile experience", () => {
     const searchButton = within(timerDialog).getByRole("button", {
       name: "Search timer exercises",
     });
+    const filterButton = within(timerDialog).getByRole("button", {
+      name: "Open timer exercise filters",
+    });
     expect(searchInput).toBeTruthy();
     expect(searchButton).toBeTruthy();
+    expect(searchButton.className).toContain("client-add-log-timer-picker__search-button");
+    expect(filterButton.className).toContain("client-add-log-timer-picker__filter-button");
     expect(searchButton.parentElement?.className).toContain(
-      "client-add-log-timer-picker__search-shell",
+      "client-add-log-timer-picker__search-actions",
     );
-    expect(
-      within(timerDialog).getByRole("button", { name: "Open timer exercise filters" }),
-    ).toBeTruthy();
     expect(within(timerDialog).getByRole("button", { name: "Close" })).toBeTruthy();
     expect(
       within(timerDialog).getByRole("button", { name: /Open timer session for Morning Circuit/ }),
@@ -415,6 +417,11 @@ describe("AddLogPage mobile experience", () => {
         name: /Open timer session for/,
       }),
     ).toHaveLength(5);
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url, init]) => String(url) === HISTORY_URL && (init?.method ?? "GET") === "GET",
+      ),
+    ).toHaveLength(initialHistoryFetches.length);
 
     await user.click(within(timerDialog).getByRole("button", { name: "Search timer exercises" }));
 

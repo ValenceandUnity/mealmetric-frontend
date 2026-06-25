@@ -1865,23 +1865,23 @@ function AddLogPageContent() {
           <label htmlFor="client-add-log-timer-search" className="sr-only">
             Search timer exercises
           </label>
-          <div className="client-add-log-timer-picker__search-shell">
-            <input
-              id="client-add-log-timer-search"
-              className="client-add-log-timer-picker__search-input mobile-focus-ring"
-              type="search"
-              value={timerDraftSearchQuery}
-              onChange={(event) => setTimerDraftSearchQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                }
-              }}
-              placeholder="Search recent exercises"
-            />
+          <input
+            id="client-add-log-timer-search"
+            className="client-add-log-timer-picker__search-input mobile-focus-ring"
+            type="search"
+            value={timerDraftSearchQuery}
+            onChange={(event) => setTimerDraftSearchQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+              }
+            }}
+            placeholder="Search recent exercises"
+          />
+          <div className="client-add-log-timer-picker__search-actions">
             <button
               type="button"
-              className="client-add-log-timer-picker__search-submit mobile-focus-ring client-add-log-timer-button-reset"
+              className="client-add-log-timer-picker__search-button mobile-focus-ring client-add-log-timer-button-reset"
               aria-label="Search timer exercises"
               onClick={applyTimerSearch}
             >
@@ -1896,70 +1896,70 @@ function AddLogPageContent() {
                 />
               </svg>
             </button>
-          </div>
-          <div className="client-add-log-timer-picker__filter">
-            <button
-              type="button"
-              className="client-add-log-timer-picker__filter-button mobile-focus-ring client-add-log-timer-button-reset"
-              aria-label="Open timer exercise filters"
-              aria-haspopup="dialog"
-              aria-expanded={timerFilterPopoverOpen}
-              aria-controls={TIMER_FILTER_POPOVER_ID}
-              onClick={() => setTimerFilterPopoverOpen((current) => !current)}
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path
-                  d="M12 3.75a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5Zm0 12a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5ZM4.5 9.75a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5Zm15 0a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5ZM12 6v2.25m0 7.5V18m-5.25-6H4.5m15 0h-2.25"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.8"
-                />
-              </svg>
-            </button>
-            {timerFilterPopoverOpen ? (
-              <div
-                id={TIMER_FILTER_POPOVER_ID}
-                role="dialog"
-                aria-modal="false"
-                aria-labelledby="client-add-log-timer-filter-title"
-                className="client-add-log-timer-picker__filter-popover"
+            <div className="client-add-log-timer-picker__filter">
+              <button
+                type="button"
+                className="client-add-log-timer-picker__filter-button mobile-focus-ring client-add-log-timer-button-reset"
+                aria-label="Open timer exercise filters"
+                aria-haspopup="dialog"
+                aria-expanded={timerFilterPopoverOpen}
+                aria-controls={TIMER_FILTER_POPOVER_ID}
+                onClick={() => setTimerFilterPopoverOpen((current) => !current)}
               >
-                <p
-                  id="client-add-log-timer-filter-title"
-                  className="client-add-log-timer-picker__filter-title"
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M12 3.75a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5Zm0 12a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5ZM4.5 9.75a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5Zm15 0a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5ZM12 6v2.25m0 7.5V18m-5.25-6H4.5m15 0h-2.25"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                  />
+                </svg>
+              </button>
+              {timerFilterPopoverOpen ? (
+                <div
+                  id={TIMER_FILTER_POPOVER_ID}
+                  role="dialog"
+                  aria-modal="false"
+                  aria-labelledby="client-add-log-timer-filter-title"
+                  className="client-add-log-timer-picker__filter-popover"
                 >
-                  Filter exercises
-                </p>
-                <fieldset
-                  className="client-add-log-timer-picker__filter-group"
-                  aria-label="Filter exercises by workout type"
-                >
-                  <legend className="sr-only">Filter exercises by workout type</legend>
-                  {([
-                    ["all", "All"],
-                    ["rep", "Rep"],
-                    ["set", "Set"],
-                    ["routine", "Routine"],
-                  ] as const).map(([value, label]) => (
-                    <label
-                      key={value}
-                      className="client-add-log-timer-picker__filter-option"
-                    >
-                      <input
-                        type="radio"
-                        name="client-add-log-timer-type-filter"
-                        value={value}
-                        checked={timerTypeFilter === value}
-                        onChange={() => setTimerTypeFilter(value)}
-                      />
-                      <span>{label}</span>
-                    </label>
-                  ))}
-                </fieldset>
-              </div>
-            ) : null}
+                  <p
+                    id="client-add-log-timer-filter-title"
+                    className="client-add-log-timer-picker__filter-title"
+                  >
+                    Filter exercises
+                  </p>
+                  <fieldset
+                    className="client-add-log-timer-picker__filter-group"
+                    aria-label="Filter exercises by workout type"
+                  >
+                    <legend className="sr-only">Filter exercises by workout type</legend>
+                    {([
+                      ["all", "All"],
+                      ["rep", "Rep"],
+                      ["set", "Set"],
+                      ["routine", "Routine"],
+                    ] as const).map(([value, label]) => (
+                      <label
+                        key={value}
+                        className="client-add-log-timer-picker__filter-option"
+                      >
+                        <input
+                          type="radio"
+                          name="client-add-log-timer-type-filter"
+                          value={value}
+                          checked={timerTypeFilter === value}
+                          onChange={() => setTimerTypeFilter(value)}
+                        />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                  </fieldset>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 
