@@ -63,7 +63,7 @@ describe("PTTrainingPage mobile experience", () => {
     vi.stubGlobal("fetch", fetchMock);
   });
 
-  it("renders the PT training mobile hub from protected PT BFF routes", async () => {
+  it("renders the training portfolio accordion from the existing PT BFF routes", async () => {
     fetchMock.mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
 
@@ -78,8 +78,14 @@ describe("PTTrainingPage mobile experience", () => {
                 description: "Barbell-first programming",
                 sort_order: 1,
               },
+              {
+                id: "folder-2",
+                name: "Recovery",
+                description: "Mobility and reset work",
+                sort_order: 2,
+              },
             ],
-            count: 1,
+            count: 2,
           },
         });
       }
@@ -98,8 +104,17 @@ describe("PTTrainingPage mobile experience", () => {
                 duration_days: 28,
                 is_template: false,
               },
+              {
+                id: "package-2",
+                folder_id: "folder-2",
+                title: "Recovery Reset",
+                description: "Lower-load deload cycle",
+                status: "draft",
+                duration_days: 14,
+                is_template: true,
+              },
             ],
-            count: 1,
+            count: 2,
           },
         });
       }
@@ -118,8 +133,17 @@ describe("PTTrainingPage mobile experience", () => {
                 estimated_minutes: 55,
                 is_archived: false,
               },
+              {
+                id: "routine-2",
+                folder_id: "folder-2",
+                title: "Recovery Flow",
+                description: "Breathing and mobility sequence",
+                difficulty: "easy",
+                estimated_minutes: 20,
+                is_archived: false,
+              },
             ],
-            count: 1,
+            count: 2,
           },
         });
       }
@@ -130,28 +154,59 @@ describe("PTTrainingPage mobile experience", () => {
     render(React.createElement(PTTrainingPage));
 
     await waitFor(() => {
-      expect(screen.getByText("Strength Camp")).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Training Portfolio" })).toBeTruthy();
     });
 
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/folders", { cache: "no-store" });
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/packages", { cache: "no-store" });
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/routines", { cache: "no-store" });
+    expect(screen.getByRole("heading", { name: "PT Training" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/pt/settings");
     expect(screen.getByRole("button", { name: "Sign Out" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "PT Training" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Training overview" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Folder lanes" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Portfolio cards" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Routine cards" })).toBeTruthy();
     expect(screen.getByRole("searchbox", { name: "Search PT training" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Filter to Strength folder" })).toBeTruthy();
+    expect(screen.getAllByRole("heading", { level: 2 })[0]?.textContent).toBe("Training Portfolio");
+    expect(screen.queryByRole("heading", { name: "Training overview" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Portfolio cards" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Routine cards" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Management status" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Folder lanes" })).toBeNull();
+    expect(screen.queryByText("Editor routes are not wired yet")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Edit folders unavailable" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add new portfolio unavailable" })).toBeNull();
+
+    const strengthFolderButton = screen.getByRole("button", { name: "Strength" });
+    const recoveryFolderButton = screen.getByRole("button", { name: "Recovery" });
+    const fetchCallCount = fetchMock.mock.calls.length;
+
+    expect(strengthFolderButton.getAttribute("aria-expanded")).toBe("false");
+    expect(recoveryFolderButton.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByText("Strength")).toBeTruthy();
+
+    fireEvent.click(strengthFolderButton);
+
+    await waitFor(() => {
+      expect(strengthFolderButton.getAttribute("aria-expanded")).toBe("true");
+    });
+
     expect(screen.getByText("Barbell-first programming")).toBeTruthy();
+    expect(screen.getByText("Strength Camp")).toBeTruthy();
     expect(screen.getByText("Deadlift Primer")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Edit folders unavailable" }).hasAttribute("disabled")).toBe(true);
-    expect(screen.getByRole("button", { name: "Add new portfolio unavailable" }).hasAttribute("disabled")).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
+
+    fireEvent.click(recoveryFolderButton);
+
+    await waitFor(() => {
+      expect(recoveryFolderButton.getAttribute("aria-expanded")).toBe("true");
+    });
+
+    expect(strengthFolderButton.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("Strength Camp")).toBeNull();
+    expect(screen.getByText("Recovery Reset")).toBeTruthy();
+    expect(screen.getByText("Recovery Flow")).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
   });
 
-  it("filters already-fetched PT training data locally without issuing new requests", async () => {
+  it("filters loaded training portfolio folders locally without issuing new requests", async () => {
     fetchMock.mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
 
@@ -232,8 +287,8 @@ describe("PTTrainingPage mobile experience", () => {
     render(React.createElement(PTTrainingPage));
 
     await waitFor(() => {
-      expect(screen.getByText("Strength Camp")).toBeTruthy();
-      expect(screen.getByText("Recovery Reset")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Strength" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Recovery" })).toBeTruthy();
     });
 
     const searchbox = screen.getByRole("searchbox", { name: "Search PT training" });
@@ -244,17 +299,23 @@ describe("PTTrainingPage mobile experience", () => {
     });
 
     await waitFor(() => {
-      expect(screen.queryByText("Strength Camp")).toBeNull();
-      expect(screen.queryByText("Deadlift Primer")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Strength" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Recovery" })).toBeTruthy();
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
+
+    fireEvent.click(screen.getByRole("button", { name: "Recovery" }));
+
+    await waitFor(() => {
       expect(screen.getByText("Recovery Reset")).toBeTruthy();
       expect(screen.getByText("Recovery Flow")).toBeTruthy();
-      expect(screen.getByRole("button", { name: "Filter to Recovery folder" })).toBeTruthy();
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
   });
 
-  it("renders safe empty states when the PT training routes return no folders, packages, or routines", async () => {
+  it("renders a safe empty state when the PT training routes return no folders, packages, or routines", async () => {
     fetchMock.mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
 
@@ -278,27 +339,35 @@ describe("PTTrainingPage mobile experience", () => {
     render(React.createElement(PTTrainingPage));
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "No folders yet" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "No training folders yet." })).toBeTruthy();
     });
 
-    expect(screen.getByRole("heading", { name: "No portfolios yet" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "No routines yet" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Training overview" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Portfolio cards" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Routine cards" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Management status" })).toBeNull();
   });
 
-  it("renders a protected unavailable state when every PT training route fails", async () => {
+  it("renders a safe Training Portfolio unavailable state when the folders route fails", async () => {
     fetchMock.mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
 
-      if (
-        url === "/api/pt/folders" ||
-        url === "/api/pt/packages" ||
-        url === "/api/pt/routines"
-      ) {
+      if (url === "/api/pt/folders") {
         return jsonResponse({
           ok: false,
           error: {
             code: "internal_error",
-            message: `Unavailable: ${url}`,
+            message: "Unavailable: /api/pt/folders",
+          },
+        });
+      }
+
+      if (url === "/api/pt/packages" || url === "/api/pt/routines") {
+        return jsonResponse({
+          ok: true,
+          data: {
+            items: [],
+            count: 0,
           },
         });
       }
@@ -309,10 +378,10 @@ describe("PTTrainingPage mobile experience", () => {
     render(React.createElement(PTTrainingPage));
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "PT training unavailable" })).toBeTruthy();
+      expect(screen.getAllByText("Training Portfolio unavailable").length).toBeGreaterThan(0);
     });
 
-    expect(screen.getByText(/does not fall back to direct backend calls/i)).toBeTruthy();
+    expect(screen.getByText("Unavailable: /api/pt/folders")).toBeTruthy();
   });
 
   it("does not bypass PT session bootstrap before fetching PT training data", () => {

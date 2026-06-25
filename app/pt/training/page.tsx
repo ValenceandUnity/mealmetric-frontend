@@ -2,18 +2,17 @@
 
 import Link from "next/link";
 import { startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { MobileAppShell } from "@/components/mobile/MobileAppShell";
 import { MobileHeaderUtilities } from "@/components/mobile/MobileHeaderUtilities";
 import { MobileCard } from "@/components/mobile/MobileCard";
 import { MobileSection } from "@/components/mobile/MobileSection";
-import { MobileStatCard } from "@/components/mobile/MobileStatCard";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
 import { adaptPTTrainingView } from "@/lib/view-models/pt-training";
-import { formatCountLabel, formatDisplayNameFromUser } from "@/lib/view-models/common";
+import { formatDisplayNameFromUser } from "@/lib/view-models/common";
 
 type PTTrainingApiResponse = ApiResponse<JsonValue>;
 
@@ -23,11 +22,47 @@ type SectionErrors = {
   routines: string | null;
 };
 
+type PortfolioFolderGroup = {
+  id: string;
+  title: string;
+  description: string;
+  countLabel: string;
+  packageCountLabel: string;
+  routineCountLabel: string;
+  sortOrderLabel: string;
+  packages: Array<{
+    id: string;
+    title: string;
+    description: string;
+    statusLabel: string;
+    durationLabel: string;
+    templateLabel: string;
+  }>;
+  routines: Array<{
+    id: string;
+    title: string;
+    description: string;
+    difficultyLabel: string;
+    estimatedMinutesLabel: string;
+    archiveLabel: string;
+  }>;
+  searchFields: string[];
+  themeClassName: string;
+};
+
 const EMPTY_SECTION_ERRORS: SectionErrors = {
   folders: null,
   packages: null,
   routines: null,
 };
+
+const PORTFOLIO_THEME_CLASS_NAMES = [
+  "pt-training-portfolio-card--green",
+  "pt-training-portfolio-card--red",
+  "pt-training-portfolio-card--purple",
+  "pt-training-portfolio-card--blue",
+  "pt-training-portfolio-card--amber",
+] as const;
 
 type ActionPillProps = {
   href: string;
@@ -69,49 +104,12 @@ function matchesTrainingQuery(query: string, fields: Array<string | null | undef
   return fields.some((field) => field?.toLowerCase().includes(query));
 }
 
-function getTrainingIcon(label: string) {
-  switch (label.toLowerCase()) {
-    case "folders":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4.5 7.5h5l1.8 2H19a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 19 18.5H5A1.5 1.5 0 0 1 3.5 17V9A1.5 1.5 0 0 1 5 7.5Z" />
-        </svg>
-      );
-    case "portfolios":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M7 6.5h10a2 2 0 0 1 2 2V18l-4-2-4 2-4-2-4 2V8.5a2 2 0 0 1 2-2h2Z" />
-          <path d="M9 10h6m-6 3h5" />
-        </svg>
-      );
-    case "routines":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 7.5h12M12 7.5v9m-3-3h6" />
-        </svg>
-      );
-    case "drafts":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 18h12M8 15.5 16 7.5m-6 8 8-8" />
-        </svg>
-      );
-    case "active portfolios":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 12.5 10 16l8-9" />
-        </svg>
-      );
-    case "archived routines":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 8h12M8 11v6m4-6v6m4-6v6" />
-          <path d="M5 8.5h14L18 19H6L5 8.5Z" />
-        </svg>
-      );
-    default:
-      return null;
-  }
+function PortfolioChevronIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="m8 10 4 4 4-4" />
+    </svg>
+  );
 }
 
 export default function PTTrainingPage() {
@@ -126,7 +124,7 @@ export default function PTTrainingPage() {
   const [sectionErrors, setSectionErrors] = useState<SectionErrors>(EMPTY_SECTION_ERRORS);
   const [loading, setLoading] = useState(true);
   const [searchValue, setSearchValue] = useState("");
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [openPortfolioFolderId, setOpenPortfolioFolderId] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(searchValue);
 
   useEffect(() => {
@@ -209,24 +207,104 @@ export default function PTTrainingPage() {
   }, [status, user]);
 
   const view = useMemo(
-    () => adaptPTTrainingView({
-      folders: foldersData,
-      packages: packagesData,
-      routines: routinesData,
-      selectedFolderId,
-    }),
-    [foldersData, packagesData, routinesData, selectedFolderId],
+    () =>
+      adaptPTTrainingView({
+        folders: foldersData,
+        packages: packagesData,
+        routines: routinesData,
+        selectedFolderId: openPortfolioFolderId,
+      }),
+    [foldersData, packagesData, routinesData, openPortfolioFolderId],
   );
 
+  const query = deferredSearch.trim().toLowerCase();
+  const hasSearchValue = query.length > 0;
+  const partialErrorMessages = Object.values(sectionErrors).filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+  const detailErrorMessages = [sectionErrors.packages, sectionErrors.routines].filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+  const showLoadingState = loading && !view.hasAnyData && partialErrorMessages.length === 0;
+  const allSectionsFailed = !loading && !view.hasAnyData && partialErrorMessages.length === 3;
+
+  const portfolioFolders = useMemo<PortfolioFolderGroup[]>(
+    () =>
+      view.folderTiles.map((folder, index) => {
+        const packages = view.packageCards
+          .filter((item) => item.folderId === folder.id)
+          .map((item) => ({
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            statusLabel: item.statusLabel,
+            durationLabel: item.durationLabel,
+            templateLabel: item.templateLabel,
+          }));
+        const routines = view.routineCards
+          .filter((item) => item.folderId === folder.id)
+          .map((item) => ({
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            difficultyLabel: item.difficultyLabel,
+            estimatedMinutesLabel: item.estimatedMinutesLabel,
+            archiveLabel: item.archiveLabel,
+          }));
+
+        return {
+          id: folder.id,
+          title: folder.title,
+          description: folder.description,
+          countLabel: folder.countLabel,
+          packageCountLabel: folder.packageCountLabel,
+          routineCountLabel: folder.routineCountLabel,
+          sortOrderLabel: folder.sortOrderLabel,
+          packages,
+          routines,
+          searchFields: [
+            folder.title,
+            folder.description,
+            folder.countLabel,
+            folder.packageCountLabel,
+            folder.routineCountLabel,
+            folder.sortOrderLabel,
+            ...packages.flatMap((item) => [
+              item.title,
+              item.description,
+              item.statusLabel,
+              item.durationLabel,
+              item.templateLabel,
+            ]),
+            ...routines.flatMap((item) => [
+              item.title,
+              item.description,
+              item.difficultyLabel,
+              item.estimatedMinutesLabel,
+              item.archiveLabel,
+            ]),
+          ],
+          themeClassName:
+            PORTFOLIO_THEME_CLASS_NAMES[index % PORTFOLIO_THEME_CLASS_NAMES.length] ??
+            PORTFOLIO_THEME_CLASS_NAMES[0],
+        };
+      }),
+    [view.folderTiles, view.packageCards, view.routineCards],
+  );
+
+  const filteredPortfolioFolders = hasSearchValue
+    ? portfolioFolders.filter((folder) => matchesTrainingQuery(query, folder.searchFields))
+    : portfolioFolders;
+
   useEffect(() => {
-    if (!selectedFolderId) {
+    if (!openPortfolioFolderId) {
       return;
     }
 
-    if (!view.folderTiles.some((item) => item.id === selectedFolderId)) {
-      setSelectedFolderId(null);
+    if (!filteredPortfolioFolders.some((folder) => folder.id === openPortfolioFolderId)) {
+      setOpenPortfolioFolderId(null);
     }
-  }, [selectedFolderId, view.folderTiles]);
+  }, [filteredPortfolioFolders, openPortfolioFolderId]);
 
   if (status === "loading") {
     return <LoadingBlock title="Loading PT training" message="Validating your BFF-managed PT session." />;
@@ -236,55 +314,14 @@ export default function PTTrainingPage() {
     return <LoadingBlock title="Redirecting" message="PT training requires an authenticated PT session." />;
   }
 
-  const query = deferredSearch.trim().toLowerCase();
-  const hasSearchValue = query.length > 0;
-  const partialErrorMessages = Object.values(sectionErrors).filter(
-    (item): item is string => typeof item === "string" && item.trim().length > 0,
-  );
-  const showLoadingState = loading && !view.hasAnyData && partialErrorMessages.length === 0;
-  const allSectionsFailed = !loading && !view.hasAnyData && partialErrorMessages.length === 3;
-  const filteredFolderTiles = hasSearchValue
-    ? view.folderTiles.filter((item) =>
-        matchesTrainingQuery(query, [
-          item.title,
-          item.description,
-          item.countLabel,
-          item.packageCountLabel,
-          item.routineCountLabel,
-          item.sortOrderLabel,
-        ]))
-    : view.folderTiles;
-  const filteredPackageCards = view.packageCards.filter((item) =>
-    (selectedFolderId === null || item.folderId === selectedFolderId) &&
-    matchesTrainingQuery(query, [
-      item.title,
-      item.description,
-      item.statusLabel,
-      item.durationLabel,
-      item.folderLabel,
-      item.templateLabel,
-    ]),
-  );
-  const filteredRoutineCards = view.routineCards.filter((item) =>
-    (selectedFolderId === null || item.folderId === selectedFolderId) &&
-    matchesTrainingQuery(query, [
-      item.title,
-      item.description,
-      item.difficultyLabel,
-      item.estimatedMinutesLabel,
-      item.folderLabel,
-      item.archiveLabel,
-    ]),
-  );
-
   return (
     <MobileAppShell
       user={user}
       greeting={formatDisplayNameFromUser(user)}
       title="PT Training"
-      subtitle="Folders, portfolios, and routines stay inside the existing PT BFF layer and use local-only filtering on the frontend."
+      subtitle="Training portfolios and routines stay inside the existing PT BFF layer and use local-only filtering on the frontend."
       searchLabel="Search PT training"
-      searchPlaceholder="Search folders, portfolios, or routines"
+      searchPlaceholder="Search training portfolios or routines"
       searchValue={searchValue}
       onSearchChange={(nextValue) => {
         startTransition(() => {
@@ -299,12 +336,12 @@ export default function PTTrainingPage() {
       {allSectionsFailed ? (
         <MobileSection
           eyebrow="Training sync"
-          title="PT training unavailable"
+          title="Training Portfolio unavailable"
           description="This screen stays on protected frontend-to-BFF PT routes and does not fall back to direct backend calls."
         >
           <TrainingStateCard
-            title="Unable to load PT training"
-            message={partialErrorMessages.join(" ")}
+            title="Training Portfolio unavailable"
+            message={sectionErrors.folders ?? "Unable to load PT folders."}
             action={<ActionPill href="/pt">Back home</ActionPill>}
           />
         </MobileSection>
@@ -313,286 +350,166 @@ export default function PTTrainingPage() {
       {showLoadingState ? (
         <MobileSection
           eyebrow="Syncing"
-          title="Loading the PT training hub"
+          title="Loading Training Portfolio"
           description="Fetching folders, portfolios, and routines through the current signed PT BFF routes."
         >
           <TrainingStateCard
-            title="Refreshing PT training data"
-            message="Your PT training hub is loading through the protected frontend-to-BFF path."
+            title="Refreshing Training Portfolio"
+            message="Your PT training workspace is loading through the protected frontend-to-BFF path."
           />
         </MobileSection>
       ) : null}
 
       {!showLoadingState && !allSectionsFailed ? (
         <>
-          {partialErrorMessages.length > 0 && view.hasAnyData ? (
-            <MobileSection
-              eyebrow="Partial data"
-              title="Some PT training sources are unavailable"
-              description="This hub still renders the PT routes that succeeded instead of inventing missing data."
-            >
-              <TrainingStateCard
-                title="Partial PT training data"
-                message={partialErrorMessages.join(" ")}
-              />
-            </MobileSection>
-          ) : null}
-
           <MobileSection
-            eyebrow="PT training hub"
-            title="Training overview"
-            description="Summary cards reflect only the data returned by the current PT folders, packages, and routines routes."
-          >
-            <MobileCard as="article" variant="action" className="mobile-pt-hero-card">
-              <div className="mobile-pt-hero-masthead">
-                <div className="mobile-section__copy">
-                  <p className="mobile-section__eyebrow">Protected PT training</p>
-                  <h2 className="mobile-section__title">Portfolios and routines in the same visual language</h2>
-                  <p className="mobile-section__description">
-                    Folders, packages, and routines keep the current BFF-backed behavior while shifting into the darker grid and highlighted-card treatment used across the mobile client surfaces.
-                  </p>
-                </div>
-                <div className="mobile-pt-actions">
-                  <ActionPill href="/pt/clients">Open clients</ActionPill>
-                  <ActionPill href="/pt/metrics" tone="purple">Metrics</ActionPill>
-                </div>
-              </div>
-
-              <div className="mobile-pt-signal-grid">
-                {view.summaryCards.map((item) => (
-                  <MobileStatCard
-                    key={item.label}
-                    label={item.label}
-                    value={item.value}
-                    progressText={item.progressText}
-                    icon={getTrainingIcon(item.label)}
-                  />
-                ))}
-              </div>
-            </MobileCard>
-          </MobileSection>
-
-          <MobileSection
-            eyebrow="Folders"
-            title="Folder lanes"
-            description="Folder tiles filter the PT training hub locally and do not trigger new backend requests."
+            eyebrow="PT training"
+            title="Training Portfolio"
+            description="Organize client training routines into custom folder lanes from the existing PT folders route."
           >
             {sectionErrors.folders && !view.hasFolders ? (
               <TrainingStateCard
-                title="Folders unavailable"
+                title="Training Portfolio unavailable"
                 message={sectionErrors.folders}
               />
             ) : view.hasFolders ? (
-              <div className="mobile-pt-chip-grid" role="list" aria-label="PT training folders">
-                <button
-                  type="button"
-                  className={[
-                    "mobile-pt-chip-card",
-                    selectedFolderId === null ? "mobile-pt-chip-card--active" : "",
-                    "mobile-focus-ring",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  aria-label="Filter to all training folders"
-                  aria-pressed={selectedFolderId === null}
-                  onClick={() => setSelectedFolderId(null)}
-                >
-                  <p className="mobile-pt-chip-card__title">All training</p>
-                  <p className="mobile-pt-chip-card__meta">
-                    {formatCountLabel(view.packageCards.length, "portfolio")} | {formatCountLabel(view.routineCards.length, "routine")}
-                  </p>
-                </button>
+              filteredPortfolioFolders.length > 0 ? (
+                <div className="pt-training-portfolio" role="list" aria-label="Training portfolio folders">
+                  {filteredPortfolioFolders.map((folder) => {
+                    const isOpen = openPortfolioFolderId === folder.id;
+                    const triggerId = `pt-training-folder-${folder.id}-trigger`;
+                    const panelId = `pt-training-folder-${folder.id}-panel`;
 
-                {filteredFolderTiles.length > 0 ? (
-                  filteredFolderTiles.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={[
-                        "mobile-pt-chip-card",
-                        item.active ? "mobile-pt-chip-card--active" : "",
-                        "mobile-focus-ring",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      aria-label={`Filter to ${item.title} folder`}
-                      aria-pressed={item.active}
-                      onClick={() => setSelectedFolderId(item.id)}
-                    >
-                      <p className="mobile-pt-chip-card__title">{item.title}</p>
-                      <p className="mobile-pt-chip-card__meta">{item.description}</p>
-                      <p className="mobile-pt-chip-card__meta">{item.countLabel}</p>
-                      <p className="mobile-pt-chip-card__meta">{item.sortOrderLabel}</p>
-                    </button>
-                  ))
-                ) : hasSearchValue ? (
-                  <TrainingStateCard
-                    title="No folders match this search"
-                    message={`No PT folders matched "${searchValue.trim()}". Adjust the local filter to see returned training folders again.`}
-                  />
-                ) : null}
-              </div>
+                    return (
+                      <article
+                        key={folder.id}
+                        role="listitem"
+                        className={[
+                          "pt-training-portfolio-card",
+                          folder.themeClassName,
+                          isOpen ? "pt-training-portfolio-card--open" : "",
+                        ].filter(Boolean).join(" ")}
+                      >
+                        <button
+                          id={triggerId}
+                          type="button"
+                          className="pt-training-portfolio-trigger mobile-focus-ring"
+                          aria-expanded={isOpen}
+                          aria-controls={panelId}
+                          onClick={() => {
+                            setOpenPortfolioFolderId((current) => (current === folder.id ? null : folder.id));
+                          }}
+                        >
+                          <span className="pt-training-portfolio-title">{folder.title}</span>
+                          <span className="pt-training-portfolio-chevron" aria-hidden="true">
+                            <PortfolioChevronIcon />
+                          </span>
+                        </button>
+
+                        {isOpen ? (
+                          <div
+                            id={panelId}
+                            role="region"
+                            aria-labelledby={triggerId}
+                            className="pt-training-portfolio-panel"
+                          >
+                            <div className="mobile-section__copy">
+                              <p className="mobile-section__description">
+                                {folder.description}
+                              </p>
+                            </div>
+
+                            <div className="pt-training-portfolio-meta" aria-label={`${folder.title} folder details`}>
+                              <span className="mobile-pill mobile-pill--purple">{folder.packageCountLabel}</span>
+                              <span className="mobile-pill">{folder.routineCountLabel}</span>
+                              <span className="mobile-pill">{folder.sortOrderLabel}</span>
+                            </div>
+
+                            {folder.packages.length === 0 && folder.routines.length === 0 ? (
+                              <p className="pt-training-portfolio-empty">
+                                No training routines are assigned to this folder yet.
+                              </p>
+                            ) : (
+                              <div className="pt-training-portfolio-list">
+                                {folder.packages.length > 0 ? (
+                                  <section className="pt-training-portfolio-list-block">
+                                    <p className="pt-training-portfolio-list-label">Training portfolios</p>
+                                    <ul className="pt-training-portfolio-list-items">
+                                      {folder.packages.map((item) => (
+                                        <li key={item.id} className="pt-training-portfolio-list-item">
+                                          <div className="pt-training-portfolio-list-copy">
+                                            <p className="pt-training-portfolio-list-title">{item.title}</p>
+                                            <p className="pt-training-portfolio-list-description">
+                                              {item.description}
+                                            </p>
+                                          </div>
+                                          <div className="pt-training-portfolio-list-pills">
+                                            <span className="mobile-pill mobile-pill--yellow">{item.statusLabel}</span>
+                                            <span className="mobile-pill">{item.durationLabel}</span>
+                                            <span className="mobile-pill">{item.templateLabel}</span>
+                                          </div>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </section>
+                                ) : null}
+
+                                {folder.routines.length > 0 ? (
+                                  <section className="pt-training-portfolio-list-block">
+                                    <p className="pt-training-portfolio-list-label">Training routines</p>
+                                    <ul className="pt-training-portfolio-list-items">
+                                      {folder.routines.map((item) => (
+                                        <li key={item.id} className="pt-training-portfolio-list-item">
+                                          <div className="pt-training-portfolio-list-copy">
+                                            <p className="pt-training-portfolio-list-title">{item.title}</p>
+                                            <p className="pt-training-portfolio-list-description">
+                                              {item.description}
+                                            </p>
+                                          </div>
+                                          <div className="pt-training-portfolio-list-pills">
+                                            <span className="mobile-pill mobile-pill--yellow">{item.difficultyLabel}</span>
+                                            <span className="mobile-pill">{item.estimatedMinutesLabel}</span>
+                                            <span className="mobile-pill">{item.archiveLabel}</span>
+                                          </div>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </section>
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <TrainingStateCard
+                  title="No training portfolio folders match this search."
+                  message={`No loaded PT folders matched "${searchValue.trim()}". Adjust the local filter to see the returned folder lanes again.`}
+                />
+              )
             ) : (
               <TrainingStateCard
-                title="No folders yet"
-                message="PT folders will appear here when the current folders route returns training folder records."
+                title="No training folders yet."
+                message="Training folders will appear here when the current PT folders route returns custom folder records."
               />
             )}
           </MobileSection>
 
-          <MobileSection
-            eyebrow="Portfolios"
-            title="Portfolio cards"
-            description="Portfolio cards come only from the current PT packages route. No editor or detail route is invented when one does not exist."
-          >
-            {sectionErrors.packages && !view.hasPackages ? (
+          {detailErrorMessages.length > 0 && view.hasFolders ? (
+            <MobileSection
+              eyebrow="Partial data"
+              title="Some training details are unavailable"
+              description="Folder blocks still render from the PT folders route while linked training details stay limited to the package and routine routes that succeeded."
+            >
               <TrainingStateCard
-                title="Portfolios unavailable"
-                message={sectionErrors.packages}
+                title="Partial PT training data"
+                message={detailErrorMessages.join(" ")}
               />
-            ) : filteredPackageCards.length > 0 ? (
-              <div className="mobile-pt-training-stack">
-                {filteredPackageCards.map((item) => (
-                  <MobileCard key={item.id} as="article" variant="action" className="mobile-pt-training-card">
-                    <div
-                      className="mobile-training-card-media"
-                      style={{ "--mobile-routine-gradient": item.gradient } as CSSProperties}
-                    >
-                      <div className="mobile-training-pill-row">
-                        <span className="mobile-pill mobile-pill--purple">{item.statusLabel}</span>
-                        <span className="mobile-pill mobile-pill--yellow">{item.templateLabel}</span>
-                        <span className="mobile-pill">{item.durationLabel}</span>
-                      </div>
-                    </div>
-
-                    <div className="mobile-section__copy">
-                      <p className="mobile-section__eyebrow">Training portfolio</p>
-                      <h3 className="mobile-section__title">{item.title}</h3>
-                      <p className="mobile-section__description">{item.description}</p>
-                    </div>
-
-                    <dl className="mobile-pt-training-meta-grid">
-                      <div>
-                        <dt>Folder</dt>
-                        <dd>{item.folderLabel}</dd>
-                      </div>
-                      <div>
-                        <dt>Editor</dt>
-                        <dd>Not wired</dd>
-                      </div>
-                    </dl>
-
-                    <p className="mobile-section__description">{item.managementNote}</p>
-                  </MobileCard>
-                ))}
-              </div>
-            ) : hasSearchValue && view.hasPackages ? (
-              <TrainingStateCard
-                title="No portfolios match this search"
-                message={`No PT training portfolios matched "${searchValue.trim()}".`}
-              />
-            ) : (
-              <TrainingStateCard
-                title="No portfolios yet"
-                message="PT training portfolios will appear here when the current packages route returns training package records."
-              />
-            )}
-          </MobileSection>
-
-          <MobileSection
-            eyebrow="Routines"
-            title="Routine cards"
-            description="Routine cards come only from the current PT routines route and remain read-only until a stable editor route exists."
-          >
-            {sectionErrors.routines && !view.hasRoutines ? (
-              <TrainingStateCard
-                title="Routines unavailable"
-                message={sectionErrors.routines}
-              />
-            ) : filteredRoutineCards.length > 0 ? (
-              <div className="mobile-pt-training-stack">
-                {filteredRoutineCards.map((item) => (
-                  <MobileCard key={item.id} as="article" variant="image" className="mobile-pt-training-card">
-                    <div
-                      className="mobile-training-card-media"
-                      style={{ "--mobile-routine-gradient": item.gradient } as CSSProperties}
-                    >
-                      <div className="mobile-training-pill-row">
-                        <span className="mobile-pill mobile-pill--purple">{item.difficultyLabel}</span>
-                        <span className="mobile-pill mobile-pill--yellow">{item.estimatedMinutesLabel}</span>
-                        <span className="mobile-pill">{item.archiveLabel}</span>
-                      </div>
-                    </div>
-
-                    <div className="mobile-section__copy">
-                      <p className="mobile-section__eyebrow">Routine</p>
-                      <h3 className="mobile-section__title">{item.title}</h3>
-                      <p className="mobile-section__description">{item.description}</p>
-                    </div>
-
-                    <dl className="mobile-pt-training-meta-grid">
-                      <div>
-                        <dt>Folder</dt>
-                        <dd>{item.folderLabel}</dd>
-                      </div>
-                      <div>
-                        <dt>Editor</dt>
-                        <dd>Not wired</dd>
-                      </div>
-                    </dl>
-
-                    <p className="mobile-section__description">{item.managementNote}</p>
-                  </MobileCard>
-                ))}
-              </div>
-            ) : hasSearchValue && view.hasRoutines ? (
-              <TrainingStateCard
-                title="No routines match this search"
-                message={`No PT routines matched "${searchValue.trim()}".`}
-              />
-            ) : (
-              <TrainingStateCard
-                title="No routines yet"
-                message="PT routines will appear here when the current routines route returns routine records."
-              />
-            )}
-          </MobileSection>
-
-          <MobileSection
-            eyebrow="Management"
-            title="Management status"
-            description="This phase keeps PT training management read-only unless a stable editor route already exists."
-          >
-            <MobileCard as="article" variant="soft" className="mobile-pt-training-management-card">
-              <div className="mobile-section__copy">
-                <h3 className="mobile-section__title">Editor routes are not wired yet</h3>
-                <p className="mobile-section__description">
-                  Dedicated PT folder and portfolio editor screens do not currently exist in the frontend route map, so this hub stops at safe read-only summary cards.
-                </p>
-              </div>
-              <div className="mobile-pt-training-disabled-actions" aria-describedby="pt-training-management-note">
-                <button
-                  type="button"
-                  className="mobile-pt-button mobile-focus-ring"
-                  aria-label="Edit folders unavailable"
-                  disabled
-                >
-                  Edit folders unavailable
-                </button>
-                <button
-                  type="button"
-                  className="mobile-pt-button mobile-focus-ring"
-                  aria-label="Add new portfolio unavailable"
-                  disabled
-                >
-                  Add new portfolio unavailable
-                </button>
-              </div>
-              <p id="pt-training-management-note" className="mobile-section__description">
-                Management actions will be available after stable PT training editor routes are wired into the frontend.
-              </p>
-            </MobileCard>
-          </MobileSection>
+            </MobileSection>
+          ) : null}
         </>
       ) : null}
     </MobileAppShell>
