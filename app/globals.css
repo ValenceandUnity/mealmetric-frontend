@@ -2149,6 +2149,37 @@ html[data-theme="light"] .mobile-bottom-nav {
   word-break: break-word;
 }
 
+.client-history-search-field {
+  position: relative;
+  display: grid;
+}
+
+.client-history-search-field__input {
+  padding-right: 3.25rem;
+}
+
+.client-history-search-field__button {
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(173, 187, 255, 0.18);
+  background: rgba(124, 92, 255, 0.2);
+  color: #f8fafc;
+}
+
+.client-history-search-field__icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  fill: currentColor;
+}
+
 .client-history-search-overlay {
   position: fixed;
   z-index: 80;

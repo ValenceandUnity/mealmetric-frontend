@@ -303,3 +303,24 @@
   - No backend/app-api/auth/session/dependency changes.
 - Note:
   - Overlay uses currently loaded BFF rows; no new search endpoint was added.
+
+## Phase 12B.20 - Full log search submit button and autosuggest
+
+- Route: `/client/add-log/full-log-history`
+- Changes:
+  - Search input no longer triggers search or the results overlay on every keystroke.
+  - Added a magnifying-glass submit button inside the search input.
+  - Search overlay opens only after the search button or Enter is used.
+  - Added frontend-only native `datalist` autosuggest from already loaded workout-history exercise names.
+- Preserved:
+  - Existing workout-history BFF fetch route.
+  - Existing submitted search query behavior.
+  - Existing search results overlay.
+  - Existing Start date / End date archive controls.
+  - Existing weekly archive blocks.
+  - Existing older-entry pagination.
+  - Existing `/client/training/history` behavior.
+  - Existing PR #18 add-log autosuggest behavior.
+  - No backend/app-api/auth/session/dependency changes.
+- Note:
+  - Autosuggest is frontend-only over loaded rows; no new endpoint was added.
