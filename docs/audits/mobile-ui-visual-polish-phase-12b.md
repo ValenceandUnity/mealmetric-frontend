@@ -283,3 +283,23 @@
 - Note:
   - Autosuggest is frontend-only over loaded workout-history rows in this phase.
   - Metrics/search benefits come from saving consistent exercise names; no metrics feature is added here.
+
+## Phase 12B.19 - Full log search results overlay
+
+- Route: `/client/add-log/full-log-history`
+- Changes:
+  - Added a search-results floating overlay when the user types into the search field.
+  - Overlay shows matching loaded workout-history rows in a performance/data-cell layout.
+  - Added close and clear-search behavior.
+  - Kept behavior frontend-only over existing BFF search results.
+- Preserved:
+  - Existing workout-history BFF fetch route.
+  - Existing search query behavior.
+  - Existing Start date / End date archive controls.
+  - Existing weekly archive blocks.
+  - Existing older-entry pagination.
+  - Existing `/client/training/history` behavior.
+  - Existing PR #18 add-log autosuggest behavior.
+  - No backend/app-api/auth/session/dependency changes.
+- Note:
+  - Overlay uses currently loaded BFF rows; no new search endpoint was added.

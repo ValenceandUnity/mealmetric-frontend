@@ -30,6 +30,7 @@ export type ClientHistoryRouteSurfaceProps = {
   showHistoryUtility?: boolean;
   showDateArchive?: boolean;
   showTypeFilter?: boolean;
+  showSearchResultsOverlay?: boolean;
   historyUtilityVariant?: "default" | "hidden";
 };
 
@@ -151,6 +152,7 @@ export function ClientHistoryRouteSurface({
   showHistoryUtility = true,
   showDateArchive = false,
   showTypeFilter = true,
+  showSearchResultsOverlay = false,
   historyUtilityVariant = "default",
 }: ClientHistoryRouteSurfaceProps) {
   const { status, user } = useSessionBootstrap({
@@ -163,6 +165,7 @@ export function ClientHistoryRouteSurface({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<ClientHistoryModeFilter>("all");
   const [searchValue, setSearchValue] = useState("");
+  const [searchOverlayDismissed, setSearchOverlayDismissed] = useState(false);
   const [archiveStartDate, setArchiveStartDate] = useState("");
   const [archiveEndDate, setArchiveEndDate] = useState("");
   const [openArchiveBlockId, setOpenArchiveBlockId] = useState<string | null>(null);
@@ -174,6 +177,10 @@ export function ClientHistoryRouteSurface({
       setTypeFilter("all");
     }
   }, [showTypeFilter, typeFilter]);
+
+  useEffect(() => {
+    setSearchOverlayDismissed(false);
+  }, [searchValue]);
 
   useEffect(() => {
     if (status !== "authenticated" || !user || user.role !== "client") {
@@ -242,6 +249,7 @@ export function ClientHistoryRouteSurface({
   }, [effectiveTypeFilter, offset, searchValue, status, user]);
 
   const historyView = useMemo(() => adaptClientHistoryView(historyData), [historyData]);
+  const normalizedSearchValue = searchValue.trim();
   const shouldShowHistoryUtility =
     historyUtilityVariant !== "hidden" && showHistoryUtility;
   const archiveRangeState = useMemo(() => {
@@ -351,6 +359,32 @@ export function ClientHistoryRouteSurface({
       }),
     ];
   }, [archiveRangeState, historyView.rows, showDateArchive]);
+  const searchOverlayRows = useMemo(() => {
+    if (
+      showDateArchive &&
+      archiveRangeState.useCustomRange &&
+      archiveRangeState.rangeStart &&
+      archiveRangeState.rangeEnd
+    ) {
+      const { rangeStart, rangeEnd } = archiveRangeState;
+
+      return historyView.rows.filter((row) =>
+        isDateKeyInRange(
+          row.performedAtDateKey,
+          rangeStart,
+          rangeEnd,
+        ),
+      );
+    }
+
+    return historyView.rows;
+  }, [archiveRangeState, historyView.rows, showDateArchive]);
+  const searchOverlayVisible =
+    showSearchResultsOverlay &&
+    normalizedSearchValue.length > 0 &&
+    !searchOverlayDismissed;
+  const visibleSearchOverlayRows = searchOverlayRows.slice(0, 5);
+  const hasMoreSearchOverlayRows = searchOverlayRows.length > visibleSearchOverlayRows.length;
 
   useEffect(() => {
     if (openArchiveBlockId && !archiveBlocks.some((block) => block.id === openArchiveBlockId)) {
@@ -375,6 +409,100 @@ export function ClientHistoryRouteSurface({
       notificationSlot={<ActionPill href={backHref} tone="purple">{backLabel}</ActionPill>}
       activePath={activePath}
     >
+      {searchOverlayVisible ? (
+        <div
+          className="client-history-search-overlay"
+          role="dialog"
+          aria-labelledby="client-history-search-overlay-title"
+        >
+          <div className="client-history-search-overlay__header">
+            <div className="mobile-section__copy">
+              <h2
+                id="client-history-search-overlay-title"
+                className="mobile-section__title"
+              >
+                Search Results
+              </h2>
+              <p className="mobile-section__description">
+                Results for &quot;{normalizedSearchValue}&quot;
+              </p>
+              {showDateArchive ? (
+                <p className="mobile-section__description">
+                  Search results reflect the currently loaded archive.
+                </p>
+              ) : null}
+            </div>
+            <div className="client-history-search-overlay__actions">
+              <button
+                type="button"
+                className="mobile-pill mobile-pill--purple mobile-focus-ring"
+                onClick={() => setSearchOverlayDismissed(true)}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="mobile-pill mobile-pill--yellow mobile-focus-ring"
+                onClick={() => {
+                  setSearchValue("");
+                  setOffset(0);
+                  setSearchOverlayDismissed(false);
+                }}
+              >
+                Clear search
+              </button>
+            </div>
+          </div>
+
+          {loading ? (
+            <p className="mobile-section__description">Searching logs...</p>
+          ) : errorMessage ? (
+            <p className="mobile-section__description">Unable to load search results.</p>
+          ) : visibleSearchOverlayRows.length === 0 ? (
+            <p className="mobile-section__description">No matching logs found.</p>
+          ) : (
+            <div className="client-history-search-overlay__list">
+              {visibleSearchOverlayRows.map((row) => (
+                <article
+                  key={row.id}
+                  className="client-history-search-overlay__card"
+                >
+                  <div className="mobile-section__copy">
+                    <p className="mobile-section__eyebrow">{row.performedAtLabel}</p>
+                    <h3 className="mobile-section__title">{row.exerciseName}</h3>
+                    {row.notes !== "-" ? (
+                      <p className="mobile-section__description">Notes: {row.notes}</p>
+                    ) : null}
+                  </div>
+                  <div className="client-history-search-overlay__cells">
+                    <div className="client-history-search-overlay__cell">
+                      <span className="mobile-section__eyebrow">Sets</span>
+                      <span className="mobile-section__description">{row.sets}</span>
+                    </div>
+                    <div className="client-history-search-overlay__cell">
+                      <span className="mobile-section__eyebrow">Reps</span>
+                      <span className="mobile-section__description">{row.reps}</span>
+                    </div>
+                    <div className="client-history-search-overlay__cell">
+                      <span className="mobile-section__eyebrow">Weight</span>
+                      <span className="mobile-section__description">{row.weight}</span>
+                    </div>
+                    <div className="client-history-search-overlay__cell">
+                      <span className="mobile-section__eyebrow">Time</span>
+                      <span className="mobile-section__description">{row.duration}</span>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+
+          {!loading && !errorMessage && hasMoreSearchOverlayRows ? (
+            <p className="mobile-section__description">Showing first 5 matching logs.</p>
+          ) : null}
+        </div>
+      ) : null}
+
       {loading ? (
         <MobileSection
           eyebrow="Syncing"

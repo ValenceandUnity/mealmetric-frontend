@@ -330,6 +330,163 @@ describe("Client history routes mobile experience", () => {
     ).toBe(true);
   });
 
+  it("shows the search overlay on add-log full-history and lets the user close it without clearing the query", async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (method !== "GET") {
+        throw new Error(`Unexpected mutation: ${method} ${url}`);
+      }
+
+      if (url === "/api/client/training/workout-logs?limit=30&offset=0") {
+        return jsonResponse(historyPayload());
+      }
+
+      if (url === "/api/client/training/workout-logs?limit=30&offset=0&search=bench") {
+        return jsonResponse(
+          historyPayload({
+            items: [
+              createHistoryItem({
+                id: "search-overlay-log-1",
+                performedAt: "2026-06-08T10:00:00Z",
+                mode: "rep",
+                exerciseName: "Bench Press",
+                sets: 4,
+                reps: 8,
+                weight: 135.5,
+                durationSeconds: 90,
+              }),
+            ],
+          }),
+        );
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+
+    render(React.createElement(AddLogFullHistoryPage));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/client/training/workout-logs?limit=30&offset=0",
+        expect.objectContaining({ cache: "no-store" }),
+      );
+    });
+
+    fireEvent.change(screen.getByLabelText("Search"), {
+      target: { value: "bench" },
+    });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/client/training/workout-logs?limit=30&offset=0&search=bench",
+        expect.objectContaining({ cache: "no-store" }),
+      );
+    });
+
+    const overlay = screen.getByRole("dialog", { name: "Search Results" });
+    expect(within(overlay).getByText('Results for "bench"')).toBeTruthy();
+    expect(within(overlay).getByText("Bench Press")).toBeTruthy();
+    expect(within(overlay).getByText("Sets")).toBeTruthy();
+    expect(within(overlay).getByText("Reps")).toBeTruthy();
+    expect(within(overlay).getByText("Weight")).toBeTruthy();
+    expect(within(overlay).getByText("Time")).toBeTruthy();
+
+    fireEvent.click(within(overlay).getByRole("button", { name: "Close" }));
+
+    expect(screen.queryByRole("dialog", { name: "Search Results" })).toBeNull();
+    expect((screen.getByLabelText("Search") as HTMLInputElement).value).toBe("bench");
+  });
+
+  it("clears the add-log full-history search from the overlay action", async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (method !== "GET") {
+        throw new Error(`Unexpected mutation: ${method} ${url}`);
+      }
+
+      if (url === "/api/client/training/workout-logs?limit=30&offset=0") {
+        return jsonResponse(historyPayload());
+      }
+
+      if (url === "/api/client/training/workout-logs?limit=30&offset=0&search=bench") {
+        return jsonResponse(
+          historyPayload({
+            items: [
+              createHistoryItem({
+                id: "search-overlay-log-2",
+                performedAt: "2026-06-08T10:00:00Z",
+                mode: "rep",
+                exerciseName: "Bench Press",
+                sets: 4,
+                reps: 8,
+                weight: 135.5,
+                durationSeconds: 90,
+              }),
+            ],
+          }),
+        );
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+
+    render(React.createElement(AddLogFullHistoryPage));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Search")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText("Search"), {
+      target: { value: "bench" },
+    });
+
+    const overlay = await screen.findByRole("dialog", { name: "Search Results" });
+    fireEvent.click(within(overlay).getByRole("button", { name: "Clear search" }));
+
+    await waitFor(() => {
+      expect((screen.getByLabelText("Search") as HTMLInputElement).value).toBe("");
+    });
+    expect(screen.queryByRole("dialog", { name: "Search Results" })).toBeNull();
+  });
+
+  it("shows a no-results message in the add-log full-history search overlay when no rows match", async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (method !== "GET") {
+        throw new Error(`Unexpected mutation: ${method} ${url}`);
+      }
+
+      if (url === "/api/client/training/workout-logs?limit=30&offset=0") {
+        return jsonResponse(historyPayload());
+      }
+
+      if (url === "/api/client/training/workout-logs?limit=30&offset=0&search=missing") {
+        return jsonResponse(historyPayload({ items: [], count: 0 }));
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+
+    render(React.createElement(AddLogFullHistoryPage));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Search")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText("Search"), {
+      target: { value: "missing" },
+    });
+
+    const overlay = await screen.findByRole("dialog", { name: "Search Results" });
+    expect(within(overlay).getByText("No matching logs found.")).toBeTruthy();
+  });
+
   it("preserves add-log full-history search and older-entry pagination without adding a mode query", async () => {
     fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -422,6 +579,61 @@ describe("Client history routes mobile experience", () => {
 
     const requestedUrls = fetchMock.mock.calls.map(([url]) => String(url));
     expect(requestedUrls.every((url) => !url.includes("mode="))).toBe(true);
+  });
+
+  it("does not show the search overlay on /client/training/history", async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (method !== "GET") {
+        throw new Error(`Unexpected mutation: ${method} ${url}`);
+      }
+
+      if (url === "/api/client/training/workout-logs?limit=30&offset=0") {
+        return jsonResponse(historyPayload());
+      }
+
+      if (url === "/api/client/training/workout-logs?limit=30&offset=0&search=bench") {
+        return jsonResponse(
+          historyPayload({
+            items: [
+              createHistoryItem({
+                id: "training-search-log-1",
+                performedAt: "2026-06-08T10:00:00Z",
+                mode: "rep",
+                exerciseName: "Bench Press",
+                sets: 4,
+                reps: 8,
+                weight: 135.5,
+                durationSeconds: 90,
+              }),
+            ],
+          }),
+        );
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+
+    render(React.createElement(ClientWorkoutHistoryPage));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Search")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText("Search"), {
+      target: { value: "bench" },
+    });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/client/training/workout-logs?limit=30&offset=0&search=bench",
+        expect.objectContaining({ cache: "no-store" }),
+      );
+    });
+
+    expect(screen.queryByRole("dialog", { name: "Search Results" })).toBeNull();
   });
 
   it("preserves training-history type-filter queries, search, and older-entry pagination", async () => {
