@@ -141,7 +141,8 @@ describe("ClientMetricsPage mobile experience", () => {
     expect(screen.queryByRole("heading", { name: "My Week" })).toBeNull();
     expect(screen.queryByText("History and log summary")).toBeNull();
     expect(screen.queryByText("No history yet")).toBeNull();
-    expect(screen.getByRole("link", { name: "Client home" }).getAttribute("href")).toBe("/client");
+    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/client/settings");
+    expect(screen.getByRole("button", { name: "Sign Out" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Add log" }).getAttribute("href")).toBe("/client/add-log");
     expect(screen.getAllByText("1,400 cal").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Jun 1 - Jun 7").length).toBeGreaterThan(0);

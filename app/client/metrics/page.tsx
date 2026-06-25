@@ -377,13 +377,7 @@ export default function ClientMetricsPage() {
       greeting={formatDisplayNameFromUser(user)}
       title="Metrics"
       subtitle="Track intake, output, deficit, and targets from your current client metrics snapshot."
-      notificationSlot={(
-        <MobileHeaderUtilities
-          role="client"
-          settingsHref="/client/settings"
-          leadingSlot={<ActionPill href="/client" tone="purple">Client home</ActionPill>}
-        />
-      )}
+      notificationSlot={<MobileHeaderUtilities settingsHref="/client/settings" />}
       topHubAction={<ActionPill href="/client/add-log">Add log</ActionPill>}
       activePath="/client/metrics"
       showAvatar={false}

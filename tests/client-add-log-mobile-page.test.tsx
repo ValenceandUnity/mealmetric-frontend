@@ -242,9 +242,8 @@ describe("AddLogPage mobile experience", () => {
         cache: "no-store",
       }),
     );
-    expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Open client header settings" }));
-    expect(screen.getByRole("link", { name: "Open settings" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("button", { name: "Sign Out" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe(
       "/client/settings",
     );
     expect(screen.getByText("Capture a workout quickly")).toBeTruthy();

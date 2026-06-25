@@ -98,10 +98,10 @@ describe("PTMealPlansPage mobile experience", () => {
       expect(screen.getByRole("heading", { name: "PT Meal Plans" })).toBeTruthy();
     });
 
-    const ptHomeLinks = screen.getAllByRole("link", { name: "PT home" });
-
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/meal-plans/search", { cache: "no-store" });
     expect(screen.getByRole("searchbox", { name: "Filter PT meal plans" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/pt/settings");
+    expect(screen.getByRole("button", { name: "Sign Out" })).toBeTruthy();
     expect(screen.getAllByText("Lean Fuel Week").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Northside Prep").length).toBeGreaterThan(0);
     expect(screen.getByText("10001")).toBeTruthy();
@@ -110,7 +110,6 @@ describe("PTMealPlansPage mobile experience", () => {
     expect(screen.getByText("5 meals")).toBeTruthy();
     expect(screen.getByText("2 availability windows")).toBeTruthy();
     expect(screen.getAllByText("published").length).toBeGreaterThan(0);
-    expect(ptHomeLinks.some((link) => link.getAttribute("href") === "/pt")).toBe(true);
     expect(screen.getAllByRole("link", { name: "Open clients" })[0]?.getAttribute("href")).toBe("/pt/clients");
     expect(screen.queryByRole("button", { name: /create recommendation/i })).toBeNull();
   });

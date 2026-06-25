@@ -210,13 +210,7 @@ export default function PTMetricsPage() {
       greeting={formatDisplayNameFromUser(user)}
       title="Progress Reports"
       subtitle="PT metrics stay inside the current dashboard and linked-client BFF routes, with no direct backend access from the browser."
-      notificationSlot={(
-        <MobileHeaderUtilities
-          role="pt"
-          settingsHref="/pt/settings"
-          leadingSlot={<ActionPill href="/pt" tone="purple">PT home</ActionPill>}
-        />
-      )}
+      notificationSlot={<MobileHeaderUtilities settingsHref="/pt/settings" />}
       topHubAction={<ActionPill href="/pt/clients">Open clients</ActionPill>}
       activePath="/pt/metrics"
       showAvatar={false}

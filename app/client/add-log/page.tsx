@@ -2162,7 +2162,7 @@ function AddLogPageContent() {
       avatarExpanded={timerDialogsOpen}
       avatarButtonLabel="Open workout timer"
       avatarContent={<TimerHubIcon />}
-      notificationSlot={<MobileHeaderUtilities role="client" settingsHref="/client/settings" />}
+      notificationSlot={<MobileHeaderUtilities settingsHref="/client/settings" />}
       activePath="/client/add-log"
     >
       {submitError ? (

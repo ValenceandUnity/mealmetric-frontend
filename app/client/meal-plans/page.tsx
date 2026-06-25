@@ -755,13 +755,7 @@ export default function ClientMealPlansPage() {
           setSearchValue(nextValue);
         });
       }}
-      notificationSlot={(
-        <MobileHeaderUtilities
-          role="client"
-          settingsHref="/client/settings"
-          leadingSlot={<ActionPill href="/client" tone="purple">Client home</ActionPill>}
-        />
-      )}
+      notificationSlot={<MobileHeaderUtilities settingsHref="/client/settings" />}
       topHubAction={
         <ActionPillButton
           onClick={() => {

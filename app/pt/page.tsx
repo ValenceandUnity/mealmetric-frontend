@@ -167,7 +167,7 @@ export default function PTDashboardPage() {
       greeting={formatDisplayNameFromUser(user)}
       title="PT Studio"
       subtitle="Client progress, activity, and nutrition snapshots through the existing protected PT dashboard route."
-      notificationSlot={<MobileHeaderUtilities role="pt" settingsHref="/pt/settings" />}
+      notificationSlot={<MobileHeaderUtilities settingsHref="/pt/settings" />}
       topHubAction={<ActionPill href="/pt/clients">Open clients</ActionPill>}
       activePath="/pt"
       showAvatar={false}

@@ -187,13 +187,7 @@ export default function ClientTrainingHubPage() {
           setSearchValue(nextValue);
         });
       }}
-      notificationSlot={(
-        <MobileHeaderUtilities
-          role="client"
-          settingsHref="/client/settings"
-          leadingSlot={<ActionPill href="/client/training/history" tone="purple">History</ActionPill>}
-        />
-      )}
+      notificationSlot={<MobileHeaderUtilities settingsHref="/client/settings" />}
       topHubAction={<ActionPill href="/client/add-log">Log your reps</ActionPill>}
       activePath="/client/training"
       showAvatar={false}

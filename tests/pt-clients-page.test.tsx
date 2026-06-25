@@ -106,6 +106,12 @@ describe("PTClientsPage", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/roster-categories", { cache: "no-store" });
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/clients", { cache: "no-store" });
+    expect(
+      screen
+        .getAllByRole("link", { name: "Settings" })
+        .some((link) => link.getAttribute("href") === "/pt/settings"),
+    ).toBe(true);
+    expect(screen.getByRole("button", { name: "Sign Out" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Roster control" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Roster lineup" })).toBeTruthy();
     expect(screen.getByRole("searchbox", { name: "Search roster clients" })).toBeTruthy();

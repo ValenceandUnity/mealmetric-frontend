@@ -291,13 +291,7 @@ export default function PTTrainingPage() {
           setSearchValue(nextValue);
         });
       }}
-      notificationSlot={(
-        <MobileHeaderUtilities
-          role="pt"
-          settingsHref="/pt/settings"
-          leadingSlot={<ActionPill href="/pt" tone="purple">PT home</ActionPill>}
-        />
-      )}
+      notificationSlot={<MobileHeaderUtilities settingsHref="/pt/settings" />}
       topHubAction={<ActionPill href="/pt/clients">Open clients</ActionPill>}
       activePath="/pt/training"
       showAvatar={false}

@@ -398,13 +398,7 @@ export default function PTClientsPage() {
           setSearchValue(nextValue);
         });
       }}
-      notificationSlot={(
-        <MobileHeaderUtilities
-          role="pt"
-          settingsHref="/pt/settings"
-          leadingSlot={<ActionPill href="/pt" tone="purple">Dashboard</ActionPill>}
-        />
-      )}
+      notificationSlot={<MobileHeaderUtilities settingsHref="/pt/settings" />}
       topHubAction={(
         <ActionPillButton
           onClick={() => setShowInviteForm((current) => !current)}

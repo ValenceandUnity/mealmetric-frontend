@@ -263,17 +263,7 @@ export default function ClientDashboardPage() {
           setSearchValue(nextValue);
         });
       }}
-      notificationSlot={(
-        <MobileHeaderUtilities
-          role="client"
-          settingsHref="/client/settings"
-          leadingSlot={(
-            <ActionPill href="/client/bookmarks" tone="purple">
-              <PillLabel icon={getShortcutIcon("bookmarks")}>Bookmarks</PillLabel>
-            </ActionPill>
-          )}
-        />
-      )}
+      notificationSlot={<MobileHeaderUtilities settingsHref="/client/settings" />}
       topHubAction={(
         <>
           <ActionPill href="/client/meal-plans/search" tone="purple">

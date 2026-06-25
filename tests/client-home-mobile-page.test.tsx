@@ -109,8 +109,8 @@ describe("ClientDashboardPage mobile home", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("/api/client/home", { cache: "no-store" });
     expect(screen.getByRole("searchbox", { name: "Search client home" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Bookmarks" }).getAttribute("href")).toBe("/client/bookmarks");
-    expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/client/settings");
+    expect(screen.getByRole("button", { name: "Sign Out" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Add log" }).getAttribute("href")).toBe("/client/add-log");
     expect(screen.getByRole("heading", { name: "Lower body strength" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Lean Fuel Week" })).toBeTruthy();
