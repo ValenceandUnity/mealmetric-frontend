@@ -30,6 +30,7 @@ export type ClientHistoryRouteSurfaceProps = {
   showHistoryUtility?: boolean;
   showDateArchive?: boolean;
   showTypeFilter?: boolean;
+  showOlderEntriesControl?: boolean;
   showSearchResultsOverlay?: boolean;
   searchMode?: "live" | "submit";
   historyUtilityVariant?: "default" | "hidden";
@@ -184,6 +185,7 @@ export function ClientHistoryRouteSurface({
   showHistoryUtility = true,
   showDateArchive = false,
   showTypeFilter = true,
+  showOlderEntriesControl = true,
   showSearchResultsOverlay = false,
   searchMode = "live",
   historyUtilityVariant = "default",
@@ -919,24 +921,26 @@ export function ClientHistoryRouteSurface({
               </div>
             )}
 
-            <div className="mobile-training-action-row">
-              <button
-                type="button"
-                className="utility-icon-link mobile-focus-ring"
-                onClick={() => {
-                  if (historyView.nextOffset !== null) {
-                    setOffset(historyView.nextOffset);
-                  }
-                }}
-                disabled={!historyView.hasMore || historyView.nextOffset === null}
-                aria-label="Show older workout entries"
-                title="Show older workout entries"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M8.97 5.97a.75.75 0 0 1 1.06 0l5.5 5.5a.75.75 0 0 1 0 1.06l-5.5 5.5a.75.75 0 1 1-1.06-1.06L13.94 12 8.97 7.03a.75.75 0 0 1 0-1.06Z" />
-                </svg>
-              </button>
-            </div>
+            {showOlderEntriesControl ? (
+              <div className="mobile-training-action-row">
+                <button
+                  type="button"
+                  className="utility-icon-link mobile-focus-ring"
+                  onClick={() => {
+                    if (historyView.nextOffset !== null) {
+                      setOffset(historyView.nextOffset);
+                    }
+                  }}
+                  disabled={!historyView.hasMore || historyView.nextOffset === null}
+                  aria-label="Show older workout entries"
+                  title="Show older workout entries"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8.97 5.97a.75.75 0 0 1 1.06 0l5.5 5.5a.75.75 0 0 1 0 1.06l-5.5 5.5a.75.75 0 1 1-1.06-1.06L13.94 12 8.97 7.03a.75.75 0 0 1 0-1.06Z" />
+                  </svg>
+                </button>
+              </div>
+            ) : null}
           </MobileSection>
         </>
       ) : null}

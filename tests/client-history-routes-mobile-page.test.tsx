@@ -183,6 +183,7 @@ describe("Client history routes mobile experience", () => {
     expect(screen.getByLabelText("End date")).toHaveProperty("type", "date");
     expect(screen.getByText("This Week")).toBeTruthy();
     expect(screen.getByText("Last Week")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Show older workout entries" })).toBeNull();
 
     const requestedUrls = fetchMock.mock.calls.map(([url]) => String(url));
     expect(requestedUrls.every((url) => url.startsWith("/api/client/training/workout-logs"))).toBe(true);
@@ -217,6 +218,29 @@ describe("Client history routes mobile experience", () => {
     expect(screen.getByRole("button", { name: "Rep" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Set" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "General Workout" })).toBeTruthy();
+  });
+
+  it("keeps the standalone older-entry pagination hidden on add-log full-history", async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (url === "/api/client/training/workout-logs?limit=30&offset=0" && method === "GET") {
+        return jsonResponse(historyPayload({ nextOffset: 30, hasMore: true }));
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+
+    render(React.createElement(AddLogFullHistoryPage));
+
+    await waitFor(() => {
+      expect(screen.getByText("Last Week")).toBeTruthy();
+    });
+
+    expect(screen.queryByRole("button", { name: "Show older workout entries" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Toggle This Week archive block" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Toggle Last Week archive block" })).toBeTruthy();
   });
 
   it("builds weekly archive blocks from a selected date range and expands them into data cells without a type pill", async () => {
@@ -434,7 +458,9 @@ describe("Client history routes mobile experience", () => {
 
     expect(screen.queryByRole("dialog", { name: "Search Results" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Search workout history" }));
+    const searchButton = screen.getByRole("button", { name: "Search workout history" });
+    expect(searchButton.className).toContain("client-history-search-field__button");
+    fireEvent.click(searchButton);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -634,7 +660,7 @@ describe("Client history routes mobile experience", () => {
     expect(within(overlay).getByText("No matching logs found.")).toBeTruthy();
   });
 
-  it("preserves add-log full-history search and older-entry pagination without adding a mode query", async () => {
+  it("preserves add-log full-history submit search without adding a mode query", async () => {
     fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
@@ -668,30 +694,6 @@ describe("Client history routes mobile experience", () => {
         );
       }
 
-      if (url === "/api/client/training/workout-logs?limit=30&offset=30&search=bench") {
-        return jsonResponse(
-          historyPayload({
-            items: [
-              createHistoryItem({
-                id: "search-log-2",
-                performedAt: "2026-06-01T09:00:00Z",
-                mode: "set",
-                exerciseName: "Bench Supported Row",
-                sets: 2,
-                reps: 12,
-                weight: 55,
-                durationSeconds: 60,
-              }),
-            ],
-            count: 2,
-            limit: 30,
-            offset: 30,
-            nextOffset: null,
-            hasMore: false,
-          }),
-        );
-      }
-
       throw new Error(`Unexpected fetch: ${method} ${url}`);
     });
 
@@ -716,17 +718,9 @@ describe("Client history routes mobile experience", () => {
       );
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Show older workout entries" }));
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/client/training/workout-logs?limit=30&offset=30&search=bench",
-        expect.objectContaining({ cache: "no-store" }),
-      );
-    });
-
     const requestedUrls = fetchMock.mock.calls.map(([url]) => String(url));
     expect(requestedUrls.every((url) => !url.includes("mode="))).toBe(true);
+    expect(screen.queryByRole("button", { name: "Show older workout entries" })).toBeNull();
   });
 
   it("preserves live search on /client/training/history without showing the add-log overlay controls", async () => {
@@ -875,6 +869,8 @@ describe("Client history routes mobile experience", () => {
         expect.objectContaining({ cache: "no-store" }),
       );
     });
+
+    expect(screen.getByRole("button", { name: "Show older workout entries" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Set" }));
 
