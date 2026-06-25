@@ -2052,15 +2052,6 @@ function AddLogPageContent() {
                     {formatTimerWorkoutType(row.mode)}
                   </span>
                 </div>
-                <div
-                  className="mobile-training-pill-row"
-                  aria-label={`${row.exerciseName} timer summary`}
-                >
-                  <span className="mobile-pill">Sets {row.sets}</span>
-                  <span className="mobile-pill">Reps {row.reps}</span>
-                  <span className="mobile-pill">Weight {row.weight}</span>
-                  <span className="mobile-pill">Time {row.duration}</span>
-                </div>
               </button>
             ))}
           </div>

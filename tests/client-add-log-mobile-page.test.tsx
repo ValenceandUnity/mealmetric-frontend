@@ -374,6 +374,11 @@ describe("AddLogPage mobile experience", () => {
     expect(
       within(exerciseButtons[1]).getByText("Set").className,
     ).toContain("client-add-log-timer-picker__type-tag");
+    expect(within(timerDialog).queryByLabelText(/timer summary/i)).toBeNull();
+    expect(within(exerciseButtons[0]).queryByText(/^Sets /)).toBeNull();
+    expect(within(exerciseButtons[0]).queryByText(/^Reps /)).toBeNull();
+    expect(within(exerciseButtons[0]).queryByText(/^Weight /)).toBeNull();
+    expect(within(exerciseButtons[0]).queryByText(/^Time /)).toBeNull();
 
     const initialHistoryFetches = fetchMock.mock.calls.filter(
       ([url, init]) => String(url) === HISTORY_URL && (init?.method ?? "GET") === "GET",
