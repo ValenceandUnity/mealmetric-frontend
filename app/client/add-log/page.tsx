@@ -722,6 +722,18 @@ function formatTimerWorkoutType(mode: WorkoutLogMode): string {
   return formatWorkoutType(mode);
 }
 
+function getTimerWorkoutTypeClassName(mode: WorkoutLogMode): string {
+  switch (mode) {
+    case "rep":
+      return "client-add-log-timer-picker__type-tag--rep";
+    case "set":
+      return "client-add-log-timer-picker__type-tag--set";
+    case "general_workout":
+    default:
+      return "client-add-log-timer-picker__type-tag--routine";
+  }
+}
+
 function flattenExerciseEntries(logs: WorkoutHistoryItemView[]): WorkoutHistoryTableRow[] {
   return logs
     .flatMap((log, logIndex) => {
@@ -1180,6 +1192,11 @@ function AddLogPageContent() {
 
   function applyTimerSearch() {
     setTimerActiveSearchQuery(timerDraftSearchQuery.trim());
+  }
+
+  function clearTimerSearch() {
+    setTimerDraftSearchQuery("");
+    setTimerActiveSearchQuery("");
   }
 
   function handleTimerExerciseSelect(row: WorkoutHistoryTableRow) {
@@ -1879,9 +1896,30 @@ function AddLogPageContent() {
               }}
               placeholder="Search recent exercises"
             />
+            {timerDraftSearchQuery.length > 0 || timerActiveSearchQuery.length > 0 ? (
+              <button
+                type="button"
+                className="client-add-log-timer-picker__search-clear mobile-focus-ring client-add-log-timer-button-reset"
+                aria-label="Clear timer search"
+                onClick={clearTimerSearch}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M7 7l10 10M17 7 7 17"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.9"
+                  />
+                </svg>
+              </button>
+            ) : null}
+          </div>
+          <div className="client-add-log-timer-picker__search-actions">
             <button
               type="button"
-              className="client-add-log-timer-picker__search-submit mobile-focus-ring client-add-log-timer-button-reset"
+              className="client-add-log-timer-picker__search-button mobile-focus-ring client-add-log-timer-button-reset"
               aria-label="Search timer exercises"
               onClick={applyTimerSearch}
             >
@@ -1896,70 +1934,89 @@ function AddLogPageContent() {
                 />
               </svg>
             </button>
-          </div>
-          <div className="client-add-log-timer-picker__filter">
-            <button
-              type="button"
-              className="client-add-log-timer-picker__filter-button mobile-focus-ring client-add-log-timer-button-reset"
-              aria-label="Open timer exercise filters"
-              aria-haspopup="dialog"
-              aria-expanded={timerFilterPopoverOpen}
-              aria-controls={TIMER_FILTER_POPOVER_ID}
-              onClick={() => setTimerFilterPopoverOpen((current) => !current)}
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path
-                  d="M12 3.75a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5Zm0 12a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5ZM4.5 9.75a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5Zm15 0a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5ZM12 6v2.25m0 7.5V18m-5.25-6H4.5m15 0h-2.25"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.8"
-                />
-              </svg>
-            </button>
-            {timerFilterPopoverOpen ? (
-              <div
-                id={TIMER_FILTER_POPOVER_ID}
-                role="dialog"
-                aria-modal="false"
-                aria-labelledby="client-add-log-timer-filter-title"
-                className="client-add-log-timer-picker__filter-popover"
+            <div className="client-add-log-timer-picker__filter">
+              <button
+                type="button"
+                className="client-add-log-timer-picker__filter-button mobile-focus-ring client-add-log-timer-button-reset"
+                aria-label="Open timer exercise filters"
+                aria-haspopup="dialog"
+                aria-expanded={timerFilterPopoverOpen}
+                aria-controls={TIMER_FILTER_POPOVER_ID}
+                onClick={() => setTimerFilterPopoverOpen((current) => !current)}
               >
-                <p
-                  id="client-add-log-timer-filter-title"
-                  className="client-add-log-timer-picker__filter-title"
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M12 3.75a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5Zm0 12a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5ZM4.5 9.75a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5Zm15 0a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 0 0 0-4.5ZM12 6v2.25m0 7.5V18m-5.25-6H4.5m15 0h-2.25"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                  />
+                </svg>
+              </button>
+              {timerFilterPopoverOpen ? (
+                <div
+                  id={TIMER_FILTER_POPOVER_ID}
+                  role="dialog"
+                  aria-modal="false"
+                  aria-labelledby="client-add-log-timer-filter-title"
+                  className="client-add-log-timer-picker__filter-popover"
                 >
-                  Filter exercises
-                </p>
-                <fieldset
-                  className="client-add-log-timer-picker__filter-group"
-                  aria-label="Filter exercises by workout type"
-                >
-                  <legend className="sr-only">Filter exercises by workout type</legend>
-                  {([
-                    ["all", "All"],
-                    ["rep", "Rep"],
-                    ["set", "Set"],
-                    ["routine", "Routine"],
-                  ] as const).map(([value, label]) => (
-                    <label
-                      key={value}
-                      className="client-add-log-timer-picker__filter-option"
+                  <div className="client-add-log-timer-filter-popover__header">
+                    <p
+                      id="client-add-log-timer-filter-title"
+                      className="client-add-log-timer-picker__filter-title"
                     >
-                      <input
-                        type="radio"
-                        name="client-add-log-timer-type-filter"
-                        value={value}
-                        checked={timerTypeFilter === value}
-                        onChange={() => setTimerTypeFilter(value)}
-                      />
-                      <span>{label}</span>
-                    </label>
-                  ))}
-                </fieldset>
-              </div>
-            ) : null}
+                      Filter exercises
+                    </p>
+                    <button
+                      type="button"
+                      className="client-add-log-timer-filter-popover__close mobile-focus-ring client-add-log-timer-button-reset"
+                      aria-label="Close timer exercise filters"
+                      onClick={() => setTimerFilterPopoverOpen(false)}
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path
+                          d="M7 7l10 10M17 7 7 17"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.9"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  <fieldset
+                    className="client-add-log-timer-picker__filter-group"
+                    aria-label="Filter exercises by workout type"
+                  >
+                    <legend className="sr-only">Filter exercises by workout type</legend>
+                    {([
+                      ["all", "All"],
+                      ["rep", "Rep"],
+                      ["set", "Set"],
+                      ["routine", "Routine"],
+                    ] as const).map(([value, label]) => (
+                      <label
+                        key={value}
+                        className="client-add-log-timer-picker__filter-option"
+                      >
+                        <input
+                          type="radio"
+                          name="client-add-log-timer-type-filter"
+                          value={value}
+                          checked={timerTypeFilter === value}
+                          onChange={() => setTimerTypeFilter(value)}
+                        />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                  </fieldset>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 
@@ -1981,10 +2038,19 @@ function AddLogPageContent() {
                 onClick={() => handleTimerExerciseSelect(row)}
                 aria-label={`Open timer session for ${row.exerciseName} from ${row.performedAtLabel}`}
               >
-                <div className="mobile-section__copy">
-                  <p className="mobile-section__eyebrow">{row.performedAtLabel}</p>
-                  <h3 className="mobile-section__title">{row.exerciseName}</h3>
-                  <p className="mobile-section__description">{formatTimerWorkoutType(row.mode)}</p>
+                <div className="client-add-log-timer-picker__item-header">
+                  <div className="mobile-section__copy client-add-log-timer-picker__item-copy">
+                    <p className="mobile-section__eyebrow">{row.performedAtLabel}</p>
+                    <h3 className="mobile-section__title">{row.exerciseName}</h3>
+                  </div>
+                  <span
+                    className={[
+                      "client-add-log-timer-picker__type-tag",
+                      getTimerWorkoutTypeClassName(row.mode),
+                    ].join(" ")}
+                  >
+                    {formatTimerWorkoutType(row.mode)}
+                  </span>
                 </div>
                 <div
                   className="mobile-training-pill-row"
