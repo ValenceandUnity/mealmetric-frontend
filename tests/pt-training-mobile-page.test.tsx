@@ -136,6 +136,8 @@ describe("PTTrainingPage mobile experience", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/folders", { cache: "no-store" });
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/packages", { cache: "no-store" });
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/routines", { cache: "no-store" });
+    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/pt/settings");
+    expect(screen.getByRole("button", { name: "Sign Out" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "PT Training" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Training overview" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Folder lanes" })).toBeTruthy();

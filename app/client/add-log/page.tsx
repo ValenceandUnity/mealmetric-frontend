@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { MobileAppShell } from "@/components/mobile/MobileAppShell";
+import { MobileHeaderUtilities } from "@/components/mobile/MobileHeaderUtilities";
 import { MobileCard } from "@/components/mobile/MobileCard";
 import { MobileSection } from "@/components/mobile/MobileSection";
 import { MobileStatCard } from "@/components/mobile/MobileStatCard";
@@ -2161,7 +2162,7 @@ function AddLogPageContent() {
       avatarExpanded={timerDialogsOpen}
       avatarButtonLabel="Open workout timer"
       avatarContent={<TimerHubIcon />}
-      notificationSlot={<ActionPillLink href="/client/settings">Settings</ActionPillLink>}
+      notificationSlot={<MobileHeaderUtilities settingsHref="/client/settings" />}
       activePath="/client/add-log"
     >
       {submitError ? (

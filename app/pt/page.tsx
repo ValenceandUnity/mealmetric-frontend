@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 import { MobileAppShell } from "@/components/mobile/MobileAppShell";
+import { MobileHeaderUtilities } from "@/components/mobile/MobileHeaderUtilities";
 import { MobileCard } from "@/components/mobile/MobileCard";
 import { MobileSection } from "@/components/mobile/MobileSection";
 import { MobileStatCard } from "@/components/mobile/MobileStatCard";
@@ -166,9 +167,10 @@ export default function PTDashboardPage() {
       greeting={formatDisplayNameFromUser(user)}
       title="PT Studio"
       subtitle="Client progress, activity, and nutrition snapshots through the existing protected PT dashboard route."
-      notificationSlot={<ActionPill href="/pt/settings" tone="purple">Settings</ActionPill>}
+      notificationSlot={<MobileHeaderUtilities settingsHref="/pt/settings" />}
       topHubAction={<ActionPill href="/pt/clients">Open clients</ActionPill>}
       activePath="/pt"
+      showAvatar={false}
     >
       {errorMessage ? (
         <MobileSection

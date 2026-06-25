@@ -242,6 +242,7 @@ describe("AddLogPage mobile experience", () => {
         cache: "no-store",
       }),
     );
+    expect(screen.getByRole("button", { name: "Sign Out" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe(
       "/client/settings",
     );

@@ -94,7 +94,8 @@ describe("ClientTrainingHubPage mobile experience", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("/api/client/training", { cache: "no-store" });
     expect(screen.getByRole("searchbox", { name: "Search training" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "History" }).getAttribute("href")).toBe("/client/training/history");
+    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/client/settings");
+    expect(screen.getByRole("button", { name: "Sign Out" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Log your reps" }).getAttribute("href")).toBe("/client/add-log");
     expect(screen.getAllByText("Strength Block").length).toBeGreaterThan(0);
     expect(screen.getByText("Warm up")).toBeTruthy();

@@ -1,5 +1,7 @@
-import type { ChangeEventHandler, ReactNode } from "react";
+import type { CSSProperties, ChangeEventHandler, ReactNode } from "react";
 import { useId } from "react";
+
+import type { HeaderBackgroundPreset } from "@/lib/client/header-background";
 
 type MobileTopHubProps = {
   greeting?: string;
@@ -20,6 +22,8 @@ type MobileTopHubProps = {
   notificationSlot?: ReactNode;
   actionSlot?: ReactNode;
   statusStrip?: ReactNode;
+  heroBackgroundPreset?: HeaderBackgroundPreset;
+  heroBackgroundStyle?: CSSProperties;
 };
 
 export function MobileTopHub({
@@ -41,6 +45,8 @@ export function MobileTopHub({
   notificationSlot,
   actionSlot,
   statusStrip,
+  heroBackgroundPreset = "default",
+  heroBackgroundStyle,
 }: MobileTopHubProps) {
   const searchId = useId();
   const resolvedAvatarLabel =
@@ -54,9 +60,12 @@ export function MobileTopHub({
 
   return (
     <header className={["mobile-top-hub", className ?? ""].filter(Boolean).join(" ")}>
-      <div className="mobile-top-hub__hero">
+      <div
+        className="mobile-top-hub__hero"
+        data-header-background={heroBackgroundPreset}
+      >
         <div className="mobile-top-hub__hero-media" aria-hidden="true">
-          <div className="mobile-top-hub__hero-image" />
+          <div className="mobile-top-hub__hero-image" style={heroBackgroundStyle} />
           <div className="mobile-top-hub__hero-grid" />
         </div>
         <div className="mobile-top-hub__header">

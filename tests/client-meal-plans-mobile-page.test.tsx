@@ -129,6 +129,8 @@ describe("ClientMealPlansPage mobile experience", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/client/meal-plans", { cache: "no-store" });
     expect(fetchMock).toHaveBeenCalledWith("/api/client/bookmarks", { cache: "no-store" });
     expect(screen.getByRole("searchbox", { name: "Filter loaded meal plans" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/client/settings");
+    expect(screen.getByRole("button", { name: "Sign Out" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Marketplace links" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Budget-aware discovery" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Catalog cards" })).toBeTruthy();

@@ -123,6 +123,8 @@ describe("PTDashboardPage mobile experience", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith("/api/pt/dashboard", { cache: "no-store" });
+    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/pt/settings");
+    expect(screen.getByRole("button", { name: "Sign Out" })).toBeTruthy();
     expect(screen.getAllByRole("link", { name: "Open clients" })[0]?.getAttribute("href")).toBe("/pt/clients");
     expect(screen.getByText("Linked clients")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Today at a glance" })).toBeTruthy();

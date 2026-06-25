@@ -5,6 +5,7 @@ import { useState } from "react";
 import { LogoutButton } from "@/components/LogoutButton";
 import { MobileAppShell } from "@/components/mobile/MobileAppShell";
 import { MobileCard } from "@/components/mobile/MobileCard";
+import { MobileHeaderBackgroundSettings } from "@/components/mobile/MobileHeaderBackgroundSettings";
 import { MobileSection } from "@/components/mobile/MobileSection";
 import { MobileStatCard } from "@/components/mobile/MobileStatCard";
 import { useTheme } from "@/components/theme/ThemeProvider";
@@ -87,6 +88,8 @@ export function ClientSettingsRouteSurface({ appVersion }: ClientSettingsRouteSu
       title="Client Settings"
       subtitle="Lightweight account and app controls using existing session data, with theme stored locally in this browser."
     >
+      <MobileHeaderBackgroundSettings role="client" />
+
       <MobileSection
         eyebrow="Client settings"
         title="Settings overview"

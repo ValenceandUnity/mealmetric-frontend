@@ -5,6 +5,7 @@ import { startTransition, useDeferredValue, useEffect, useMemo, useState } from 
 import type { ReactNode } from "react";
 
 import { MobileAppShell } from "@/components/mobile/MobileAppShell";
+import { MobileHeaderUtilities } from "@/components/mobile/MobileHeaderUtilities";
 import { MobileCard } from "@/components/mobile/MobileCard";
 import { MobileSection } from "@/components/mobile/MobileSection";
 import { MobileStatCard } from "@/components/mobile/MobileStatCard";
@@ -192,9 +193,10 @@ export default function PTMealPlansPage() {
           setSearchValue(nextValue);
         });
       }}
-      notificationSlot={<ActionPill href="/pt" tone="purple">PT home</ActionPill>}
+      notificationSlot={<MobileHeaderUtilities settingsHref="/pt/settings" />}
       topHubAction={<ActionPill href="/pt/clients">Open clients</ActionPill>}
       activePath="/pt/meal-plans"
+      showAvatar={false}
     >
       {loading ? (
         <MobileSection

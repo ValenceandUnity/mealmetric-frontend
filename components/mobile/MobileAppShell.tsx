@@ -1,7 +1,17 @@
-import type { ReactNode } from "react";
+"use client";
+
+import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { MobileTopHub } from "@/components/mobile/MobileTopHub";
+import {
+  getDefaultHeaderBackgroundPreference,
+  getHeaderBackgroundStorageKey,
+  HEADER_BACKGROUND_CHANGE_EVENT,
+  isHeaderBackgroundRole,
+  readHeaderBackgroundPreference,
+} from "@/lib/client/header-background";
 import type { SessionUser } from "@/lib/types/api";
 
 type MobileAppShellProps = {
@@ -24,6 +34,7 @@ type MobileAppShellProps = {
   avatarButtonLabel?: string;
   notificationSlot?: ReactNode;
   topHubAction?: ReactNode;
+  showAvatar?: boolean;
   showTopHub?: boolean;
   showBottomNav?: boolean;
   activePath?: string;
@@ -63,13 +74,70 @@ export function MobileAppShell({
   avatarButtonLabel,
   notificationSlot,
   topHubAction,
+  showAvatar = true,
   showTopHub = true,
   showBottomNav = true,
   activePath,
   statusStrip,
 }: MobileAppShellProps) {
-  const resolvedInitials = fallbackInitials(user, avatarInitials);
+  const [headerBackgroundPreference, setHeaderBackgroundPreference] = useState(
+    getDefaultHeaderBackgroundPreference(),
+  );
+  const resolvedInitials = showAvatar ? fallbackInitials(user, avatarInitials) : undefined;
   const resolvedTitle = title ?? "MealMetric";
+  const headerBackgroundRole = isHeaderBackgroundRole(user?.role) ? user.role : null;
+
+  useEffect(() => {
+    if (!headerBackgroundRole) {
+      setHeaderBackgroundPreference(getDefaultHeaderBackgroundPreference());
+      return;
+    }
+
+    const role = headerBackgroundRole;
+
+    function syncPreference() {
+      setHeaderBackgroundPreference(readHeaderBackgroundPreference(role));
+    }
+
+    function handleStorage(event: StorageEvent) {
+      if (event.key && event.key !== getHeaderBackgroundStorageKey(role)) {
+        return;
+      }
+
+      syncPreference();
+    }
+
+    function handlePreferenceChange(event: Event) {
+      const customEvent = event as CustomEvent<{ role?: string }>;
+      if (customEvent.detail?.role && customEvent.detail.role !== role) {
+        return;
+      }
+
+      syncPreference();
+    }
+
+    syncPreference();
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener(HEADER_BACKGROUND_CHANGE_EVENT, handlePreferenceChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(HEADER_BACKGROUND_CHANGE_EVENT, handlePreferenceChange);
+    };
+  }, [headerBackgroundRole]);
+
+  const heroBackgroundStyle = useMemo(() => {
+    if (
+      headerBackgroundPreference.preset !== "custom-local-image" ||
+      !headerBackgroundPreference.customImageDataUrl
+    ) {
+      return undefined;
+    }
+
+    return {
+      "--mobile-top-hub-custom-image": `url("${headerBackgroundPreference.customImageDataUrl}")`,
+    } as CSSProperties;
+  }, [headerBackgroundPreference.customImageDataUrl, headerBackgroundPreference.preset]);
   const shouldRenderTopHub =
     showTopHub &&
     Boolean(
@@ -115,6 +183,8 @@ export function MobileAppShell({
             notificationSlot={notificationSlot}
             actionSlot={topHubAction}
             statusStrip={statusStrip}
+            heroBackgroundPreset={headerBackgroundPreference.preset}
+            heroBackgroundStyle={heroBackgroundStyle}
           />
         ) : null}
         <div className="mobile-shell__viewport">{children}</div>

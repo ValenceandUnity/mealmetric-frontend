@@ -104,6 +104,11 @@ describe("PTSettingsPage mobile experience", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith("/api/me", { cache: "no-store" });
+    expect(screen.getByRole("heading", { name: "Header Background" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Default" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Dark Grid" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Purple Gradient" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Custom Local Image" })).toBeTruthy();
     expect(screen.getByText("Profile summary")).toBeTruthy();
     expect(screen.getAllByText("pt@example.com").length).toBeGreaterThan(0);
     expect(screen.getAllByText("pt").length).toBeGreaterThan(0);
@@ -152,6 +157,11 @@ describe("PTSettingsPage mobile experience", () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText("Full name")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Dark Grid" }));
+    await waitFor(() => {
+      expect(screen.getByText("Dark Grid saved locally.")).toBeTruthy();
     });
 
     fireEvent.change(screen.getByLabelText("Full name"), {
