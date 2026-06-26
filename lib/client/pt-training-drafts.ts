@@ -1,6 +1,10 @@
 export const PT_TRAINING_FOLDER_DRAFTS_STORAGE_KEY = "mealmetric:pt-training:folder-drafts";
 export const PT_TRAINING_EXERCISE_DRAFTS_STORAGE_KEY = "mealmetric:pt-training:exercise-drafts";
 export const PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY = "mealmetric:pt-training:routine-drafts";
+export const PT_TRAINING_CUSTOM_FITNESS_TARGETS_STORAGE_KEY =
+  "mealmetric:pt-training:custom-fitness-targets";
+export const PT_TRAINING_CUSTOM_FITNESS_ATTRIBUTES_STORAGE_KEY =
+  "mealmetric:pt-training:custom-fitness-attributes";
 
 export type LocalPTFolderDraft = {
   id: string;
@@ -31,7 +35,8 @@ export type LocalPTRoutineDraft = {
   type: "routine";
   routineName: string;
   description: string;
-  fitnessTarget: string;
+  fitnessTargets: string[];
+  fitnessAttributes: string[];
   timedByDuration: boolean;
   setAmount: number;
   exercises: LocalPTRoutineExerciseDraft[];
@@ -126,7 +131,8 @@ export function writeLocalPTRoutineDrafts(drafts: LocalPTRoutineDraft[]) {
 export function createLocalPTRoutineDraft(input: {
   routineName: string;
   description: string;
-  fitnessTarget: string;
+  fitnessTargets: string[];
+  fitnessAttributes: string[];
   timedByDuration: boolean;
   setAmount: number;
   exercises: LocalPTRoutineExerciseDraft[];
@@ -136,7 +142,8 @@ export function createLocalPTRoutineDraft(input: {
     type: "routine",
     routineName: input.routineName.trim(),
     description: input.description.trim(),
-    fitnessTarget: input.fitnessTarget.trim(),
+    fitnessTargets: input.fitnessTargets.map((item) => item.trim()).filter(Boolean),
+    fitnessAttributes: input.fitnessAttributes.map((item) => item.trim()).filter(Boolean),
     timedByDuration: input.timedByDuration,
     setAmount: input.setAmount,
     exercises: input.exercises.map((exercise) => ({
@@ -148,4 +155,24 @@ export function createLocalPTRoutineDraft(input: {
     })),
     createdAt: new Date().toISOString(),
   };
+}
+
+export function readLocalPTCustomFitnessTargets(): string[] {
+  return readDrafts<string>(PT_TRAINING_CUSTOM_FITNESS_TARGETS_STORAGE_KEY).filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+}
+
+export function writeLocalPTCustomFitnessTargets(targets: string[]) {
+  writeDrafts(PT_TRAINING_CUSTOM_FITNESS_TARGETS_STORAGE_KEY, targets);
+}
+
+export function readLocalPTCustomFitnessAttributes(): string[] {
+  return readDrafts<string>(PT_TRAINING_CUSTOM_FITNESS_ATTRIBUTES_STORAGE_KEY).filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+}
+
+export function writeLocalPTCustomFitnessAttributes(attributes: string[]) {
+  writeDrafts(PT_TRAINING_CUSTOM_FITNESS_ATTRIBUTES_STORAGE_KEY, attributes);
 }

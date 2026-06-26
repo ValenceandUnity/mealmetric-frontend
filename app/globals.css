@@ -4127,6 +4127,12 @@ html[data-theme="light"] .mobile-training-form textarea {
 .pt-training-builder-card:hover,
 .pt-training-builder-card:active,
 .pt-training-builder-card:focus-visible,
+.pt-training-routine-form__field-action:hover,
+.pt-training-routine-form__field-action:active,
+.pt-training-routine-form__field-action:focus-visible,
+.pt-training-routine-form__exercise-nav-button:hover,
+.pt-training-routine-form__exercise-nav-button:active,
+.pt-training-routine-form__exercise-nav-button:focus-visible,
 .pt-training-modal__secondary-action:hover,
 .pt-training-modal__secondary-action:active,
 .pt-training-modal__secondary-action:focus-visible,
@@ -4337,6 +4343,7 @@ html[data-theme="light"] .mobile-training-form textarea {
   color: #111827;
 }
 
+.pt-training-routine-form__checkbox-fieldset,
 .pt-training-builder-form__field {
   gap: 0.45rem;
 }
@@ -4379,6 +4386,63 @@ html[data-theme="light"] .mobile-training-form textarea {
 .pt-training-builder-form__helper {
   color: var(--mobile-text-muted);
   line-height: 1.45;
+}
+
+.pt-training-routine-form__checkbox-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.pt-training-routine-form__field-header {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--mobile-text);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.pt-training-routine-form__field-action {
+  min-height: 2.1rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--mobile-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.pt-training-routine-form__checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.pt-training-routine-form__checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  min-height: 3rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.52);
+  color: var(--mobile-text);
+  line-height: 1.35;
+}
+
+.pt-training-routine-form__checkbox-option input {
+  width: 1rem;
+  min-width: 1rem;
+  height: 1rem;
+  margin: 0;
 }
 
 .pt-training-builder-form__error {
@@ -4444,9 +4508,66 @@ html[data-theme="light"] .mobile-training-form textarea {
   justify-content: space-between;
 }
 
+.pt-training-routine-form__add-exercise-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.pt-training-routine-form__exercise-nav {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.pt-training-routine-form__exercise-nav-button {
+  width: 2.8rem;
+  min-width: 2.8rem;
+  min-height: 2.8rem;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--mobile-text);
+  box-shadow: none;
+}
+
+.pt-training-routine-form__exercise-nav-button svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pt-training-routine-form__exercise-index {
+  margin: 0;
+  text-align: center;
+  color: var(--mobile-text-muted);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.pt-training-routine-form__add-option-dialog {
+  width: min(100%, 22rem);
+}
+
 @media (min-width: 390px) {
   .pt-training-builder-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 360px) {
+  .pt-training-routine-form__checkbox-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pt-training-routine-form__field-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

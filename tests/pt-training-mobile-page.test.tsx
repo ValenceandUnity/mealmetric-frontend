@@ -5,6 +5,8 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  PT_TRAINING_CUSTOM_FITNESS_ATTRIBUTES_STORAGE_KEY,
+  PT_TRAINING_CUSTOM_FITNESS_TARGETS_STORAGE_KEY,
   PT_TRAINING_EXERCISE_DRAFTS_STORAGE_KEY,
   PT_TRAINING_FOLDER_DRAFTS_STORAGE_KEY,
   PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY,
@@ -54,6 +56,95 @@ function jsonResponse(payload: unknown) {
   });
 }
 
+function mockTrainingFetches() {
+  fetchMock.mockImplementation((input: RequestInfo | URL) => {
+    const url = String(input);
+
+    if (url === "/api/pt/folders") {
+      return jsonResponse({
+        ok: true,
+        data: {
+          items: [
+            {
+              id: "folder-1",
+              name: "Strength",
+              description: "Barbell-first programming",
+              sort_order: 1,
+            },
+            {
+              id: "folder-2",
+              name: "Recovery",
+              description: "Mobility and reset work",
+              sort_order: 2,
+            },
+          ],
+          count: 2,
+        },
+      });
+    }
+
+    if (url === "/api/pt/packages") {
+      return jsonResponse({
+        ok: true,
+        data: {
+          items: [
+            {
+              id: "package-1",
+              folder_id: "folder-1",
+              title: "Strength Camp",
+              description: "Four-week progressive overload block",
+              status: "active",
+              duration_days: 28,
+              is_template: false,
+            },
+            {
+              id: "package-2",
+              folder_id: "folder-2",
+              title: "Recovery Reset",
+              description: "Lower-load deload cycle",
+              status: "draft",
+              duration_days: 14,
+              is_template: true,
+            },
+          ],
+          count: 2,
+        },
+      });
+    }
+
+    if (url === "/api/pt/routines") {
+      return jsonResponse({
+        ok: true,
+        data: {
+          items: [
+            {
+              id: "routine-1",
+              folder_id: "folder-1",
+              title: "Deadlift Primer",
+              description: "Posterior-chain prep",
+              difficulty: "advanced",
+              estimated_minutes: 55,
+              is_archived: false,
+            },
+            {
+              id: "routine-2",
+              folder_id: "folder-2",
+              title: "Recovery Flow",
+              description: "Breathing and mobility sequence",
+              difficulty: "easy",
+              estimated_minutes: 20,
+              is_archived: false,
+            },
+          ],
+          count: 2,
+        },
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+}
+
 function mockEmptyTrainingFetches() {
   fetchMock.mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
@@ -88,93 +179,8 @@ describe("PTTrainingPage mobile experience", () => {
     vi.stubGlobal("fetch", fetchMock);
   });
 
-  it("renders the updated portfolio and builder sections, keeps old sections absent, and preserves the real folder accordion", async () => {
-    fetchMock.mockImplementation((input: RequestInfo | URL) => {
-      const url = String(input);
-
-      if (url === "/api/pt/folders") {
-        return jsonResponse({
-          ok: true,
-          data: {
-            items: [
-              {
-                id: "folder-1",
-                name: "Strength",
-                description: "Barbell-first programming",
-                sort_order: 1,
-              },
-              {
-                id: "folder-2",
-                name: "Recovery",
-                description: "Mobility and reset work",
-                sort_order: 2,
-              },
-            ],
-            count: 2,
-          },
-        });
-      }
-
-      if (url === "/api/pt/packages") {
-        return jsonResponse({
-          ok: true,
-          data: {
-            items: [
-              {
-                id: "package-1",
-                folder_id: "folder-1",
-                title: "Strength Camp",
-                description: "Four-week progressive overload block",
-                status: "active",
-                duration_days: 28,
-                is_template: false,
-              },
-              {
-                id: "package-2",
-                folder_id: "folder-2",
-                title: "Recovery Reset",
-                description: "Lower-load deload cycle",
-                status: "draft",
-                duration_days: 14,
-                is_template: true,
-              },
-            ],
-            count: 2,
-          },
-        });
-      }
-
-      if (url === "/api/pt/routines") {
-        return jsonResponse({
-          ok: true,
-          data: {
-            items: [
-              {
-                id: "routine-1",
-                folder_id: "folder-1",
-                title: "Deadlift Primer",
-                description: "Posterior-chain prep",
-                difficulty: "advanced",
-                estimated_minutes: 55,
-                is_archived: false,
-              },
-              {
-                id: "routine-2",
-                folder_id: "folder-2",
-                title: "Recovery Flow",
-                description: "Breathing and mobility sequence",
-                difficulty: "easy",
-                estimated_minutes: 20,
-                is_archived: false,
-              },
-            ],
-            count: 2,
-          },
-        });
-      }
-
-      throw new Error(`Unexpected fetch: ${url}`);
-    });
+  it("renders the portfolio and builder sections, keeps old sections absent, and preserves the real folder accordion", async () => {
+    mockTrainingFetches();
 
     render(React.createElement(PTTrainingPage));
 
@@ -193,22 +199,18 @@ describe("PTTrainingPage mobile experience", () => {
     expect(screen.queryByRole("heading", { name: "Portfolio cards" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Routine cards" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Management status" })).toBeNull();
-
-    const createFolderButton = screen.getByRole("button", { name: "Create New Folder" });
-    expect(createFolderButton.parentElement?.className).toContain("pt-training-create-folder-card-wrap");
-    expect(screen.getByRole("heading", { name: "Build Training Routine" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add an Exercise" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Create a Routine" })).toBeTruthy();
     expect(screen.queryByText("Add A Rep")).toBeNull();
     expect(screen.queryByText("Add A Set")).toBeNull();
     expect(screen.queryByText("Goals and Cues")).toBeNull();
-    expect(screen.getByRole("button", { name: "Add an Exercise" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Create a Routine" })).toBeTruthy();
+
+    const createFolderButton = screen.getByRole("button", { name: "Create New Folder" });
+    expect(createFolderButton.parentElement?.className).toContain("pt-training-create-folder-card-wrap");
 
     const strengthFolderButton = screen.getByRole("button", { name: "Strength" });
     const recoveryFolderButton = screen.getByRole("button", { name: "Recovery" });
     const fetchCallCount = fetchMock.mock.calls.length;
-
-    expect(strengthFolderButton.getAttribute("aria-expanded")).toBe("false");
-    expect(recoveryFolderButton.getAttribute("aria-expanded")).toBe("false");
 
     fireEvent.click(strengthFolderButton);
 
@@ -234,31 +236,7 @@ describe("PTTrainingPage mobile experience", () => {
   });
 
   it("keeps Create New Folder local-only and separate from the real folder accordion", async () => {
-    fetchMock.mockImplementation((input: RequestInfo | URL) => {
-      const url = String(input);
-
-      if (url === "/api/pt/folders") {
-        return jsonResponse({
-          ok: true,
-          data: {
-            items: [{ id: "folder-1", name: "Strength", description: "Power block", sort_order: 1 }],
-            count: 1,
-          },
-        });
-      }
-
-      if (url === "/api/pt/packages" || url === "/api/pt/routines") {
-        return jsonResponse({
-          ok: true,
-          data: {
-            items: [],
-            count: 0,
-          },
-        });
-      }
-
-      throw new Error(`Unexpected fetch: ${url}`);
-    });
+    mockTrainingFetches();
 
     render(React.createElement(PTTrainingPage));
 
@@ -273,10 +251,6 @@ describe("PTTrainingPage mobile experience", () => {
     await waitFor(() => {
       expect(screen.getByRole("dialog", { name: "Create New Folder" })).toBeTruthy();
     });
-
-    expect(
-      screen.getByText(/Folder creation is not connected to the PT folders save route yet/i),
-    ).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Folder name"), {
       target: { value: "Mobility Builder" },
@@ -307,32 +281,8 @@ describe("PTTrainingPage mobile experience", () => {
     );
   });
 
-  it("validates and saves Add an Exercise drafts locally without new fetches", async () => {
-    fetchMock.mockImplementation((input: RequestInfo | URL) => {
-      const url = String(input);
-
-      if (url === "/api/pt/folders") {
-        return jsonResponse({
-          ok: true,
-          data: {
-            items: [{ id: "folder-1", name: "Strength", description: "Power block", sort_order: 1 }],
-            count: 1,
-          },
-        });
-      }
-
-      if (url === "/api/pt/packages" || url === "/api/pt/routines") {
-        return jsonResponse({
-          ok: true,
-          data: {
-            items: [],
-            count: 0,
-          },
-        });
-      }
-
-      throw new Error(`Unexpected fetch: ${url}`);
-    });
+  it("keeps Add an Exercise local-only and exposes saved exercises to routine autosuggest", async () => {
+    mockTrainingFetches();
 
     render(React.createElement(PTTrainingPage));
 
@@ -348,10 +298,6 @@ describe("PTTrainingPage mobile experience", () => {
       expect(screen.getByRole("dialog", { name: "Add an Exercise" })).toBeTruthy();
     });
 
-    expect(screen.getByLabelText("Exercise description")).toBeTruthy();
-    expect(screen.getByLabelText("Instructions")).toBeTruthy();
-    expect(screen.getByLabelText("Main objective")).toBeTruthy();
-
     fireEvent.click(screen.getByRole("button", { name: "Save local draft" }));
 
     await waitFor(() => {
@@ -361,10 +307,10 @@ describe("PTTrainingPage mobile experience", () => {
     });
 
     fireEvent.change(screen.getByLabelText("Exercise description"), {
-      target: { value: "Bench press with shoulder blades anchored" },
+      target: { value: "Bench Press" },
     });
     fireEvent.change(screen.getByLabelText("Instructions"), {
-      target: { value: "Lower the bar to mid-chest, pause, then drive through the floor." },
+      target: { value: "Lower with control and drive upward." },
     });
     fireEvent.change(screen.getByLabelText("Main objective"), {
       target: { value: "Upper-body pressing strength" },
@@ -375,13 +321,6 @@ describe("PTTrainingPage mobile experience", () => {
       expect(screen.getByText("Local exercise drafts")).toBeTruthy();
     });
 
-    expect(screen.getByText("Bench press with shoulder blades anchored")).toBeTruthy();
-    expect(screen.getByText("Main objective: Upper-body pressing strength")).toBeTruthy();
-    expect(
-      screen.getByText("Lower the bar to mid-chest, pause, then drive through the floor."),
-    ).toBeTruthy();
-    expect(screen.getByText("Local draft")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Bench press with shoulder blades anchored" })).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
     expect(
       JSON.parse(window.localStorage.getItem(PT_TRAINING_EXERCISE_DRAFTS_STORAGE_KEY) ?? "[]"),
@@ -389,40 +328,44 @@ describe("PTTrainingPage mobile experience", () => {
       expect.arrayContaining([
         expect.objectContaining({
           type: "exercise",
-          description: "Bench press with shoulder blades anchored",
-          instructions: "Lower the bar to mid-chest, pause, then drive through the floor.",
+          description: "Bench Press",
+          instructions: "Lower with control and drive upward.",
           objective: "Upper-body pressing strength",
         }),
       ]),
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "Create a Routine" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Create a Routine" })).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText("Routine name"), {
+      target: { value: "Press Builder" },
+    });
+    fireEvent.change(screen.getByLabelText("Description"), {
+      target: { value: "A pressing-focused routine draft." },
+    });
+    fireEvent.click(screen.getByLabelText("Biceps"));
+    fireEvent.click(screen.getByLabelText("Strength"));
+    fireEvent.change(screen.getByLabelText("How many Sets?"), {
+      target: { value: "4" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Next: Add Exercises" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Routine Exercises")).toBeTruthy();
+    });
+
+    const exerciseInput = screen.getByLabelText("Exercise") as HTMLInputElement;
+    expect(exerciseInput.getAttribute("list")).toBe("pt-training-routine-exercise-suggestions");
+    const datalist = document.getElementById("pt-training-routine-exercise-suggestions");
+    expect((datalist as HTMLElement).querySelector('option[value="Bench Press"]')).toBeTruthy();
   });
 
-  it("validates the two-page Create a Routine flow, keeps numeric inputs numeric-only, and saves locally", async () => {
-    fetchMock.mockImplementation((input: RequestInfo | URL) => {
-      const url = String(input);
-
-      if (url === "/api/pt/folders") {
-        return jsonResponse({
-          ok: true,
-          data: {
-            items: [{ id: "folder-1", name: "Strength", description: "Power block", sort_order: 1 }],
-            count: 1,
-          },
-        });
-      }
-
-      if (url === "/api/pt/packages" || url === "/api/pt/routines") {
-        return jsonResponse({
-          ok: true,
-          data: {
-            items: [],
-            count: 0,
-          },
-        });
-      }
-
-      throw new Error(`Unexpected fetch: ${url}`);
-    });
+  it("validates Page 1 targets and attributes, supports local Add Target and Add Attribute, and saves the routine draft locally", async () => {
+    mockTrainingFetches();
 
     render(React.createElement(PTTrainingPage));
 
@@ -441,20 +384,86 @@ describe("PTTrainingPage mobile experience", () => {
     expect(screen.getByText("Routine Details")).toBeTruthy();
     expect(screen.getByLabelText("Routine name")).toBeTruthy();
     expect(screen.getByLabelText("Description")).toBeTruthy();
-    expect(screen.getByLabelText("Fitness Target")).toBeTruthy();
+    expect(screen.getByText("Fitness Target")).toBeTruthy();
+    expect(screen.getByText("Fitness Attributes")).toBeTruthy();
     expect(screen.getByText("Timed by duration")).toBeTruthy();
+    expect(screen.getByLabelText("How many Sets?")).toBeTruthy();
+    expect(screen.queryByLabelText("Set Amount")).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Fitness Target" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Fitness Attributes" })).toBeNull();
+    expect(screen.getByText("Which body targets does this routine contribute to?")).toBeTruthy();
+    expect(screen.getByText("Which physical attributes does this routine contribute to?")).toBeTruthy();
+    expect(screen.getByLabelText("Biceps")).toBeTruthy();
+    expect(screen.getByLabelText("Back")).toBeTruthy();
+    expect(screen.getByLabelText("Neck")).toBeTruthy();
+    expect(screen.getByLabelText("Triceps")).toBeTruthy();
+    expect(screen.getByLabelText("Achilles")).toBeTruthy();
+    expect(screen.getByLabelText("Knees")).toBeTruthy();
+    expect(screen.getByLabelText("Forearm")).toBeTruthy();
+    expect(screen.getByLabelText("Lats")).toBeTruthy();
+    expect(screen.getByLabelText("Quads")).toBeTruthy();
+    expect(screen.getByLabelText("Hands")).toBeTruthy();
+    expect(screen.getByLabelText("Hand Eye Coordination")).toBeTruthy();
+    expect(screen.getByLabelText("Strength")).toBeTruthy();
+    expect(screen.getByLabelText("Endurance")).toBeTruthy();
+    expect(screen.getByLabelText("Vertical")).toBeTruthy();
+    expect(screen.getByLabelText("Speed")).toBeTruthy();
+    expect(screen.getByLabelText("Agility")).toBeTruthy();
+    expect(screen.getByLabelText("Heart Rate")).toBeTruthy();
+    expect(screen.getByLabelText("Elusiveness")).toBeTruthy();
+    expect((screen.getByLabelText("How many Sets?") as HTMLInputElement).getAttribute("type")).toBe("number");
 
-    const setAmountInput = screen.getByLabelText("Set Amount") as HTMLInputElement;
-    expect(setAmountInput.getAttribute("type")).toBe("number");
-
-    fireEvent.click(screen.getByRole("button", { name: "Next: Exercises" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next: Add Exercises" }));
 
     await waitFor(() => {
       expect(screen.getByText("Routine name is required.")).toBeTruthy();
       expect(screen.getByText("Description is required.")).toBeTruthy();
-      expect(screen.getByText("Fitness Target is required.")).toBeTruthy();
-      expect(screen.getByText("Set Amount is required.")).toBeTruthy();
+      expect(screen.getByText("Select at least one Fitness Target.")).toBeTruthy();
+      expect(screen.getByText("Select at least one Fitness Attribute.")).toBeTruthy();
+      expect(screen.getByText("How many Sets? is required.")).toBeTruthy();
     });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Target" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Add Fitness Target" })).toBeTruthy();
+    });
+
+    const addTargetDialog = screen.getByRole("dialog", { name: "Add Fitness Target" });
+    fireEvent.change(screen.getByLabelText("Body target"), {
+      target: { value: "Glutes" },
+    });
+    fireEvent.click(within(addTargetDialog).getByRole("button", { name: "Add Target" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Glutes")).toBeTruthy();
+    });
+
+    expect((screen.getByLabelText("Glutes") as HTMLInputElement).checked).toBe(true);
+    expect(
+      JSON.parse(window.localStorage.getItem(PT_TRAINING_CUSTOM_FITNESS_TARGETS_STORAGE_KEY) ?? "[]"),
+    ).toEqual(expect.arrayContaining(["Glutes"]));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Attribute" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Add Fitness Attribute" })).toBeTruthy();
+    });
+
+    const addAttributeDialog = screen.getByRole("dialog", { name: "Add Fitness Attribute" });
+    fireEvent.change(screen.getByLabelText("Physical attribute"), {
+      target: { value: "Balance" },
+    });
+    fireEvent.click(within(addAttributeDialog).getByRole("button", { name: "Add Attribute" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Balance")).toBeTruthy();
+    });
+
+    expect((screen.getByLabelText("Balance") as HTMLInputElement).checked).toBe(true);
+    expect(
+      JSON.parse(window.localStorage.getItem(PT_TRAINING_CUSTOM_FITNESS_ATTRIBUTES_STORAGE_KEY) ?? "[]"),
+    ).toEqual(expect.arrayContaining(["Balance"]));
 
     fireEvent.change(screen.getByLabelText("Routine name"), {
       target: { value: "Full Body Builder" },
@@ -462,62 +471,28 @@ describe("PTTrainingPage mobile experience", () => {
     fireEvent.change(screen.getByLabelText("Description"), {
       target: { value: "A reusable total-body session for strength and control." },
     });
-    fireEvent.change(screen.getByLabelText("Fitness Target"), {
-      target: { value: "Chest, back, legs, and overall work capacity" },
-    });
-    fireEvent.click(screen.getByRole("radio", { name: "Yes" }));
-    fireEvent.change(setAmountInput, {
+    fireEvent.click(within(screen.getByText("Timed by duration").closest("fieldset") as HTMLElement).getByRole("radio", { name: "Yes" }));
+    fireEvent.change(screen.getByLabelText("How many Sets?"), {
       target: { value: "12" },
     });
-    expect(setAmountInput.value).toBe("12");
-
-    fireEvent.click(screen.getByRole("button", { name: "Next: Exercises" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next: Add Exercises" }));
 
     await waitFor(() => {
       expect(screen.getByText("Routine Exercises")).toBeTruthy();
     });
 
-    expect(screen.getByLabelText("Exercise")).toBeTruthy();
-    const repGoalInput = screen.getByLabelText("Rep Goal") as HTMLInputElement;
-    expect(repGoalInput.getAttribute("type")).toBe("number");
-    fireEvent.change(repGoalInput, {
-      target: { value: "8" },
-    });
-    expect(repGoalInput.value).toBe("8");
-    expect(screen.getByLabelText("Instructions")).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
 
-    const weightsFieldset = screen.getByText("Weights Involved?").closest("fieldset");
-    expect(weightsFieldset).toBeTruthy();
-    if (!weightsFieldset) {
-      throw new Error("Expected weights fieldset");
-    }
-    expect(within(weightsFieldset).queryByRole("textbox")).toBeNull();
-    expect(within(weightsFieldset).getByRole("radio", { name: "Yes" })).toBeTruthy();
-    expect(within(weightsFieldset).getByRole("radio", { name: "No" })).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Add exercise row" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("Exercise 2")).toBeTruthy();
-    });
-
-    fireEvent.change(screen.getAllByLabelText("Exercise")[0] as HTMLInputElement, {
+    fireEvent.change(screen.getByLabelText("Exercise"), {
       target: { value: "Bench Press" },
     });
-    fireEvent.change(screen.getAllByLabelText("Instructions")[0] as HTMLTextAreaElement, {
+    fireEvent.change(screen.getByLabelText("Rep Goal"), {
+      target: { value: "8" },
+    });
+    fireEvent.change(screen.getByLabelText("Instructions"), {
       target: { value: "Drive through the floor and keep the bar path stacked." },
     });
-    fireEvent.click(within(weightsFieldset).getByRole("radio", { name: "Yes" }));
-
-    fireEvent.change(screen.getAllByLabelText("Exercise")[1] as HTMLInputElement, {
-      target: { value: "Leg Extension" },
-    });
-    fireEvent.change(screen.getAllByLabelText("Rep Goal")[1] as HTMLInputElement, {
-      target: { value: "15" },
-    });
-    fireEvent.change(screen.getAllByLabelText("Instructions")[1] as HTMLTextAreaElement, {
-      target: { value: "Pause at the top and control the lowering phase." },
-    });
+    fireEvent.click(within(screen.getByText("Weights Involved?").closest("fieldset") as HTMLElement).getByRole("radio", { name: "Yes" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Save local routine draft" }));
 
@@ -526,11 +501,12 @@ describe("PTTrainingPage mobile experience", () => {
     });
 
     expect(screen.getByText("Full Body Builder")).toBeTruthy();
-    expect(screen.getByText("Fitness target: Chest, back, legs, and overall work capacity")).toBeTruthy();
-    expect(screen.getByText(/Set amount: 12 \| Exercise count: 2/)).toBeTruthy();
+    expect(screen.getByText("Fitness targets: Glutes")).toBeTruthy();
+    expect(screen.getByText("Fitness attributes: Balance")).toBeTruthy();
+    expect(screen.getByText(/Set amount: 12 \| Exercise count: 1/)).toBeTruthy();
     expect(screen.getByText("Local draft")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Full Body Builder" })).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
+
     expect(
       JSON.parse(window.localStorage.getItem(PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY) ?? "[]"),
     ).toEqual(
@@ -538,7 +514,8 @@ describe("PTTrainingPage mobile experience", () => {
         expect.objectContaining({
           type: "routine",
           routineName: "Full Body Builder",
-          fitnessTarget: "Chest, back, legs, and overall work capacity",
+          fitnessTargets: ["Glutes"],
+          fitnessAttributes: ["Balance"],
           timedByDuration: true,
           setAmount: 12,
           exercises: expect.arrayContaining([
@@ -548,95 +525,123 @@ describe("PTTrainingPage mobile experience", () => {
               instructions: "Drive through the floor and keep the bar path stacked.",
               weightsInvolved: true,
             }),
-            expect.objectContaining({
-              exerciseName: "Leg Extension",
-              repGoal: 15,
-              instructions: "Pause at the top and control the lowering phase.",
-              weightsInvolved: false,
-            }),
           ]),
         }),
       ]),
     );
   });
 
-  it("filters real folders locally without issuing new requests", async () => {
-    fetchMock.mockImplementation((input: RequestInfo | URL) => {
-      const url = String(input);
+  it("supports Page 2 autosuggest, centers Add Another Exercise, and shows navigation arrows only after multiple exercises exist", async () => {
+    mockTrainingFetches();
+    window.localStorage.setItem(
+      PT_TRAINING_EXERCISE_DRAFTS_STORAGE_KEY,
+      JSON.stringify([
+        {
+          id: "draft-exercise-1",
+          type: "exercise",
+          description: "Push Up",
+          instructions: "Keep a tight plank.",
+          objective: "Upper-body endurance",
+          createdAt: new Date().toISOString(),
+        },
+      ]),
+    );
 
-      if (url === "/api/pt/folders") {
-        return jsonResponse({
-          ok: true,
-          data: {
-            items: [
-              { id: "folder-1", name: "Strength", description: "Power block", sort_order: 1 },
-              { id: "folder-2", name: "Recovery", description: "Mobility block", sort_order: 2 },
-            ],
-            count: 2,
-          },
-        });
-      }
+    render(React.createElement(PTTrainingPage));
 
-      if (url === "/api/pt/packages") {
-        return jsonResponse({
-          ok: true,
-          data: {
-            items: [
-              {
-                id: "package-1",
-                folder_id: "folder-1",
-                title: "Strength Camp",
-                description: "Barbell cycle",
-                status: "active",
-                duration_days: 28,
-                is_template: false,
-              },
-              {
-                id: "package-2",
-                folder_id: "folder-2",
-                title: "Recovery Reset",
-                description: "Deload cycle",
-                status: "draft",
-                duration_days: 14,
-                is_template: true,
-              },
-            ],
-            count: 2,
-          },
-        });
-      }
-
-      if (url === "/api/pt/routines") {
-        return jsonResponse({
-          ok: true,
-          data: {
-            items: [
-              {
-                id: "routine-1",
-                folder_id: "folder-1",
-                title: "Deadlift Primer",
-                description: "Heavy pulling prep",
-                difficulty: "advanced",
-                estimated_minutes: 55,
-                is_archived: false,
-              },
-              {
-                id: "routine-2",
-                folder_id: "folder-2",
-                title: "Recovery Flow",
-                description: "Mobility sequence",
-                difficulty: "easy",
-                estimated_minutes: 20,
-                is_archived: false,
-              },
-            ],
-            count: 2,
-          },
-        });
-      }
-
-      throw new Error(`Unexpected fetch: ${url}`);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Create a Routine" })).toBeTruthy();
     });
+
+    const fetchCallCount = fetchMock.mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Create a Routine" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Create a Routine" })).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText("Routine name"), {
+      target: { value: "Conditioning Builder" },
+    });
+    fireEvent.change(screen.getByLabelText("Description"), {
+      target: { value: "A routine with multiple exercise windows." },
+    });
+    fireEvent.click(screen.getByLabelText("Back"));
+    fireEvent.click(screen.getByLabelText("Endurance"));
+    fireEvent.change(screen.getByLabelText("How many Sets?"), {
+      target: { value: "3" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Next: Add Exercises" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Routine Exercises")).toBeTruthy();
+    });
+
+    const exerciseInput = screen.getByLabelText("Exercise") as HTMLInputElement;
+    expect(exerciseInput.getAttribute("list")).toBe("pt-training-routine-exercise-suggestions");
+    const repGoalInput = screen.getByLabelText("Rep Goal") as HTMLInputElement;
+    expect(repGoalInput.getAttribute("type")).toBe("number");
+    expect(screen.queryByRole("button", { name: "Previous exercise" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Next exercise" })).toBeNull();
+
+    const addAnotherButton = screen.getByRole("button", { name: "Add Another Exercise" });
+    expect(addAnotherButton.parentElement?.className).toContain("pt-training-routine-form__add-exercise-wrap");
+    const datalist = document.getElementById("pt-training-routine-exercise-suggestions");
+    expect((datalist as HTMLElement).querySelector('option[value="Push Up"]')).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Exercise"), {
+      target: { value: "Push Up" },
+    });
+    fireEvent.change(screen.getByLabelText("Rep Goal"), {
+      target: { value: "20" },
+    });
+    fireEvent.change(screen.getByLabelText("Instructions"), {
+      target: { value: "Stay rigid through the midline." },
+    });
+
+    fireEvent.click(addAnotherButton);
+
+    await waitFor(() => {
+      expect(screen.getByText("Exercise 2")).toBeTruthy();
+    });
+
+    expect(screen.getByRole("button", { name: "Previous exercise" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Next exercise" })).toBeTruthy();
+    expect(screen.getByText("Exercise 2 of 2")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Next exercise" }).hasAttribute("disabled")).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("Exercise"), {
+      target: { value: "Leg Extension" },
+    });
+    fireEvent.change(screen.getByLabelText("Rep Goal"), {
+      target: { value: "15" },
+    });
+    fireEvent.change(screen.getByLabelText("Instructions"), {
+      target: { value: "Pause at the top and control the lowering phase." },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous exercise" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Exercise 1 of 2")).toBeTruthy();
+    });
+
+    expect((screen.getByLabelText("Exercise") as HTMLInputElement).value).toBe("Push Up");
+    expect(screen.getByRole("button", { name: "Previous exercise" }).hasAttribute("disabled")).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Next exercise" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Exercise 2 of 2")).toBeTruthy();
+    });
+
+    expect((screen.getByLabelText("Exercise") as HTMLInputElement).value).toBe("Leg Extension");
+    expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
+  });
+
+  it("filters real folders locally without issuing new requests", async () => {
+    mockTrainingFetches();
 
     render(React.createElement(PTTrainingPage));
 

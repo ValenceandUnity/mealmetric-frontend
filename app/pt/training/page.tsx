@@ -14,20 +14,24 @@ import {
   createLocalPTExerciseDraft,
   createLocalPTFolderDraft,
   createLocalPTRoutineDraft,
+  readLocalPTCustomFitnessAttributes,
+  readLocalPTCustomFitnessTargets,
   readLocalPTExerciseDrafts,
   readLocalPTFolderDrafts,
   readLocalPTRoutineDrafts,
   type LocalPTExerciseDraft,
   type LocalPTFolderDraft,
   type LocalPTRoutineDraft,
+  writeLocalPTCustomFitnessAttributes,
+  writeLocalPTCustomFitnessTargets,
   writeLocalPTExerciseDrafts,
   writeLocalPTFolderDrafts,
   writeLocalPTRoutineDrafts,
 } from "@/lib/client/pt-training-drafts";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
-import { adaptPTTrainingView } from "@/lib/view-models/pt-training";
 import { formatDisplayNameFromUser } from "@/lib/view-models/common";
+import { adaptPTTrainingView } from "@/lib/view-models/pt-training";
 
 type PTTrainingApiResponse = ApiResponse<JsonValue>;
 
@@ -94,7 +98,8 @@ type ExerciseFormErrors = {
 type RoutineDetailsErrors = {
   routineName?: string;
   description?: string;
-  fitnessTarget?: string;
+  fitnessTargets?: string;
+  fitnessAttributes?: string;
   setAmount?: string;
 };
 
@@ -111,6 +116,8 @@ type RoutineExerciseRowErrors = {
   repGoal?: string;
   instructions?: string;
 };
+
+type RoutineOptionDialogKind = "target" | "attribute" | null;
 
 const EMPTY_SECTION_ERRORS: SectionErrors = {
   folders: null,
@@ -142,6 +149,30 @@ const BUILDER_OPTIONS: BuilderOption[] = [
     className: "pt-training-builder-card--routine",
   },
 ];
+
+const DEFAULT_FITNESS_TARGETS = [
+  "Biceps",
+  "Back",
+  "Neck",
+  "Triceps",
+  "Achilles",
+  "Knees",
+  "Forearm",
+  "Lats",
+  "Quads",
+  "Hands",
+] as const;
+
+const DEFAULT_FITNESS_ATTRIBUTES = [
+  "Hand Eye Coordination",
+  "Strength",
+  "Endurance",
+  "Vertical",
+  "Speed",
+  "Agility",
+  "Heart Rate",
+  "Elusiveness",
+] as const;
 
 function ActionPill({ href, children, tone = "yellow" }: ActionPillProps) {
   return (
@@ -187,8 +218,51 @@ function CreateFolderPlusIcon() {
   );
 }
 
+function ExerciseArrowIcon({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {direction === "left" ? <path d="m15 18-6-6 6-6" /> : <path d="m9 18 6-6-6-6" />}
+    </svg>
+  );
+}
+
 function sanitizeNumericInput(value: string) {
   return value.replace(/\D+/g, "");
+}
+
+function normalizeOptionValue(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function dedupeStringValues(values: string[]) {
+  const seen = new Set<string>();
+  const next: string[] = [];
+
+  values.forEach((value) => {
+    const trimmed = value.trim();
+    const normalized = normalizeOptionValue(trimmed);
+
+    if (!trimmed || seen.has(normalized)) {
+      return;
+    }
+
+    seen.add(normalized);
+    next.push(trimmed);
+  });
+
+  return next;
+}
+
+function formatSummaryList(values: string[]) {
+  if (values.length === 0) {
+    return "None selected";
+  }
+
+  if (values.length <= 3) {
+    return values.join(", ");
+  }
+
+  return `${values.slice(0, 3).join(", ")} +${values.length - 3} more`;
 }
 
 function createRoutineExerciseRow(): RoutineExerciseRow {
@@ -217,6 +291,8 @@ export default function PTTrainingPage() {
   const [folderDrafts, setFolderDrafts] = useState<LocalPTFolderDraft[]>([]);
   const [exerciseDrafts, setExerciseDrafts] = useState<LocalPTExerciseDraft[]>([]);
   const [routineDrafts, setRoutineDrafts] = useState<LocalPTRoutineDraft[]>([]);
+  const [customFitnessTargets, setCustomFitnessTargets] = useState<string[]>([]);
+  const [customFitnessAttributes, setCustomFitnessAttributes] = useState<string[]>([]);
   const [createFolderDialogOpen, setCreateFolderDialogOpen] = useState(false);
   const [folderDraftName, setFolderDraftName] = useState("");
   const [folderDraftNote, setFolderDraftNote] = useState("");
@@ -229,20 +305,27 @@ export default function PTTrainingPage() {
   const [routineDialogPage, setRoutineDialogPage] = useState<"details" | "exercises">("details");
   const [routineName, setRoutineName] = useState("");
   const [routineDescription, setRoutineDescription] = useState("");
-  const [fitnessTarget, setFitnessTarget] = useState("");
+  const [fitnessTargets, setFitnessTargets] = useState<string[]>([]);
+  const [fitnessAttributes, setFitnessAttributes] = useState<string[]>([]);
   const [timedByDuration, setTimedByDuration] = useState(false);
   const [setAmount, setSetAmount] = useState("");
   const [routineRows, setRoutineRows] = useState<RoutineExerciseRow[]>([createRoutineExerciseRow()]);
+  const [activeRoutineExerciseIndex, setActiveRoutineExerciseIndex] = useState(0);
   const [routineDetailsErrors, setRoutineDetailsErrors] = useState<RoutineDetailsErrors>({});
   const [routineRowErrors, setRoutineRowErrors] = useState<Record<string, RoutineExerciseRowErrors>>(
     {},
   );
+  const [routineOptionDialogKind, setRoutineOptionDialogKind] = useState<RoutineOptionDialogKind>(null);
+  const [routineOptionValue, setRoutineOptionValue] = useState("");
+  const [routineOptionError, setRoutineOptionError] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(searchValue);
 
   useEffect(() => {
     setFolderDrafts(readLocalPTFolderDrafts());
     setExerciseDrafts(readLocalPTExerciseDrafts());
     setRoutineDrafts(readLocalPTRoutineDrafts());
+    setCustomFitnessTargets(readLocalPTCustomFitnessTargets());
+    setCustomFitnessAttributes(readLocalPTCustomFitnessAttributes());
   }, []);
 
   useEffect(() => {
@@ -325,7 +408,12 @@ export default function PTTrainingPage() {
   }, [status, user]);
 
   useEffect(() => {
-    if (!createFolderDialogOpen && !exerciseDialogOpen && !routineDialogOpen) {
+    if (
+      !createFolderDialogOpen &&
+      !exerciseDialogOpen &&
+      !routineDialogOpen &&
+      !routineOptionDialogKind
+    ) {
       return;
     }
 
@@ -334,16 +422,39 @@ export default function PTTrainingPage() {
         return;
       }
 
-      closeCreateFolderDialog();
-      closeExerciseDialog();
-      closeRoutineDialog();
+      if (routineOptionDialogKind) {
+        closeRoutineOptionDialog();
+        return;
+      }
+
+      setCreateFolderDialogOpen(false);
+      setFolderDraftName("");
+      setFolderDraftNote("");
+      setExerciseDialogOpen(false);
+      setExerciseDescription("");
+      setExerciseInstructions("");
+      setExerciseObjective("");
+      setExerciseErrors({});
+      setRoutineDialogOpen(false);
+      setRoutineDialogPage("details");
+      setRoutineName("");
+      setRoutineDescription("");
+      setFitnessTargets([]);
+      setFitnessAttributes([]);
+      setTimedByDuration(false);
+      setSetAmount("");
+      setRoutineRows([createRoutineExerciseRow()]);
+      setActiveRoutineExerciseIndex(0);
+      setRoutineDetailsErrors({});
+      setRoutineRowErrors({});
+      closeRoutineOptionDialog();
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [createFolderDialogOpen, exerciseDialogOpen, routineDialogOpen]);
+  }, [createFolderDialogOpen, exerciseDialogOpen, routineDialogOpen, routineOptionDialogKind]);
 
   const view = useMemo(
     () =>
@@ -435,6 +546,37 @@ export default function PTTrainingPage() {
     ? portfolioFolders.filter((folder) => matchesTrainingQuery(query, folder.searchFields))
     : portfolioFolders;
 
+  const fitnessTargetOptions = useMemo(
+    () => dedupeStringValues([...DEFAULT_FITNESS_TARGETS, ...customFitnessTargets]),
+    [customFitnessTargets],
+  );
+
+  const fitnessAttributeOptions = useMemo(
+    () => dedupeStringValues([...DEFAULT_FITNESS_ATTRIBUTES, ...customFitnessAttributes]),
+    [customFitnessAttributes],
+  );
+
+  const routineExerciseSuggestions = useMemo(() => {
+    const localExerciseSuggestions = exerciseDrafts.map((draft) => draft.description);
+    const localRoutineSuggestions = routineDrafts.flatMap((draft) =>
+      draft.exercises.map((exercise) => exercise.exerciseName),
+    );
+    const loadedSuggestions = [
+      ...view.routineCards.map((item) => item.title),
+      ...view.packageCards.map((item) => item.title),
+    ];
+    const inProgressRoutineSuggestions = routineRows.map((row) => row.exerciseName);
+
+    return dedupeStringValues([
+      ...localExerciseSuggestions,
+      ...localRoutineSuggestions,
+      ...loadedSuggestions,
+      ...inProgressRoutineSuggestions,
+    ]);
+  }, [exerciseDrafts, routineDrafts, routineRows, view.packageCards, view.routineCards]);
+
+  const activeRoutineRow = routineRows[activeRoutineExerciseIndex] ?? null;
+
   useEffect(() => {
     if (!openPortfolioFolderId) {
       return;
@@ -444,6 +586,14 @@ export default function PTTrainingPage() {
       setOpenPortfolioFolderId(null);
     }
   }, [filteredPortfolioFolders, openPortfolioFolderId]);
+
+  useEffect(() => {
+    if (activeRoutineExerciseIndex <= routineRows.length - 1) {
+      return;
+    }
+
+    setActiveRoutineExerciseIndex(Math.max(0, routineRows.length - 1));
+  }, [activeRoutineExerciseIndex, routineRows.length]);
 
   function closeCreateFolderDialog() {
     setCreateFolderDialogOpen(false);
@@ -522,16 +672,19 @@ export default function PTTrainingPage() {
   }
 
   function openRoutineDialog() {
+    setRoutineDialogOpen(true);
     setRoutineDialogPage("details");
     setRoutineName("");
     setRoutineDescription("");
-    setFitnessTarget("");
+    setFitnessTargets([]);
+    setFitnessAttributes([]);
     setTimedByDuration(false);
     setSetAmount("");
     setRoutineRows([createRoutineExerciseRow()]);
+    setActiveRoutineExerciseIndex(0);
     setRoutineDetailsErrors({});
     setRoutineRowErrors({});
-    setRoutineDialogOpen(true);
+    closeRoutineOptionDialog();
   }
 
   function closeRoutineDialog() {
@@ -539,12 +692,84 @@ export default function PTTrainingPage() {
     setRoutineDialogPage("details");
     setRoutineName("");
     setRoutineDescription("");
-    setFitnessTarget("");
+    setFitnessTargets([]);
+    setFitnessAttributes([]);
     setTimedByDuration(false);
     setSetAmount("");
     setRoutineRows([createRoutineExerciseRow()]);
+    setActiveRoutineExerciseIndex(0);
     setRoutineDetailsErrors({});
     setRoutineRowErrors({});
+    closeRoutineOptionDialog();
+  }
+
+  function openRoutineOptionDialog(kind: Exclude<RoutineOptionDialogKind, null>) {
+    setRoutineOptionDialogKind(kind);
+    setRoutineOptionValue("");
+    setRoutineOptionError(null);
+  }
+
+  function closeRoutineOptionDialog() {
+    setRoutineOptionDialogKind(null);
+    setRoutineOptionValue("");
+    setRoutineOptionError(null);
+  }
+
+  function toggleSelection(value: string, selected: string[], setSelected: (value: string[]) => void) {
+    const normalized = normalizeOptionValue(value);
+    const exists = selected.some((item) => normalizeOptionValue(item) === normalized);
+
+    if (exists) {
+      setSelected(selected.filter((item) => normalizeOptionValue(item) !== normalized));
+      return;
+    }
+
+    setSelected([...selected, value]);
+  }
+
+  function handleAddRoutineOption() {
+    if (!routineOptionDialogKind) {
+      return;
+    }
+
+    const trimmed = routineOptionValue.trim();
+    if (!trimmed) {
+      setRoutineOptionError(
+        routineOptionDialogKind === "target"
+          ? "Body target is required."
+          : "Physical attribute is required.",
+      );
+      return;
+    }
+
+    if (routineOptionDialogKind === "target") {
+      const existing = dedupeStringValues([...fitnessTargetOptions, ...fitnessTargets]);
+      if (existing.some((item) => normalizeOptionValue(item) === normalizeOptionValue(trimmed))) {
+        setRoutineOptionError("That body target already exists.");
+        return;
+      }
+
+      const nextCustomTargets = [...customFitnessTargets, trimmed];
+      setCustomFitnessTargets(nextCustomTargets);
+      writeLocalPTCustomFitnessTargets(nextCustomTargets);
+      setFitnessTargets((current) => [...current, trimmed]);
+      setRoutineDetailsErrors((current) => ({ ...current, fitnessTargets: undefined }));
+      closeRoutineOptionDialog();
+      return;
+    }
+
+    const existing = dedupeStringValues([...fitnessAttributeOptions, ...fitnessAttributes]);
+    if (existing.some((item) => normalizeOptionValue(item) === normalizeOptionValue(trimmed))) {
+      setRoutineOptionError("That physical attribute already exists.");
+      return;
+    }
+
+    const nextCustomAttributes = [...customFitnessAttributes, trimmed];
+    setCustomFitnessAttributes(nextCustomAttributes);
+    writeLocalPTCustomFitnessAttributes(nextCustomAttributes);
+    setFitnessAttributes((current) => [...current, trimmed]);
+    setRoutineDetailsErrors((current) => ({ ...current, fitnessAttributes: undefined }));
+    closeRoutineOptionDialog();
   }
 
   function validateRoutineDetails() {
@@ -558,12 +783,16 @@ export default function PTTrainingPage() {
       nextErrors.description = "Description is required.";
     }
 
-    if (fitnessTarget.trim().length === 0) {
-      nextErrors.fitnessTarget = "Fitness Target is required.";
+    if (fitnessTargets.length === 0) {
+      nextErrors.fitnessTargets = "Select at least one Fitness Target.";
+    }
+
+    if (fitnessAttributes.length === 0) {
+      nextErrors.fitnessAttributes = "Select at least one Fitness Attribute.";
     }
 
     if (setAmount.trim().length === 0) {
-      nextErrors.setAmount = "Set Amount is required.";
+      nextErrors.setAmount = "How many Sets? is required.";
     }
 
     setRoutineDetailsErrors(nextErrors);
@@ -642,6 +871,38 @@ export default function PTTrainingPage() {
     });
   }
 
+  function handleAddRoutineExerciseRow() {
+    const nextRow = createRoutineExerciseRow();
+    setRoutineRows((current) => [...current, nextRow]);
+    setActiveRoutineExerciseIndex(routineRows.length);
+  }
+
+  function handleRemoveRoutineExerciseRow(rowId: string) {
+    const removeIndex = routineRows.findIndex((row) => row.id === rowId);
+    const nextRows = routineRows.filter((row) => row.id !== rowId);
+    setRoutineRows(nextRows);
+    setRoutineRowErrors((current) => {
+      const next = { ...current };
+      delete next[rowId];
+      return next;
+    });
+
+    if (nextRows.length === 0) {
+      setRoutineRows([createRoutineExerciseRow()]);
+      setActiveRoutineExerciseIndex(0);
+      return;
+    }
+
+    if (removeIndex < activeRoutineExerciseIndex) {
+      setActiveRoutineExerciseIndex((current) => Math.max(0, current - 1));
+      return;
+    }
+
+    if (removeIndex === activeRoutineExerciseIndex) {
+      setActiveRoutineExerciseIndex(Math.min(activeRoutineExerciseIndex, nextRows.length - 1));
+    }
+  }
+
   function handleSaveRoutineDraft() {
     const detailsValid = validateRoutineDetails();
     const rowsValid = validateRoutineRows();
@@ -653,13 +914,21 @@ export default function PTTrainingPage() {
 
     if (!rowsValid) {
       setRoutineDialogPage("exercises");
+      const nextInvalidIndex = routineRows.findIndex((row) => {
+        const rowErrors = routineRowErrors[row.id];
+        return rowErrors && Object.keys(rowErrors).length > 0;
+      });
+      if (nextInvalidIndex >= 0) {
+        setActiveRoutineExerciseIndex(nextInvalidIndex);
+      }
       return;
     }
 
     const nextDraft = createLocalPTRoutineDraft({
       routineName,
       description: routineDescription,
-      fitnessTarget,
+      fitnessTargets,
+      fitnessAttributes,
       timedByDuration,
       setAmount: Number(setAmount),
       exercises: routineRows.map((row) => ({
@@ -670,7 +939,6 @@ export default function PTTrainingPage() {
         weightsInvolved: row.weightsInvolved,
       })),
     });
-
     const nextDrafts = [nextDraft, ...routineDrafts];
     setRoutineDrafts(nextDrafts);
     writeLocalPTRoutineDrafts(nextDrafts);
@@ -1011,7 +1279,12 @@ export default function PTTrainingPage() {
                             <p className="pt-training-local-draft-card__title">{draft.routineName}</p>
                             <span className="pt-training-local-draft-tag">Local draft</span>
                           </div>
-                          <p className="pt-training-local-draft-card__meta">Fitness target: {draft.fitnessTarget}</p>
+                          <p className="pt-training-local-draft-card__meta">
+                            Fitness targets: {formatSummaryList(draft.fitnessTargets)}
+                          </p>
+                          <p className="pt-training-local-draft-card__meta">
+                            Fitness attributes: {formatSummaryList(draft.fitnessAttributes)}
+                          </p>
                           <p className="pt-training-local-draft-card__note">
                             Set amount: {draft.setAmount} | Exercise count: {draft.exercises.length}
                             {draft.timedByDuration ? " | Timed by duration: Yes" : " | Timed by duration: No"}
@@ -1249,7 +1522,7 @@ export default function PTTrainingPage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="pt-training-routine-dialog-title"
-            className="pt-training-modal"
+            className="pt-training-modal pt-training-routine-form"
           >
             <div className="pt-training-modal__header">
               <div className="mobile-section__copy">
@@ -1313,26 +1586,97 @@ export default function PTTrainingPage() {
                     ) : null}
                   </div>
 
-                  <div className="pt-training-builder-form__field">
-                    <label htmlFor="pt-training-routine-fitness-target">Fitness Target</label>
+                  <fieldset className="pt-training-builder-form__field pt-training-routine-form__checkbox-fieldset">
+                    <legend className="pt-training-routine-form__field-header">
+                      <span>Fitness Target</span>
+                      <button
+                        type="button"
+                        className="pt-training-routine-form__field-action mobile-focus-ring"
+                        onClick={() => {
+                          openRoutineOptionDialog("target");
+                        }}
+                      >
+                        Add Target
+                      </button>
+                    </legend>
                     <p className="pt-training-builder-form__helper">
-                      Which areas of the body or physical attributes does this routine contribute to?
+                      Which body targets does this routine contribute to?
                     </p>
-                    <textarea
-                      id="pt-training-routine-fitness-target"
-                      value={fitnessTarget}
-                      onChange={(event) => {
-                        setFitnessTarget(event.target.value);
-                        setRoutineDetailsErrors((current) => ({ ...current, fitnessTarget: undefined }));
-                      }}
-                      rows={3}
-                    />
-                    {routineDetailsErrors.fitnessTarget ? (
+                    <div className="pt-training-routine-form__checkbox-grid">
+                      {fitnessTargetOptions.map((option) => {
+                        const optionId = `pt-training-routine-target-${option.toLowerCase().replace(/\s+/g, "-")}`;
+                        const checked = fitnessTargets.some(
+                          (item) => normalizeOptionValue(item) === normalizeOptionValue(option),
+                        );
+
+                        return (
+                          <label key={option} htmlFor={optionId} className="pt-training-routine-form__checkbox-option">
+                            <input
+                              id={optionId}
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                toggleSelection(option, fitnessTargets, setFitnessTargets);
+                                setRoutineDetailsErrors((current) => ({ ...current, fitnessTargets: undefined }));
+                              }}
+                            />
+                            <span>{option}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {routineDetailsErrors.fitnessTargets ? (
                       <p className="pt-training-builder-form__error" role="alert">
-                        {routineDetailsErrors.fitnessTarget}
+                        {routineDetailsErrors.fitnessTargets}
                       </p>
                     ) : null}
-                  </div>
+                  </fieldset>
+
+                  <fieldset className="pt-training-builder-form__field pt-training-routine-form__checkbox-fieldset">
+                    <legend className="pt-training-routine-form__field-header">
+                      <span>Fitness Attributes</span>
+                      <button
+                        type="button"
+                        className="pt-training-routine-form__field-action mobile-focus-ring"
+                        onClick={() => {
+                          openRoutineOptionDialog("attribute");
+                        }}
+                      >
+                        Add Attribute
+                      </button>
+                    </legend>
+                    <p className="pt-training-builder-form__helper">
+                      Which physical attributes does this routine contribute to?
+                    </p>
+                    <div className="pt-training-routine-form__checkbox-grid">
+                      {fitnessAttributeOptions.map((option) => {
+                        const optionId = `pt-training-routine-attribute-${option.toLowerCase().replace(/\s+/g, "-")}`;
+                        const checked = fitnessAttributes.some(
+                          (item) => normalizeOptionValue(item) === normalizeOptionValue(option),
+                        );
+
+                        return (
+                          <label key={option} htmlFor={optionId} className="pt-training-routine-form__checkbox-option">
+                            <input
+                              id={optionId}
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                toggleSelection(option, fitnessAttributes, setFitnessAttributes);
+                                setRoutineDetailsErrors((current) => ({ ...current, fitnessAttributes: undefined }));
+                              }}
+                            />
+                            <span>{option}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {routineDetailsErrors.fitnessAttributes ? (
+                      <p className="pt-training-builder-form__error" role="alert">
+                        {routineDetailsErrors.fitnessAttributes}
+                      </p>
+                    ) : null}
+                  </fieldset>
 
                   <fieldset className="pt-training-builder-form__field pt-training-builder-form__toggle-field">
                     <legend>Timed by duration</legend>
@@ -1363,7 +1707,7 @@ export default function PTTrainingPage() {
                   </fieldset>
 
                   <div className="pt-training-builder-form__field">
-                    <label htmlFor="pt-training-routine-set-amount">Set Amount</label>
+                    <label htmlFor="pt-training-routine-set-amount">How many Sets?</label>
                     <input
                       id="pt-training-routine-set-amount"
                       type="number"
@@ -1396,7 +1740,7 @@ export default function PTTrainingPage() {
                       className="pt-training-modal__primary-action mobile-focus-ring"
                       onClick={handleRoutineNextPage}
                     >
-                      Next: Exercises
+                      Next: Add Exercises
                     </button>
                   </div>
                 </>
@@ -1407,132 +1751,167 @@ export default function PTTrainingPage() {
                     <h3 className="pt-training-builder-form__section-title">Routine Exercises</h3>
                   </div>
 
-                  <div className="pt-training-builder-form__exercise-list">
-                    {routineRows.map((row, index) => (
-                      <section key={row.id} className="pt-training-builder-form__exercise-row">
-                        <div className="pt-training-builder-form__exercise-row-header">
-                          <p className="pt-training-builder-form__exercise-row-title">Exercise {index + 1}</p>
-                          {routineRows.length > 1 ? (
-                            <button
-                              type="button"
-                              className="pt-training-local-draft-remove mobile-focus-ring"
-                              onClick={() => {
-                                const nextRows = routineRows.filter((item) => item.id !== row.id);
-                                setRoutineRows(nextRows);
-                                setRoutineRowErrors((current) => {
-                                  const nextErrors = { ...current };
-                                  delete nextErrors[row.id];
-                                  return nextErrors;
-                                });
-                              }}
-                            >
-                              Remove exercise row
-                            </button>
-                          ) : null}
-                        </div>
-
-                        <div className="pt-training-builder-form__field">
-                          <label htmlFor={`pt-training-routine-exercise-name-${row.id}`}>Exercise</label>
-                          <input
-                            id={`pt-training-routine-exercise-name-${row.id}`}
-                            value={row.exerciseName}
-                            onChange={(event) => {
-                              handleRoutineRowChange(row.id, "exerciseName", event.target.value);
-                            }}
-                          />
-                          {routineRowErrors[row.id]?.exerciseName ? (
-                            <p className="pt-training-builder-form__error" role="alert">
-                              {routineRowErrors[row.id]?.exerciseName}
-                            </p>
-                          ) : null}
-                        </div>
-
-                        <div className="pt-training-builder-form__field">
-                          <label htmlFor={`pt-training-routine-rep-goal-${row.id}`}>Rep Goal</label>
-                          <input
-                            id={`pt-training-routine-rep-goal-${row.id}`}
-                            type="number"
-                            inputMode="numeric"
-                            min="0"
-                            step="1"
-                            value={row.repGoal}
-                            onChange={(event) => {
-                              handleRoutineRowChange(row.id, "repGoal", sanitizeNumericInput(event.target.value));
-                            }}
-                          />
-                          {routineRowErrors[row.id]?.repGoal ? (
-                            <p className="pt-training-builder-form__error" role="alert">
-                              {routineRowErrors[row.id]?.repGoal}
-                            </p>
-                          ) : null}
-                        </div>
-
-                        <div className="pt-training-builder-form__field">
-                          <label htmlFor={`pt-training-routine-instructions-${row.id}`}>Instructions</label>
-                          <textarea
-                            id={`pt-training-routine-instructions-${row.id}`}
-                            value={row.instructions}
-                            onChange={(event) => {
-                              handleRoutineRowChange(row.id, "instructions", event.target.value);
-                            }}
-                            rows={4}
-                          />
-                          {routineRowErrors[row.id]?.instructions ? (
-                            <p className="pt-training-builder-form__error" role="alert">
-                              {routineRowErrors[row.id]?.instructions}
-                            </p>
-                          ) : null}
-                        </div>
-
-                        <fieldset className="pt-training-builder-form__field pt-training-builder-form__toggle-field">
-                          <legend>Weights Involved?</legend>
-                          <p className="pt-training-builder-form__helper">
-                            If Yes, clients will need a numeric weight input when this exercise is assigned in a future training package flow.
-                          </p>
-                          <div
-                            className="pt-training-builder-form__toggle-group"
-                            role="radiogroup"
-                            aria-label={`Weights Involved for exercise ${index + 1}`}
-                          >
-                            <label className="pt-training-builder-form__toggle">
-                              <input
-                                type="radio"
-                                name={`pt-training-routine-weights-${row.id}`}
-                                checked={row.weightsInvolved}
-                                onChange={() => {
-                                  handleRoutineRowChange(row.id, "weightsInvolved", true);
-                                }}
-                              />
-                              <span>Yes</span>
-                            </label>
-                            <label className="pt-training-builder-form__toggle">
-                              <input
-                                type="radio"
-                                name={`pt-training-routine-weights-${row.id}`}
-                                checked={!row.weightsInvolved}
-                                onChange={() => {
-                                  handleRoutineRowChange(row.id, "weightsInvolved", false);
-                                }}
-                              />
-                              <span>No</span>
-                            </label>
-                          </div>
-                        </fieldset>
-                      </section>
+                  <datalist id="pt-training-routine-exercise-suggestions">
+                    {routineExerciseSuggestions.map((option) => (
+                      <option key={option} value={option} />
                     ))}
-                  </div>
+                  </datalist>
 
-                  <div className="pt-training-builder-form__row-actions">
+                  {activeRoutineRow ? (
+                    <section className="pt-training-builder-form__exercise-row">
+                      <div className="pt-training-builder-form__exercise-row-header">
+                        <p className="pt-training-builder-form__exercise-row-title">
+                          Exercise {activeRoutineExerciseIndex + 1}
+                        </p>
+                        {routineRows.length > 1 ? (
+                          <button
+                            type="button"
+                            className="pt-training-local-draft-remove mobile-focus-ring"
+                            onClick={() => {
+                              handleRemoveRoutineExerciseRow(activeRoutineRow.id);
+                            }}
+                          >
+                            Remove exercise row
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div className="pt-training-builder-form__field">
+                        <label htmlFor={`pt-training-routine-exercise-name-${activeRoutineRow.id}`}>Exercise</label>
+                        <input
+                          id={`pt-training-routine-exercise-name-${activeRoutineRow.id}`}
+                          list="pt-training-routine-exercise-suggestions"
+                          value={activeRoutineRow.exerciseName}
+                          onChange={(event) => {
+                            handleRoutineRowChange(activeRoutineRow.id, "exerciseName", event.target.value);
+                          }}
+                        />
+                        {routineRowErrors[activeRoutineRow.id]?.exerciseName ? (
+                          <p className="pt-training-builder-form__error" role="alert">
+                            {routineRowErrors[activeRoutineRow.id]?.exerciseName}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="pt-training-builder-form__field">
+                        <label htmlFor={`pt-training-routine-rep-goal-${activeRoutineRow.id}`}>Rep Goal</label>
+                        <input
+                          id={`pt-training-routine-rep-goal-${activeRoutineRow.id}`}
+                          type="number"
+                          inputMode="numeric"
+                          min="0"
+                          step="1"
+                          value={activeRoutineRow.repGoal}
+                          onChange={(event) => {
+                            handleRoutineRowChange(
+                              activeRoutineRow.id,
+                              "repGoal",
+                              sanitizeNumericInput(event.target.value),
+                            );
+                          }}
+                        />
+                        {routineRowErrors[activeRoutineRow.id]?.repGoal ? (
+                          <p className="pt-training-builder-form__error" role="alert">
+                            {routineRowErrors[activeRoutineRow.id]?.repGoal}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="pt-training-builder-form__field">
+                        <label htmlFor={`pt-training-routine-instructions-${activeRoutineRow.id}`}>Instructions</label>
+                        <textarea
+                          id={`pt-training-routine-instructions-${activeRoutineRow.id}`}
+                          value={activeRoutineRow.instructions}
+                          onChange={(event) => {
+                            handleRoutineRowChange(activeRoutineRow.id, "instructions", event.target.value);
+                          }}
+                          rows={4}
+                        />
+                        {routineRowErrors[activeRoutineRow.id]?.instructions ? (
+                          <p className="pt-training-builder-form__error" role="alert">
+                            {routineRowErrors[activeRoutineRow.id]?.instructions}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <fieldset className="pt-training-builder-form__field pt-training-builder-form__toggle-field">
+                        <legend>Weights Involved?</legend>
+                        <p className="pt-training-builder-form__helper">
+                          If Yes, clients will need a numeric weight input when this exercise is assigned in a future training package flow.
+                        </p>
+                        <div
+                          className="pt-training-builder-form__toggle-group"
+                          role="radiogroup"
+                          aria-label={`Weights Involved for exercise ${activeRoutineExerciseIndex + 1}`}
+                        >
+                          <label className="pt-training-builder-form__toggle">
+                            <input
+                              type="radio"
+                              name={`pt-training-routine-weights-${activeRoutineRow.id}`}
+                              checked={activeRoutineRow.weightsInvolved}
+                              onChange={() => {
+                                handleRoutineRowChange(activeRoutineRow.id, "weightsInvolved", true);
+                              }}
+                            />
+                            <span>Yes</span>
+                          </label>
+                          <label className="pt-training-builder-form__toggle">
+                            <input
+                              type="radio"
+                              name={`pt-training-routine-weights-${activeRoutineRow.id}`}
+                              checked={!activeRoutineRow.weightsInvolved}
+                              onChange={() => {
+                                handleRoutineRowChange(activeRoutineRow.id, "weightsInvolved", false);
+                              }}
+                            />
+                            <span>No</span>
+                          </label>
+                        </div>
+                      </fieldset>
+                    </section>
+                  ) : null}
+
+                  <div className="pt-training-routine-form__add-exercise-wrap">
                     <button
                       type="button"
                       className="pt-training-modal__secondary-action mobile-focus-ring"
-                      onClick={() => {
-                        setRoutineRows((current) => [...current, createRoutineExerciseRow()]);
-                      }}
+                      onClick={handleAddRoutineExerciseRow}
                     >
-                      Add exercise row
+                      Add Another Exercise
                     </button>
                   </div>
+
+                  {routineRows.length > 1 ? (
+                    <div className="pt-training-routine-form__exercise-nav">
+                      <button
+                        type="button"
+                        className="pt-training-routine-form__exercise-nav-button mobile-focus-ring"
+                        onClick={() => {
+                          setActiveRoutineExerciseIndex((current) => Math.max(0, current - 1));
+                        }}
+                        disabled={activeRoutineExerciseIndex === 0}
+                        aria-label="Previous exercise"
+                      >
+                        <ExerciseArrowIcon direction="left" />
+                      </button>
+                      <p className="pt-training-routine-form__exercise-index">
+                        Exercise {activeRoutineExerciseIndex + 1} of {routineRows.length}
+                      </p>
+                      <button
+                        type="button"
+                        className="pt-training-routine-form__exercise-nav-button mobile-focus-ring"
+                        onClick={() => {
+                          setActiveRoutineExerciseIndex((current) =>
+                            Math.min(routineRows.length - 1, current + 1),
+                          );
+                        }}
+                        disabled={activeRoutineExerciseIndex === routineRows.length - 1}
+                        aria-label="Next exercise"
+                      >
+                        <ExerciseArrowIcon direction="right" />
+                      </button>
+                    </div>
+                  ) : null}
 
                   <div className="pt-training-modal__actions">
                     <button
@@ -1561,6 +1940,89 @@ export default function PTTrainingPage() {
                   </div>
                 </>
               )}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {routineOptionDialogKind ? (
+        <div
+          className="pt-training-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeRoutineOptionDialog();
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={
+              routineOptionDialogKind === "target"
+                ? "pt-training-add-target-dialog-title"
+                : "pt-training-add-attribute-dialog-title"
+            }
+            className="pt-training-modal pt-training-routine-form__add-option-dialog"
+          >
+            <div className="pt-training-modal__header">
+              <div className="mobile-section__copy">
+                <p className="mobile-section__eyebrow">Local-only option</p>
+                <h2
+                  id={
+                    routineOptionDialogKind === "target"
+                      ? "pt-training-add-target-dialog-title"
+                      : "pt-training-add-attribute-dialog-title"
+                  }
+                  className="mobile-section__title"
+                >
+                  {routineOptionDialogKind === "target" ? "Add Fitness Target" : "Add Fitness Attribute"}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="pt-training-modal__secondary-action mobile-focus-ring"
+                onClick={closeRoutineOptionDialog}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="pt-training-modal__form pt-training-builder-form">
+              <div className="pt-training-builder-form__field">
+                <label htmlFor="pt-training-routine-option-value">
+                  {routineOptionDialogKind === "target" ? "Body target" : "Physical attribute"}
+                </label>
+                <input
+                  id="pt-training-routine-option-value"
+                  value={routineOptionValue}
+                  onChange={(event) => {
+                    setRoutineOptionValue(event.target.value);
+                    setRoutineOptionError(null);
+                  }}
+                />
+                {routineOptionError ? (
+                  <p className="pt-training-builder-form__error" role="alert">
+                    {routineOptionError}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="pt-training-modal__actions">
+                <button
+                  type="button"
+                  className="pt-training-modal__secondary-action mobile-focus-ring"
+                  onClick={closeRoutineOptionDialog}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="pt-training-modal__primary-action mobile-focus-ring"
+                  onClick={handleAddRoutineOption}
+                >
+                  {routineOptionDialogKind === "target" ? "Add Target" : "Add Attribute"}
+                </button>
+              </div>
             </div>
           </section>
         </div>
