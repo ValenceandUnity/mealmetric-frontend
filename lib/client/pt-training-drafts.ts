@@ -32,6 +32,11 @@ export type LocalPTRoutineExerciseDraft = {
 
 export type LocalPTRoutineDraftPublishStatus = "draft" | "ready";
 export type LocalPTRoutineDraftPublishTargetType = "existing-folder" | "local-folder-draft";
+export type LocalPTRoutineDraftPublishTarget = {
+  type: LocalPTRoutineDraftPublishTargetType;
+  id?: string;
+  name: string;
+};
 
 export type LocalPTRoutineDraft = {
   id: string;
@@ -46,6 +51,7 @@ export type LocalPTRoutineDraft = {
   createdAt: string;
   editedAt?: string;
   publishStatus?: LocalPTRoutineDraftPublishStatus;
+  publishTargets?: LocalPTRoutineDraftPublishTarget[];
   publishTargetType?: LocalPTRoutineDraftPublishTargetType;
   publishTargetId?: string;
   publishTargetName?: string;
@@ -134,6 +140,33 @@ export function readLocalPTRoutineDrafts(): LocalPTRoutineDraft[] {
       return [];
     }
 
+    const publishTargets: LocalPTRoutineDraftPublishTarget[] = Array.isArray(draft.publishTargets)
+      ? draft.publishTargets.reduce<LocalPTRoutineDraftPublishTarget[]>((next, target) => {
+          if (!target || typeof target.name !== "string" || target.name.trim().length === 0) {
+            return next;
+          }
+
+          next.push({
+            type:
+              target.type === "local-folder-draft"
+                ? "local-folder-draft"
+                : "existing-folder",
+            id: target.id?.trim() || undefined,
+            name: target.name.trim(),
+          });
+          return next;
+        }, [])
+      : typeof draft.publishTargetName === "string" && draft.publishTargetName.trim().length > 0
+        ? [{
+            type:
+              draft.publishTargetType === "local-folder-draft"
+                ? "local-folder-draft"
+                : "existing-folder",
+            id: draft.publishTargetId?.trim() || undefined,
+            name: draft.publishTargetName.trim(),
+          }]
+        : [];
+
     return [{
       ...draft,
       routineName: draft.routineName?.trim() ?? "",
@@ -157,7 +190,9 @@ export function readLocalPTRoutineDrafts(): LocalPTRoutineDraft[] {
         : [],
       createdAt: draft.createdAt ?? new Date().toISOString(),
       editedAt: draft.editedAt ?? draft.createdAt,
-      publishStatus: draft.publishStatus === "ready" ? "ready" : "draft",
+      publishStatus:
+        draft.publishStatus === "ready" || publishTargets.length > 0 ? "ready" : "draft",
+      publishTargets,
       publishTargetType:
         draft.publishTargetType === "existing-folder" || draft.publishTargetType === "local-folder-draft"
           ? draft.publishTargetType
@@ -184,12 +219,28 @@ export function createLocalPTRoutineDraft(input: {
   createdAt?: string;
   editedAt?: string;
   publishStatus?: LocalPTRoutineDraftPublishStatus;
+  publishTargets?: LocalPTRoutineDraftPublishTarget[];
   publishTargetType?: LocalPTRoutineDraftPublishTargetType;
   publishTargetId?: string;
   publishTargetName?: string;
 }): LocalPTRoutineDraft {
   const createdAt = input.createdAt ?? new Date().toISOString();
   const editedAt = input.editedAt ?? createdAt;
+  const publishTargets: LocalPTRoutineDraftPublishTarget[] = Array.isArray(input.publishTargets)
+    ? input.publishTargets.reduce<LocalPTRoutineDraftPublishTarget[]>((next, target) => {
+        const name = target.name.trim();
+        if (!name) {
+          return next;
+        }
+
+        next.push({
+          type: target.type,
+          id: target.id?.trim() || undefined,
+          name,
+        });
+        return next;
+      }, [])
+    : [];
 
   return {
     id: input.id ?? createLocalPTDraftId(),
@@ -210,6 +261,7 @@ export function createLocalPTRoutineDraft(input: {
     createdAt,
     editedAt,
     publishStatus: input.publishStatus ?? "draft",
+    publishTargets,
     publishTargetType: input.publishTargetType,
     publishTargetId: input.publishTargetId?.trim() || undefined,
     publishTargetName: input.publishTargetName?.trim() || undefined,

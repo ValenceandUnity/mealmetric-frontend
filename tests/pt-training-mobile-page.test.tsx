@@ -388,6 +388,8 @@ describe("PTTrainingPage mobile experience", () => {
     expect(screen.getByText("Fitness Attributes")).toBeTruthy();
     expect(screen.getByText("Timed by duration")).toBeTruthy();
     expect(screen.getByLabelText("How many Sets?")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Next: Add Exercises" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Review Exercises" })).toBeNull();
     expect(screen.queryByLabelText("Set Amount")).toBeNull();
     expect(screen.queryByRole("textbox", { name: "Fitness Target" })).toBeNull();
     expect(screen.queryByRole("textbox", { name: "Fitness Attributes" })).toBeNull();
@@ -657,7 +659,7 @@ describe("PTTrainingPage mobile experience", () => {
     expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
   });
 
-  it("edits existing routine drafts, stages publish targets locally, and confirms removal without touching fetched folder data", async () => {
+  it("supports edit-mode save draft, review exercises, multi-folder publish staging, and remove confirmation without extra fetches", async () => {
     mockTrainingFetches();
     window.localStorage.setItem(
       PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY,
@@ -706,14 +708,50 @@ describe("PTTrainingPage mobile experience", () => {
     });
 
     expect((screen.getByLabelText("Routine name") as HTMLInputElement).value).toBe("Original Builder");
+    expect(screen.queryByRole("button", { name: "Next: Add Exercises" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Review Exercises" })).toBeTruthy();
+    const editModeActions = screen.getByRole("button", { name: "Save Draft" }).closest("div");
+    expect(editModeActions?.className).toContain("pt-training-modal__actions--centered");
+    expect(
+      within(editModeActions as HTMLElement)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Save Draft", "Cancel", "Review Exercises"]);
+
     fireEvent.change(screen.getByLabelText("Routine name"), {
       target: { value: "Updated Builder" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Next: Add Exercises" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
+
+    expect(screen.getByRole("dialog", { name: "Create a Routine" })).toBeTruthy();
+    expect(screen.queryByText("Routine Exercises")).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
+    expect(
+      JSON.parse(window.localStorage.getItem(PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY) ?? "[]"),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          routineName: "Updated Builder",
+          editedAt: expect.any(String),
+        }),
+      ]),
+    );
+    expect(
+      JSON.parse(window.localStorage.getItem(PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY) ?? "[]"),
+    ).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Review Exercises" }));
 
     await waitFor(() => {
       expect(screen.getByText("Routine Exercises")).toBeTruthy();
     });
+
+    const pageTwoActions = screen.getByRole("button", { name: "Back" }).closest("div");
+    expect(
+      within(pageTwoActions as HTMLElement)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Back", "Cancel", "Save Routine Draft"]);
 
     fireEvent.change(screen.getByLabelText("Instructions"), {
       target: { value: "Drive through the full range." },
@@ -734,18 +772,62 @@ describe("PTTrainingPage mobile experience", () => {
       expect(screen.getByRole("dialog", { name: "Publish Routine" })).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole("radio", { name: "Existing portfolio folder" }));
-    fireEvent.change(screen.getByLabelText("Portfolio folder"), {
-      target: { value: "folder-2" },
+    const publishDialog = screen.getByRole("dialog", { name: "Publish Routine" });
+    expect(screen.queryByText("Send to")).toBeNull();
+    expect(within(publishDialog).getByRole("button", { name: "Select Portfolio Folder" })).toBeTruthy();
+    expect(within(publishDialog).queryByLabelText("Local folder name")).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Create a Routine" })).toBeNull();
+
+    fireEvent.click(within(publishDialog).getByRole("button", { name: "Publish Routine" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Select at least one portfolio folder.")).toBeTruthy();
     });
-    fireEvent.click(screen.getByRole("button", { name: "Mark Ready to Publish" }));
+
+    fireEvent.click(within(publishDialog).getByRole("button", { name: "Select Portfolio Folder" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Select Portfolio Folder" })).toBeTruthy();
+    });
+
+    const folderPicker = screen.getByRole("dialog", { name: "Select Portfolio Folder" });
+    const strengthCheckbox = within(folderPicker).getByRole("checkbox", { name: "Strength" });
+    const recoveryCheckbox = within(folderPicker).getByRole("checkbox", { name: "Recovery" });
+    fireEvent.click(strengthCheckbox);
+    fireEvent.click(recoveryCheckbox);
+
+    fireEvent.click(within(folderPicker).getByRole("button", { name: "Add New Folder" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Add New Folder" })).toBeTruthy();
+    });
+
+    const addNewFolderDialog = screen.getByRole("dialog", { name: "Add New Folder" });
+    fireEvent.change(within(addNewFolderDialog).getByLabelText("Folder name"), {
+      target: { value: "Mobility Builder" },
+    });
+    fireEvent.click(within(addNewFolderDialog).getByRole("button", { name: "Add Folder" }));
+
+    await waitFor(() => {
+      expect(within(folderPicker).getByRole("checkbox", { name: /Mobility Builder/i })).toBeTruthy();
+    });
+
+    expect(within(folderPicker).getByText("Local folder draft")).toBeTruthy();
+    expect(
+      (within(folderPicker).getByRole("checkbox", { name: /Mobility Builder/i }) as HTMLInputElement).checked,
+    ).toBe(true);
+
+    fireEvent.click(within(folderPicker).getByRole("button", { name: "Done" }));
+    fireEvent.click(within(publishDialog).getByRole("button", { name: "Publish Routine" }));
 
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "Publish Routine" })).toBeNull();
     });
 
     expect(screen.getByText("Ready to publish")).toBeTruthy();
-    expect(screen.getByText("Portfolio: Recovery")).toBeTruthy();
+    expect(screen.getByText("Portfolio folders: Strength, Recovery, Mobility Builder")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Strength" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Recovery" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove local routine draft Updated Builder" }));
 
@@ -774,6 +856,53 @@ describe("PTTrainingPage mobile experience", () => {
     expect(
       JSON.parse(window.localStorage.getItem(PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY) ?? "[]"),
     ).toEqual([]);
+  });
+
+  it("renders legacy single-target publish staging safely for older local routine drafts", async () => {
+    mockTrainingFetches();
+    window.localStorage.setItem(
+      PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY,
+      JSON.stringify([
+        {
+          id: "legacy-routine-draft-1",
+          type: "routine",
+          routineName: "Legacy Builder",
+          description: "Legacy draft shape",
+          fitnessTargets: ["Back"],
+          fitnessAttributes: ["Strength"],
+          timedByDuration: false,
+          setAmount: 4,
+          exercises: [
+            {
+              id: "legacy-exercise-row-1",
+              exerciseName: "Row",
+              repGoal: 10,
+              instructions: "Pull through the elbows.",
+              weightsInvolved: true,
+            },
+          ],
+          createdAt: "2026-06-01T12:00:00.000Z",
+          publishStatus: "ready",
+          publishTargetType: "local-folder-draft",
+          publishTargetName: "Legacy Folder",
+        },
+      ]),
+    );
+
+    render(React.createElement(PTTrainingPage));
+
+    await waitFor(() => {
+      expect(screen.getByText("Routine Draft Queue (1)")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Show routine draft queue" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Legacy Builder")).toBeTruthy();
+    });
+
+    expect(screen.getByText("Ready to publish")).toBeTruthy();
+    expect(screen.getByText("Portfolio folders: Legacy Folder")).toBeTruthy();
   });
 
   it("filters real folders locally without issuing new requests", async () => {
