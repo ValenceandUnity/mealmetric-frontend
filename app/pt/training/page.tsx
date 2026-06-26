@@ -22,6 +22,7 @@ import {
   type LocalPTExerciseDraft,
   type LocalPTFolderDraft,
   type LocalPTRoutineDraft,
+  type LocalPTRoutineDraftPublishTarget,
   writeLocalPTCustomFitnessAttributes,
   writeLocalPTCustomFitnessTargets,
   writeLocalPTExerciseDrafts,
@@ -120,9 +121,15 @@ type RoutineExerciseRowErrors = {
 type RoutineOptionDialogKind = "target" | "attribute" | null;
 type RoutineDraftPublishDialogState = {
   draftId: string;
-  targetType: "existing-folder" | "local-folder-draft";
-  targetFolderId: string;
-  targetFolderName: string;
+  selectedTargets: LocalPTRoutineDraftPublishTarget[];
+  localFolderOptions: Array<{
+    id: string;
+    name: string;
+  }>;
+  folderPickerOpen: boolean;
+  newFolderDialogOpen: boolean;
+  newFolderName: string;
+  newFolderError: string | null;
 } | null;
 
 const EMPTY_SECTION_ERRORS: SectionErrors = {
@@ -286,6 +293,46 @@ function formatDraftTimestamp(value: string | undefined) {
     day: "numeric",
     year: "numeric",
   }).format(parsed);
+}
+
+function dedupePublishTargets(targets: LocalPTRoutineDraftPublishTarget[]) {
+  const seen = new Set<string>();
+  const next: LocalPTRoutineDraftPublishTarget[] = [];
+
+  targets.forEach((target) => {
+    const name = target.name.trim();
+    if (!name) {
+      return;
+    }
+
+    const key = `${target.type}:${target.id?.trim() || normalizeOptionValue(name)}`;
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    next.push({
+      type: target.type,
+      id: target.id?.trim() || undefined,
+      name,
+    });
+  });
+
+  return next;
+}
+
+function formatPublishTargetsSummary(targets: LocalPTRoutineDraftPublishTarget[]) {
+  const names = dedupePublishTargets(targets).map((target) => target.name);
+
+  if (names.length === 0) {
+    return "Unassigned";
+  }
+
+  if (names.length <= 3) {
+    return names.join(", ");
+  }
+
+  return `${names.slice(0, 3).join(", ")} +${names.length - 3} more`;
 }
 
 function createRoutineExerciseRow(): RoutineExerciseRow {
@@ -461,6 +508,27 @@ export default function PTTrainingPage() {
       }
 
       if (routineDraftPublishDialog) {
+        if (routineDraftPublishDialog.newFolderDialogOpen) {
+          setRoutineDraftPublishDialog({
+            ...routineDraftPublishDialog,
+            newFolderDialogOpen: false,
+            newFolderName: "",
+            newFolderError: null,
+          });
+          return;
+        }
+
+        if (routineDraftPublishDialog.folderPickerOpen) {
+          setRoutineDraftPublishDialog({
+            ...routineDraftPublishDialog,
+            folderPickerOpen: false,
+            newFolderDialogOpen: false,
+            newFolderName: "",
+            newFolderError: null,
+          });
+          return;
+        }
+
         setRoutineDraftPublishDialog(null);
         setRoutineDraftPublishError(null);
         return;
@@ -639,6 +707,7 @@ export default function PTTrainingPage() {
   }, [exerciseDrafts, routineDrafts, routineRows, view.packageCards, view.routineCards]);
 
   const activeRoutineRow = routineRows[activeRoutineExerciseIndex] ?? null;
+  const isRoutineEditMode = editingRoutineDraftId !== null;
   const publishingRoutineDraft = routineDraftPublishDialog
     ? routineDrafts.find((draft) => draft.id === routineDraftPublishDialog.draftId) ?? null
     : null;
@@ -990,6 +1059,62 @@ export default function PTTrainingPage() {
     }
   }
 
+  function buildRoutineDraft(
+    existingDraft: LocalPTRoutineDraft | null,
+    overrides?: {
+      publishStatus?: "draft" | "ready";
+      publishTargets?: LocalPTRoutineDraftPublishTarget[];
+      editedAt?: string;
+    },
+  ) {
+    return createLocalPTRoutineDraft({
+      id: existingDraft?.id,
+      routineName,
+      description: routineDescription,
+      fitnessTargets,
+      fitnessAttributes,
+      timedByDuration,
+      setAmount: Number(setAmount),
+      exercises: routineRows.map((row) => ({
+        id: row.id,
+        exerciseName: row.exerciseName,
+        repGoal: Number(row.repGoal),
+        instructions: row.instructions,
+        weightsInvolved: row.weightsInvolved,
+      })),
+      createdAt: existingDraft?.createdAt,
+      editedAt: overrides?.editedAt ?? new Date().toISOString(),
+      publishStatus: overrides?.publishStatus ?? existingDraft?.publishStatus,
+      publishTargets: overrides?.publishTargets ?? existingDraft?.publishTargets,
+    });
+  }
+
+  function saveRoutineDraftRecord(nextDraft: LocalPTRoutineDraft) {
+    const nextDrafts = routineDrafts.some((draft) => draft.id === nextDraft.id)
+      ? routineDrafts.map((draft) => (draft.id === nextDraft.id ? nextDraft : draft))
+      : [nextDraft, ...routineDrafts];
+    setRoutineDrafts(nextDrafts);
+    writeLocalPTRoutineDrafts(nextDrafts);
+  }
+
+  function handleSaveRoutineDetailsDraft() {
+    if (!isRoutineEditMode) {
+      return;
+    }
+
+    const existingDraft = routineDrafts.find((draft) => draft.id === editingRoutineDraftId) ?? null;
+    if (!existingDraft) {
+      return;
+    }
+
+    if (!validateRoutineDetails()) {
+      return;
+    }
+
+    const nextDraft = buildRoutineDraft(existingDraft);
+    saveRoutineDraftRecord(nextDraft);
+  }
+
   function handleSaveRoutineDraft() {
     const detailsValid = validateRoutineDetails();
     const nextRowErrors = validateRoutineRows();
@@ -1016,33 +1141,8 @@ export default function PTTrainingPage() {
       editingRoutineDraftId !== null
         ? routineDrafts.find((draft) => draft.id === editingRoutineDraftId) ?? null
         : null;
-    const nextDraft = createLocalPTRoutineDraft({
-      id: existingDraft?.id,
-      routineName,
-      description: routineDescription,
-      fitnessTargets,
-      fitnessAttributes,
-      timedByDuration,
-      setAmount: Number(setAmount),
-      exercises: routineRows.map((row) => ({
-        id: row.id,
-        exerciseName: row.exerciseName,
-        repGoal: Number(row.repGoal),
-        instructions: row.instructions,
-        weightsInvolved: row.weightsInvolved,
-      })),
-      createdAt: existingDraft?.createdAt,
-      editedAt: new Date().toISOString(),
-      publishStatus: existingDraft?.publishStatus,
-      publishTargetType: existingDraft?.publishTargetType,
-      publishTargetId: existingDraft?.publishTargetId,
-      publishTargetName: existingDraft?.publishTargetName,
-    });
-    const nextDrafts = existingDraft
-      ? routineDrafts.map((draft) => (draft.id === existingDraft.id ? nextDraft : draft))
-      : [nextDraft, ...routineDrafts];
-    setRoutineDrafts(nextDrafts);
-    writeLocalPTRoutineDrafts(nextDrafts);
+    const nextDraft = buildRoutineDraft(existingDraft);
+    saveRoutineDraftRecord(nextDraft);
     closeRoutineDialog();
   }
 
@@ -1050,6 +1150,10 @@ export default function PTTrainingPage() {
     const nextDrafts = routineDrafts.filter((draft) => draft.id !== draftId);
     setRoutineDrafts(nextDrafts);
     writeLocalPTRoutineDrafts(nextDrafts);
+
+    if (editingRoutineDraftId === draftId) {
+      closeRoutineDialog();
+    }
   }
 
   function openRoutineDraftRemovalDialog(draft: LocalPTRoutineDraft) {
@@ -1070,25 +1174,20 @@ export default function PTTrainingPage() {
   }
 
   function openRoutineDraftPublishDialog(draft: LocalPTRoutineDraft) {
-    const hasPortfolioFolders = portfolioFolderOptions.length > 0;
-    const targetType =
-      draft.publishTargetType === "existing-folder" && hasPortfolioFolders
-        ? "existing-folder"
-        : draft.publishTargetType === "local-folder-draft"
-          ? "local-folder-draft"
-          : hasPortfolioFolders
-            ? "existing-folder"
-            : "local-folder-draft";
-
     setRoutineDraftPublishError(null);
     setRoutineDraftPublishDialog({
       draftId: draft.id,
-      targetType,
-      targetFolderId:
-        targetType === "existing-folder"
-          ? draft.publishTargetId ?? portfolioFolderOptions[0]?.id ?? ""
-          : draft.publishTargetId ?? "",
-      targetFolderName: targetType === "local-folder-draft" ? draft.publishTargetName ?? "" : "",
+      selectedTargets: dedupePublishTargets(draft.publishTargets ?? []),
+      localFolderOptions: dedupePublishTargets(
+        (draft.publishTargets ?? []).filter((target) => target.type === "local-folder-draft"),
+      ).map((target) => ({
+        id: target.id ?? createLocalPTDraftId(),
+        name: target.name,
+      })),
+      folderPickerOpen: false,
+      newFolderDialogOpen: false,
+      newFolderName: "",
+      newFolderError: null,
     });
   }
 
@@ -1104,50 +1203,176 @@ export default function PTTrainingPage() {
     setRoutineDraftPublishError(null);
   }
 
+  function toggleRoutineDraftPublishTarget(target: LocalPTRoutineDraftPublishTarget) {
+    updateRoutineDraftPublishDialog((current) => {
+      const matchIndex = current.selectedTargets.findIndex((item) => {
+        if (item.type !== target.type) {
+          return false;
+        }
+
+        if (target.type === "existing-folder") {
+          return item.id === target.id;
+        }
+
+        return normalizeOptionValue(item.name) === normalizeOptionValue(target.name);
+      });
+
+      if (matchIndex >= 0) {
+        return {
+          ...current,
+          selectedTargets: current.selectedTargets.filter((_, index) => index !== matchIndex),
+        };
+      }
+
+      return {
+        ...current,
+        selectedTargets: dedupePublishTargets([...current.selectedTargets, target]),
+      };
+    });
+  }
+
+  function hasSelectedRoutineDraftPublishTarget(target: LocalPTRoutineDraftPublishTarget) {
+    if (!routineDraftPublishDialog) {
+      return false;
+    }
+
+    return routineDraftPublishDialog.selectedTargets.some((item) => {
+      if (item.type !== target.type) {
+        return false;
+      }
+
+      if (target.type === "existing-folder") {
+        return item.id === target.id;
+      }
+
+      return normalizeOptionValue(item.name) === normalizeOptionValue(target.name);
+    });
+  }
+
+  function closeRoutineDraftFolderPicker() {
+    updateRoutineDraftPublishDialog((current) => ({
+      ...current,
+      folderPickerOpen: false,
+      newFolderDialogOpen: false,
+      newFolderName: "",
+      newFolderError: null,
+    }));
+  }
+
+  function openRoutineDraftNewFolderDialog() {
+    updateRoutineDraftPublishDialog((current) => ({
+      ...current,
+      folderPickerOpen: true,
+      newFolderDialogOpen: true,
+      newFolderName: "",
+      newFolderError: null,
+    }));
+  }
+
+  function closeRoutineDraftNewFolderDialog() {
+    updateRoutineDraftPublishDialog((current) => ({
+      ...current,
+      newFolderDialogOpen: false,
+      newFolderName: "",
+      newFolderError: null,
+    }));
+  }
+
+  function handleAddRoutineDraftPublishFolder() {
+    if (!routineDraftPublishDialog) {
+      return;
+    }
+
+    const folderName = routineDraftPublishDialog.newFolderName.trim();
+    if (!folderName) {
+      updateRoutineDraftPublishDialog((current) => ({
+        ...current,
+        newFolderError: "Folder name is required.",
+      }));
+      return;
+    }
+
+    const existingNames = [
+      ...portfolioFolderOptions.map((folder) => folder.title),
+      ...routineDraftPublishDialog.localFolderOptions.map((folder) => folder.name),
+    ];
+    if (
+      existingNames.some(
+        (name) => normalizeOptionValue(name) === normalizeOptionValue(folderName),
+      )
+    ) {
+      updateRoutineDraftPublishDialog((current) => ({
+        ...current,
+        newFolderError: "That folder name already exists.",
+      }));
+      return;
+    }
+
+    const nextFolder = {
+      id: createLocalPTDraftId(),
+      name: folderName,
+    };
+
+    updateRoutineDraftPublishDialog((current) => ({
+      ...current,
+      localFolderOptions: [...current.localFolderOptions, nextFolder],
+      selectedTargets: dedupePublishTargets([
+        ...current.selectedTargets,
+        {
+          type: "local-folder-draft",
+          id: nextFolder.id,
+          name: nextFolder.name,
+        },
+      ]),
+      newFolderDialogOpen: false,
+      newFolderName: "",
+      newFolderError: null,
+    }));
+  }
+
   function confirmRoutineDraftPublish() {
     if (!routineDraftPublishDialog || !publishingRoutineDraft) {
       closeRoutineDraftPublishDialog();
       return;
     }
 
-    if (routineDraftPublishDialog.targetType === "existing-folder") {
-      const selectedFolder = portfolioFolderOptions.find(
-        (folder) => folder.id === routineDraftPublishDialog.targetFolderId,
-      );
+    const selectedTargets = dedupePublishTargets(
+      routineDraftPublishDialog.selectedTargets,
+    ).reduce<LocalPTRoutineDraftPublishTarget[]>((next, target) => {
+      if (target.type === "existing-folder") {
+        const selectedFolder = portfolioFolderOptions.find((folder) => folder.id === target.id);
+        if (!selectedFolder) {
+          return next;
+        }
 
-      if (!selectedFolder) {
-        setRoutineDraftPublishError("Select an existing portfolio folder.");
-        return;
+        next.push({
+          type: "existing-folder",
+          id: selectedFolder.id,
+          name: selectedFolder.title,
+        });
+        return next;
       }
 
-      const nextDraft = createLocalPTRoutineDraft({
-        id: publishingRoutineDraft.id,
-        routineName: publishingRoutineDraft.routineName,
-        description: publishingRoutineDraft.description,
-        fitnessTargets: publishingRoutineDraft.fitnessTargets,
-        fitnessAttributes: publishingRoutineDraft.fitnessAttributes,
-        timedByDuration: publishingRoutineDraft.timedByDuration,
-        setAmount: publishingRoutineDraft.setAmount,
-        exercises: publishingRoutineDraft.exercises,
-        createdAt: publishingRoutineDraft.createdAt,
-        editedAt: new Date().toISOString(),
-        publishStatus: "ready",
-        publishTargetType: "existing-folder",
-        publishTargetId: selectedFolder.id,
-        publishTargetName: selectedFolder.title,
-      });
-      const nextDrafts = routineDrafts.map((draft) =>
-        draft.id === publishingRoutineDraft.id ? nextDraft : draft,
+      const localFolder = routineDraftPublishDialog.localFolderOptions.find(
+        (folder) =>
+          folder.id === target.id ||
+          normalizeOptionValue(folder.name) === normalizeOptionValue(target.name),
       );
-      setRoutineDrafts(nextDrafts);
-      writeLocalPTRoutineDrafts(nextDrafts);
-      closeRoutineDraftPublishDialog();
-      return;
-    }
+      const name = localFolder?.name ?? target.name;
+      if (!name.trim()) {
+        return next;
+      }
 
-    const localFolderName = routineDraftPublishDialog.targetFolderName.trim();
-    if (!localFolderName) {
-      setRoutineDraftPublishError("Enter a local folder name.");
+      next.push({
+        type: "local-folder-draft",
+        id: localFolder?.id ?? target.id,
+        name,
+      });
+      return next;
+    }, []);
+
+    if (selectedTargets.length === 0) {
+      setRoutineDraftPublishError("Select at least one portfolio folder.");
       return;
     }
 
@@ -1163,14 +1388,9 @@ export default function PTTrainingPage() {
       createdAt: publishingRoutineDraft.createdAt,
       editedAt: new Date().toISOString(),
       publishStatus: "ready",
-      publishTargetType: "local-folder-draft",
-      publishTargetName: localFolderName,
+      publishTargets: selectedTargets,
     });
-    const nextDrafts = routineDrafts.map((draft) =>
-      draft.id === publishingRoutineDraft.id ? nextDraft : draft,
-    );
-    setRoutineDrafts(nextDrafts);
-    writeLocalPTRoutineDrafts(nextDrafts);
+    saveRoutineDraftRecord(nextDraft);
     closeRoutineDraftPublishDialog();
   }
 
@@ -1559,7 +1779,7 @@ export default function PTTrainingPage() {
                                     Ready to publish
                                   </p>
                                   <p className="pt-training-local-draft-card__portfolio">
-                                    Portfolio: {draft.publishTargetName ?? "Unassigned"}
+                                    Portfolio folders: {formatPublishTargetsSummary(draft.publishTargets ?? [])}
                                   </p>
                                 </>
                               ) : null}
@@ -2014,22 +2234,48 @@ export default function PTTrainingPage() {
                     ) : null}
                   </div>
 
-                  <div className="pt-training-modal__actions">
-                    <button
-                      type="button"
-                      className="pt-training-modal__secondary-action mobile-focus-ring"
-                      onClick={closeRoutineDialog}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="pt-training-modal__primary-action mobile-focus-ring"
-                      onClick={handleRoutineNextPage}
-                    >
-                      Next: Add Exercises
-                    </button>
-                  </div>
+                  {isRoutineEditMode ? (
+                    <div className="pt-training-modal__actions pt-training-modal__actions--centered pt-training-routine-form__actions--edit-page-one">
+                      <button
+                        type="button"
+                        className="pt-training-modal__secondary-action pt-training-routine-form__save-draft-button mobile-focus-ring"
+                        onClick={handleSaveRoutineDetailsDraft}
+                      >
+                        Save Draft
+                      </button>
+                      <button
+                        type="button"
+                        className="pt-training-modal__secondary-action mobile-focus-ring"
+                        onClick={closeRoutineDialog}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="pt-training-modal__primary-action mobile-focus-ring"
+                        onClick={handleRoutineNextPage}
+                      >
+                        Review Exercises
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="pt-training-modal__actions">
+                      <button
+                        type="button"
+                        className="pt-training-modal__secondary-action mobile-focus-ring"
+                        onClick={closeRoutineDialog}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="pt-training-modal__primary-action mobile-focus-ring"
+                        onClick={handleRoutineNextPage}
+                      >
+                        Next: Add Exercises
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
@@ -2332,82 +2578,194 @@ export default function PTTrainingPage() {
                 </h3>
               </div>
 
-              <fieldset className="pt-training-builder-form__field pt-training-builder-form__toggle-field">
-                <legend>Send to</legend>
-                <div
-                  className="pt-training-builder-form__toggle-group"
-                  role="radiogroup"
-                  aria-label="Routine draft publish target"
+              <div className="pt-training-builder-form__field">
+                <button
+                  type="button"
+                  className="pt-training-local-draft-action pt-training-publish-dialog__select-folder-button mobile-focus-ring"
+                  aria-haspopup="dialog"
+                  aria-expanded={routineDraftPublishDialog.folderPickerOpen}
+                  aria-controls="pt-training-publish-folder-picker"
+                  onClick={() => {
+                    updateRoutineDraftPublishDialog((current) => ({
+                      ...current,
+                      folderPickerOpen: true,
+                    }));
+                  }}
                 >
-                  {portfolioFolderOptions.length > 0 ? (
-                    <label className="pt-training-builder-form__toggle">
-                      <input
-                        type="radio"
-                        name="pt-training-routine-publish-target"
-                        checked={routineDraftPublishDialog.targetType === "existing-folder"}
-                        onChange={() => {
-                          updateRoutineDraftPublishDialog((current) => ({
-                            ...current,
-                            targetType: "existing-folder",
-                            targetFolderId: current.targetFolderId || portfolioFolderOptions[0]?.id || "",
-                          }));
-                        }}
-                      />
-                      <span>Existing portfolio folder</span>
-                    </label>
-                  ) : null}
-                  <label className="pt-training-builder-form__toggle">
-                    <input
-                      type="radio"
-                      name="pt-training-routine-publish-target"
-                      checked={routineDraftPublishDialog.targetType === "local-folder-draft"}
-                      onChange={() => {
-                        updateRoutineDraftPublishDialog((current) => ({
-                          ...current,
-                          targetType: "local-folder-draft",
-                        }));
-                      }}
-                    />
-                    <span>New local folder</span>
-                  </label>
-                </div>
-              </fieldset>
+                  Select Portfolio Folder
+                </button>
+                <p className="pt-training-builder-form__helper">
+                  Selected folders: {formatPublishTargetsSummary(routineDraftPublishDialog.selectedTargets)}
+                </p>
+              </div>
 
-              {routineDraftPublishDialog.targetType === "existing-folder" ? (
-                <div className="pt-training-builder-form__field">
-                  <label htmlFor="pt-training-routine-publish-folder">Portfolio folder</label>
-                  <select
-                    id="pt-training-routine-publish-folder"
-                    value={routineDraftPublishDialog.targetFolderId}
-                    onChange={(event) => {
-                      updateRoutineDraftPublishDialog((current) => ({
-                        ...current,
-                        targetFolderId: event.target.value,
-                      }));
-                    }}
-                  >
-                    {portfolioFolderOptions.map((folder) => (
-                      <option key={folder.id} value={folder.id}>
-                        {folder.title}
-                      </option>
+              {routineDraftPublishDialog.folderPickerOpen ? (
+                <section
+                  id="pt-training-publish-folder-picker"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="pt-training-publish-folder-picker-title"
+                  className="pt-training-publish-folder-picker"
+                >
+                  <div className="pt-training-publish-folder-picker__header">
+                    <div className="mobile-section__copy">
+                      <h4
+                        id="pt-training-publish-folder-picker-title"
+                        className="pt-training-builder-form__section-title"
+                      >
+                        Select Portfolio Folder
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      className="pt-training-modal__secondary-action mobile-focus-ring"
+                      onClick={closeRoutineDraftFolderPicker}
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="pt-training-publish-folder-picker__list">
+                    {portfolioFolderOptions.length > 0 ? (
+                      portfolioFolderOptions.map((folder) => (
+                        <label
+                          key={folder.id}
+                          className="pt-training-publish-folder-picker__option"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={hasSelectedRoutineDraftPublishTarget({
+                              type: "existing-folder",
+                              id: folder.id,
+                              name: folder.title,
+                            })}
+                            onChange={() => {
+                              toggleRoutineDraftPublishTarget({
+                                type: "existing-folder",
+                                id: folder.id,
+                                name: folder.title,
+                              });
+                            }}
+                          />
+                          <span>{folder.title}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <p className="pt-training-builder-form__helper">
+                        No existing portfolio folders are loaded yet. Add a local folder draft below or create folders when save routes are wired.
+                      </p>
+                    )}
+
+                    {routineDraftPublishDialog.localFolderOptions.map((folder) => (
+                      <label
+                        key={folder.id}
+                        className="pt-training-publish-folder-picker__option"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={hasSelectedRoutineDraftPublishTarget({
+                            type: "local-folder-draft",
+                            id: folder.id,
+                            name: folder.name,
+                          })}
+                          onChange={() => {
+                            toggleRoutineDraftPublishTarget({
+                              type: "local-folder-draft",
+                              id: folder.id,
+                              name: folder.name,
+                            });
+                          }}
+                        />
+                        <span>{folder.name}</span>
+                        <span className="pt-training-publish-folder-picker__local-tag">
+                          Local folder draft
+                        </span>
+                      </label>
                     ))}
-                  </select>
-                </div>
-              ) : (
-                <div className="pt-training-builder-form__field">
-                  <label htmlFor="pt-training-routine-publish-local-folder">Local folder name</label>
-                  <input
-                    id="pt-training-routine-publish-local-folder"
-                    value={routineDraftPublishDialog.targetFolderName}
-                    onChange={(event) => {
-                      updateRoutineDraftPublishDialog((current) => ({
-                        ...current,
-                        targetFolderName: event.target.value,
-                      }));
-                    }}
-                  />
-                </div>
-              )}
+                  </div>
+
+                  <div className="pt-training-publish-folder-picker__actions">
+                    <button
+                      type="button"
+                      className="pt-training-modal__secondary-action mobile-focus-ring"
+                      onClick={openRoutineDraftNewFolderDialog}
+                    >
+                      Add New Folder
+                    </button>
+                    <button
+                      type="button"
+                      className="pt-training-modal__secondary-action mobile-focus-ring"
+                      onClick={closeRoutineDraftFolderPicker}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="pt-training-modal__primary-action mobile-focus-ring"
+                      onClick={closeRoutineDraftFolderPicker}
+                    >
+                      Done
+                    </button>
+                  </div>
+
+                  {routineDraftPublishDialog.newFolderDialogOpen ? (
+                    <section
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="pt-training-publish-new-folder-title"
+                      className="pt-training-publish-new-folder-dialog"
+                    >
+                      <div className="pt-training-publish-folder-picker__header">
+                        <div className="mobile-section__copy">
+                          <h5
+                            id="pt-training-publish-new-folder-title"
+                            className="pt-training-builder-form__section-title"
+                          >
+                            Add New Folder
+                          </h5>
+                        </div>
+                      </div>
+
+                      <div className="pt-training-builder-form__field">
+                        <label htmlFor="pt-training-publish-new-folder-name">Folder name</label>
+                        <input
+                          id="pt-training-publish-new-folder-name"
+                          value={routineDraftPublishDialog.newFolderName}
+                          onChange={(event) => {
+                            updateRoutineDraftPublishDialog((current) => ({
+                              ...current,
+                              newFolderName: event.target.value,
+                              newFolderError: null,
+                            }));
+                          }}
+                        />
+                        {routineDraftPublishDialog.newFolderError ? (
+                          <p className="pt-training-builder-form__error" role="alert">
+                            {routineDraftPublishDialog.newFolderError}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="pt-training-publish-folder-picker__actions">
+                        <button
+                          type="button"
+                          className="pt-training-modal__secondary-action mobile-focus-ring"
+                          onClick={closeRoutineDraftNewFolderDialog}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="pt-training-modal__primary-action mobile-focus-ring"
+                          onClick={handleAddRoutineDraftPublishFolder}
+                        >
+                          Add Folder
+                        </button>
+                      </div>
+                    </section>
+                  ) : null}
+                </section>
+              ) : null}
 
               {routineDraftPublishError ? (
                 <p className="pt-training-builder-form__error" role="alert">
@@ -2428,7 +2786,7 @@ export default function PTTrainingPage() {
                   className="pt-training-modal__primary-action mobile-focus-ring"
                   onClick={confirmRoutineDraftPublish}
                 >
-                  Mark Ready to Publish
+                  Publish Routine
                 </button>
               </div>
             </div>
