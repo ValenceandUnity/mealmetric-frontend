@@ -10,15 +10,19 @@ import { MobileCard } from "@/components/mobile/MobileCard";
 import { MobileSection } from "@/components/mobile/MobileSection";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import {
+  createLocalPTDraftId,
   createLocalPTExerciseDraft,
   createLocalPTFolderDraft,
+  createLocalPTRoutineDraft,
   readLocalPTExerciseDrafts,
   readLocalPTFolderDrafts,
+  readLocalPTRoutineDrafts,
   type LocalPTExerciseDraft,
-  type LocalPTExerciseDraftKind,
   type LocalPTFolderDraft,
+  type LocalPTRoutineDraft,
   writeLocalPTExerciseDrafts,
   writeLocalPTFolderDrafts,
+  writeLocalPTRoutineDrafts,
 } from "@/lib/client/pt-training-drafts";
 import { useSessionBootstrap } from "@/lib/client/session";
 import type { ApiResponse, JsonValue } from "@/lib/types/api";
@@ -61,16 +65,51 @@ type PortfolioFolderGroup = {
   themeClassName: string;
 };
 
-type BuilderCardDefinition = {
-  kind: LocalPTExerciseDraftKind;
+type BuilderOption = {
+  kind: "exercise" | "routine";
   badge: string;
   title: string;
   copy: string;
-  dialogTitle: string;
-  primaryLabel: string;
-  secondaryLabel: string;
-  detailLabel?: string;
   className: string;
+};
+
+type ActionPillProps = {
+  href: string;
+  children: string;
+  tone?: "purple" | "yellow";
+};
+
+type TrainingStateCardProps = {
+  title: string;
+  message: string;
+  action?: ReactNode;
+};
+
+type ExerciseFormErrors = {
+  description?: string;
+  instructions?: string;
+  objective?: string;
+};
+
+type RoutineDetailsErrors = {
+  routineName?: string;
+  description?: string;
+  fitnessTarget?: string;
+  setAmount?: string;
+};
+
+type RoutineExerciseRow = {
+  id: string;
+  exerciseName: string;
+  repGoal: string;
+  instructions: string;
+  weightsInvolved: boolean;
+};
+
+type RoutineExerciseRowErrors = {
+  exerciseName?: string;
+  repGoal?: string;
+  instructions?: string;
 };
 
 const EMPTY_SECTION_ERRORS: SectionErrors = {
@@ -87,61 +126,22 @@ const PORTFOLIO_THEME_CLASS_NAMES = [
   "pt-training-portfolio-card--amber",
 ] as const;
 
-const BUILDER_CARD_DEFINITIONS: BuilderCardDefinition[] = [
+const BUILDER_OPTIONS: BuilderOption[] = [
   {
-    kind: "rep",
-    badge: "Rep",
-    title: "Add A Rep",
-    copy: "Draft a single movement entry.",
-    dialogTitle: "Add A Rep Draft",
-    primaryLabel: "Exercise name",
-    secondaryLabel: "Weight note or target note",
-    className: "pt-training-builder-card--rep",
-  },
-  {
-    kind: "set",
-    badge: "Set",
-    title: "Add A Set",
-    copy: "Draft a repeated movement block.",
-    dialogTitle: "Add A Set Draft",
-    primaryLabel: "Exercise name",
-    secondaryLabel: "Reps target",
-    detailLabel: "Weight note or target note",
-    className: "pt-training-builder-card--set",
+    kind: "exercise",
+    badge: "Exercise",
+    title: "Add an Exercise",
+    copy: "Draft one reusable exercise movement.",
+    className: "pt-training-builder-card--exercise",
   },
   {
     kind: "routine",
-    badge: "Workout Routine",
-    title: "Add a Workout Routine",
-    copy: "Draft a routine made of multiple movements.",
-    dialogTitle: "Add a Workout Routine Draft",
-    primaryLabel: "Routine name",
-    secondaryLabel: "Routine notes",
+    badge: "Routine",
+    title: "Create a Routine",
+    copy: "Draft a structured routine with exercise goals.",
     className: "pt-training-builder-card--routine",
   },
-  {
-    kind: "cues",
-    badge: "Cues",
-    title: "Goals and Cues",
-    copy: "Draft coaching cues for a client routine.",
-    dialogTitle: "Goals and Cues Draft",
-    primaryLabel: "Cue title",
-    secondaryLabel: "Coaching note",
-    className: "pt-training-builder-card--cues",
-  },
-] as const;
-
-type ActionPillProps = {
-  href: string;
-  children: string;
-  tone?: "purple" | "yellow";
-};
-
-type TrainingStateCardProps = {
-  title: string;
-  message: string;
-  action?: ReactNode;
-};
+];
 
 function ActionPill({ href, children, tone = "yellow" }: ActionPillProps) {
   return (
@@ -187,19 +187,18 @@ function CreateFolderPlusIcon() {
   );
 }
 
-function formatDraftKindLabel(kind: LocalPTExerciseDraftKind) {
-  switch (kind) {
-    case "rep":
-      return "Rep";
-    case "set":
-      return "Set";
-    case "routine":
-      return "Workout Routine";
-    case "cues":
-      return "Goals and Cues";
-    default:
-      return "Draft";
-  }
+function sanitizeNumericInput(value: string) {
+  return value.replace(/\D+/g, "");
+}
+
+function createRoutineExerciseRow(): RoutineExerciseRow {
+  return {
+    id: createLocalPTDraftId(),
+    exerciseName: "",
+    repGoal: "",
+    instructions: "",
+    weightsInvolved: false,
+  };
 }
 
 export default function PTTrainingPage() {
@@ -217,18 +216,33 @@ export default function PTTrainingPage() {
   const [openPortfolioFolderId, setOpenPortfolioFolderId] = useState<string | null>(null);
   const [folderDrafts, setFolderDrafts] = useState<LocalPTFolderDraft[]>([]);
   const [exerciseDrafts, setExerciseDrafts] = useState<LocalPTExerciseDraft[]>([]);
+  const [routineDrafts, setRoutineDrafts] = useState<LocalPTRoutineDraft[]>([]);
   const [createFolderDialogOpen, setCreateFolderDialogOpen] = useState(false);
   const [folderDraftName, setFolderDraftName] = useState("");
   const [folderDraftNote, setFolderDraftNote] = useState("");
-  const [builderDialogKind, setBuilderDialogKind] = useState<LocalPTExerciseDraftKind | null>(null);
-  const [builderPrimaryValue, setBuilderPrimaryValue] = useState("");
-  const [builderSecondaryValue, setBuilderSecondaryValue] = useState("");
-  const [builderDetailValue, setBuilderDetailValue] = useState("");
+  const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
+  const [exerciseDescription, setExerciseDescription] = useState("");
+  const [exerciseInstructions, setExerciseInstructions] = useState("");
+  const [exerciseObjective, setExerciseObjective] = useState("");
+  const [exerciseErrors, setExerciseErrors] = useState<ExerciseFormErrors>({});
+  const [routineDialogOpen, setRoutineDialogOpen] = useState(false);
+  const [routineDialogPage, setRoutineDialogPage] = useState<"details" | "exercises">("details");
+  const [routineName, setRoutineName] = useState("");
+  const [routineDescription, setRoutineDescription] = useState("");
+  const [fitnessTarget, setFitnessTarget] = useState("");
+  const [timedByDuration, setTimedByDuration] = useState(false);
+  const [setAmount, setSetAmount] = useState("");
+  const [routineRows, setRoutineRows] = useState<RoutineExerciseRow[]>([createRoutineExerciseRow()]);
+  const [routineDetailsErrors, setRoutineDetailsErrors] = useState<RoutineDetailsErrors>({});
+  const [routineRowErrors, setRoutineRowErrors] = useState<Record<string, RoutineExerciseRowErrors>>(
+    {},
+  );
   const deferredSearch = useDeferredValue(searchValue);
 
   useEffect(() => {
     setFolderDrafts(readLocalPTFolderDrafts());
     setExerciseDrafts(readLocalPTExerciseDrafts());
+    setRoutineDrafts(readLocalPTRoutineDrafts());
   }, []);
 
   useEffect(() => {
@@ -310,12 +324,8 @@ export default function PTTrainingPage() {
     };
   }, [status, user]);
 
-  const activeBuilderDefinition = BUILDER_CARD_DEFINITIONS.find(
-    (item) => item.kind === builderDialogKind,
-  ) ?? null;
-
   useEffect(() => {
-    if (!createFolderDialogOpen && !activeBuilderDefinition) {
+    if (!createFolderDialogOpen && !exerciseDialogOpen && !routineDialogOpen) {
       return;
     }
 
@@ -324,15 +334,16 @@ export default function PTTrainingPage() {
         return;
       }
 
-      setCreateFolderDialogOpen(false);
-      setBuilderDialogKind(null);
+      closeCreateFolderDialog();
+      closeExerciseDialog();
+      closeRoutineDialog();
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [activeBuilderDefinition, createFolderDialogOpen]);
+  }, [createFolderDialogOpen, exerciseDialogOpen, routineDialogOpen]);
 
   const view = useMemo(
     () =>
@@ -342,7 +353,7 @@ export default function PTTrainingPage() {
         routines: routinesData,
         selectedFolderId: openPortfolioFolderId,
       }),
-    [foldersData, packagesData, routinesData, openPortfolioFolderId],
+    [foldersData, openPortfolioFolderId, packagesData, routinesData],
   );
 
   const query = deferredSearch.trim().toLowerCase();
@@ -457,41 +468,219 @@ export default function PTTrainingPage() {
     writeLocalPTFolderDrafts(nextDrafts);
   }
 
-  function openBuilderDialog(kind: LocalPTExerciseDraftKind) {
-    setBuilderDialogKind(kind);
-    setBuilderPrimaryValue("");
-    setBuilderSecondaryValue("");
-    setBuilderDetailValue("");
+  function openExerciseDialog() {
+    setExerciseDescription("");
+    setExerciseInstructions("");
+    setExerciseObjective("");
+    setExerciseErrors({});
+    setExerciseDialogOpen(true);
   }
 
-  function closeBuilderDialog() {
-    setBuilderDialogKind(null);
-    setBuilderPrimaryValue("");
-    setBuilderSecondaryValue("");
-    setBuilderDetailValue("");
+  function closeExerciseDialog() {
+    setExerciseDialogOpen(false);
+    setExerciseDescription("");
+    setExerciseInstructions("");
+    setExerciseObjective("");
+    setExerciseErrors({});
   }
 
   function handleSaveExerciseDraft() {
-    if (!activeBuilderDefinition) {
+    const nextErrors: ExerciseFormErrors = {};
+
+    if (exerciseDescription.trim().length === 0) {
+      nextErrors.description = "Exercise description is required.";
+    }
+
+    if (exerciseInstructions.trim().length === 0) {
+      nextErrors.instructions = "Instructions are required.";
+    }
+
+    if (exerciseObjective.trim().length === 0) {
+      nextErrors.objective = "Main objective is required.";
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setExerciseErrors(nextErrors);
       return;
     }
 
-    const noteParts = [builderSecondaryValue.trim(), builderDetailValue.trim()].filter(Boolean);
     const nextDraft = createLocalPTExerciseDraft({
-      kind: activeBuilderDefinition.kind,
-      title: builderPrimaryValue,
-      note: noteParts.join(" | "),
+      description: exerciseDescription,
+      instructions: exerciseInstructions,
+      objective: exerciseObjective,
     });
     const nextDrafts = [nextDraft, ...exerciseDrafts];
     setExerciseDrafts(nextDrafts);
     writeLocalPTExerciseDrafts(nextDrafts);
-    closeBuilderDialog();
+    closeExerciseDialog();
   }
 
   function removeExerciseDraft(draftId: string) {
     const nextDrafts = exerciseDrafts.filter((draft) => draft.id !== draftId);
     setExerciseDrafts(nextDrafts);
     writeLocalPTExerciseDrafts(nextDrafts);
+  }
+
+  function openRoutineDialog() {
+    setRoutineDialogPage("details");
+    setRoutineName("");
+    setRoutineDescription("");
+    setFitnessTarget("");
+    setTimedByDuration(false);
+    setSetAmount("");
+    setRoutineRows([createRoutineExerciseRow()]);
+    setRoutineDetailsErrors({});
+    setRoutineRowErrors({});
+    setRoutineDialogOpen(true);
+  }
+
+  function closeRoutineDialog() {
+    setRoutineDialogOpen(false);
+    setRoutineDialogPage("details");
+    setRoutineName("");
+    setRoutineDescription("");
+    setFitnessTarget("");
+    setTimedByDuration(false);
+    setSetAmount("");
+    setRoutineRows([createRoutineExerciseRow()]);
+    setRoutineDetailsErrors({});
+    setRoutineRowErrors({});
+  }
+
+  function validateRoutineDetails() {
+    const nextErrors: RoutineDetailsErrors = {};
+
+    if (routineName.trim().length === 0) {
+      nextErrors.routineName = "Routine name is required.";
+    }
+
+    if (routineDescription.trim().length === 0) {
+      nextErrors.description = "Description is required.";
+    }
+
+    if (fitnessTarget.trim().length === 0) {
+      nextErrors.fitnessTarget = "Fitness Target is required.";
+    }
+
+    if (setAmount.trim().length === 0) {
+      nextErrors.setAmount = "Set Amount is required.";
+    }
+
+    setRoutineDetailsErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
+
+  function validateRoutineRows() {
+    const nextErrors: Record<string, RoutineExerciseRowErrors> = {};
+
+    routineRows.forEach((row) => {
+      const rowErrors: RoutineExerciseRowErrors = {};
+
+      if (row.exerciseName.trim().length === 0) {
+        rowErrors.exerciseName = "Exercise is required.";
+      }
+
+      if (row.repGoal.trim().length === 0) {
+        rowErrors.repGoal = "Rep Goal is required.";
+      }
+
+      if (row.instructions.trim().length === 0) {
+        rowErrors.instructions = "Instructions are required.";
+      }
+
+      if (Object.keys(rowErrors).length > 0) {
+        nextErrors[row.id] = rowErrors;
+      }
+    });
+
+    setRoutineRowErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
+
+  function handleRoutineNextPage() {
+    if (!validateRoutineDetails()) {
+      return;
+    }
+
+    setRoutineDialogPage("exercises");
+  }
+
+  function handleRoutineRowChange(
+    rowId: string,
+    key: keyof RoutineExerciseRow,
+    value: string | boolean,
+  ) {
+    setRoutineRows((current) =>
+      current.map((row) => {
+        if (row.id !== rowId) {
+          return row;
+        }
+
+        return {
+          ...row,
+          [key]: value,
+        };
+      }),
+    );
+
+    setRoutineRowErrors((current) => {
+      if (!current[rowId]) {
+        return current;
+      }
+
+      const next = { ...current };
+      const nextRowErrors = { ...next[rowId] };
+      delete nextRowErrors[key as keyof RoutineExerciseRowErrors];
+
+      if (Object.keys(nextRowErrors).length === 0) {
+        delete next[rowId];
+      } else {
+        next[rowId] = nextRowErrors;
+      }
+
+      return next;
+    });
+  }
+
+  function handleSaveRoutineDraft() {
+    const detailsValid = validateRoutineDetails();
+    const rowsValid = validateRoutineRows();
+
+    if (!detailsValid) {
+      setRoutineDialogPage("details");
+      return;
+    }
+
+    if (!rowsValid) {
+      setRoutineDialogPage("exercises");
+      return;
+    }
+
+    const nextDraft = createLocalPTRoutineDraft({
+      routineName,
+      description: routineDescription,
+      fitnessTarget,
+      timedByDuration,
+      setAmount: Number(setAmount),
+      exercises: routineRows.map((row) => ({
+        id: row.id,
+        exerciseName: row.exerciseName,
+        repGoal: Number(row.repGoal),
+        instructions: row.instructions,
+        weightsInvolved: row.weightsInvolved,
+      })),
+    });
+
+    const nextDrafts = [nextDraft, ...routineDrafts];
+    setRoutineDrafts(nextDrafts);
+    writeLocalPTRoutineDrafts(nextDrafts);
+    closeRoutineDialog();
+  }
+
+  function removeRoutineDraft(draftId: string) {
+    const nextDrafts = routineDrafts.filter((draft) => draft.id !== draftId);
+    setRoutineDrafts(nextDrafts);
+    writeLocalPTRoutineDrafts(nextDrafts);
   }
 
   if (status === "loading") {
@@ -556,21 +745,23 @@ export default function PTTrainingPage() {
             description="Organize client training routines into custom folder lanes from the existing PT folders route."
           >
             <div className="pt-training-create-folder">
-              <button
-                id="pt-training-create-folder-trigger"
-                type="button"
-                className="pt-training-create-folder-card mobile-focus-ring"
-                aria-haspopup="dialog"
-                aria-controls="pt-training-create-folder-dialog"
-                onClick={() => {
-                  setCreateFolderDialogOpen(true);
-                }}
-              >
-                <span className="pt-training-create-folder-card__icon" aria-hidden="true">
-                  <CreateFolderPlusIcon />
-                </span>
-                <span className="pt-training-create-folder-card__label">Create New Folder</span>
-              </button>
+              <div className="pt-training-create-folder-card-wrap">
+                <button
+                  id="pt-training-create-folder-trigger"
+                  type="button"
+                  className="pt-training-create-folder-card mobile-focus-ring"
+                  aria-haspopup="dialog"
+                  aria-controls="pt-training-create-folder-dialog"
+                  onClick={() => {
+                    setCreateFolderDialogOpen(true);
+                  }}
+                >
+                  <span className="pt-training-create-folder-card__icon" aria-hidden="true">
+                    <CreateFolderPlusIcon />
+                  </span>
+                  <span className="pt-training-create-folder-card__label">Create New Folder</span>
+                </button>
+              </div>
 
               {folderDrafts.length > 0 ? (
                 <div className="pt-training-create-folder-drafts">
@@ -610,10 +801,7 @@ export default function PTTrainingPage() {
             </div>
 
             {sectionErrors.folders && !view.hasFolders ? (
-              <TrainingStateCard
-                title="Training Portfolio unavailable"
-                message={sectionErrors.folders}
-              />
+              <TrainingStateCard title="Training Portfolio unavailable" message={sectionErrors.folders} />
             ) : view.hasFolders ? (
               filteredPortfolioFolders.length > 0 ? (
                 <div className="pt-training-portfolio" role="list" aria-label="Training portfolio folders">
@@ -630,7 +818,9 @@ export default function PTTrainingPage() {
                           "pt-training-portfolio-card",
                           folder.themeClassName,
                           isOpen ? "pt-training-portfolio-card--open" : "",
-                        ].filter(Boolean).join(" ")}
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                       >
                         <button
                           id={triggerId}
@@ -742,25 +932,26 @@ export default function PTTrainingPage() {
             className="pt-training-builder-section"
             eyebrow="Routine builder"
             title="Build Training Routine"
-            description="Create local draft exercise blocks that can later be attached to training portfolio folders when folder and routine save routes are wired."
+            description="Create local draft exercises and routines that can later be attached to training portfolio folders when save routes are wired."
           >
             <div className="pt-training-builder-frame">
               <div className="pt-training-builder-grid">
-                {BUILDER_CARD_DEFINITIONS.map((item) => (
+                {BUILDER_OPTIONS.map((item) => (
                   <button
                     key={item.kind}
                     type="button"
-                    className={[
-                      "pt-training-builder-card",
-                      item.className,
-                      "mobile-focus-ring",
-                    ].join(" ")}
+                    className={["pt-training-builder-card", item.className, "mobile-focus-ring"].join(" ")}
+                    aria-label={item.title}
                     onClick={() => {
-                      openBuilderDialog(item.kind);
+                      if (item.kind === "exercise") {
+                        openExerciseDialog();
+                        return;
+                      }
+
+                      openRoutineDialog();
                     }}
                     aria-haspopup="dialog"
-                    aria-controls="pt-training-builder-dialog"
-                    aria-label={item.dialogTitle}
+                    aria-controls={item.kind === "exercise" ? "pt-training-exercise-dialog" : "pt-training-routine-dialog"}
                   >
                     <span className="pt-training-builder-card__badge">{item.badge}</span>
                     <span className="pt-training-builder-card__title">{item.title}</span>
@@ -771,7 +962,7 @@ export default function PTTrainingPage() {
 
               {exerciseDrafts.length > 0 ? (
                 <div className="pt-training-builder-drafts">
-                  <p className="pt-training-builder-drafts__title">Local routine drafts</p>
+                  <p className="pt-training-builder-drafts__title">Local exercise drafts</p>
                   <div className="pt-training-builder-drafts__list">
                     {exerciseDrafts.map((draft) => (
                       <MobileCard
@@ -782,15 +973,11 @@ export default function PTTrainingPage() {
                       >
                         <div className="pt-training-local-draft-card__copy">
                           <div className="pt-training-local-draft-card__header">
-                            <p className="pt-training-local-draft-card__title">{draft.title}</p>
+                            <p className="pt-training-local-draft-card__title">{draft.description}</p>
                             <span className="pt-training-local-draft-tag">Local draft</span>
                           </div>
-                          <p className="pt-training-local-draft-card__meta">
-                            {formatDraftKindLabel(draft.kind)}
-                          </p>
-                          <p className="pt-training-local-draft-card__note">
-                            {draft.note.length > 0 ? draft.note : "No local builder note yet."}
-                          </p>
+                          <p className="pt-training-local-draft-card__meta">Main objective: {draft.objective}</p>
+                          <p className="pt-training-local-draft-card__note">{draft.instructions}</p>
                         </div>
                         <button
                           type="button"
@@ -798,7 +985,45 @@ export default function PTTrainingPage() {
                           onClick={() => {
                             removeExerciseDraft(draft.id);
                           }}
-                          aria-label={`Remove local routine draft ${draft.title}`}
+                          aria-label={`Remove local exercise draft ${draft.description}`}
+                        >
+                          Remove
+                        </button>
+                      </MobileCard>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {routineDrafts.length > 0 ? (
+                <div className="pt-training-builder-drafts">
+                  <p className="pt-training-builder-drafts__title">Local routine drafts</p>
+                  <div className="pt-training-builder-drafts__list">
+                    {routineDrafts.map((draft) => (
+                      <MobileCard
+                        key={draft.id}
+                        as="article"
+                        variant="soft"
+                        className="pt-training-local-draft-card"
+                      >
+                        <div className="pt-training-local-draft-card__copy">
+                          <div className="pt-training-local-draft-card__header">
+                            <p className="pt-training-local-draft-card__title">{draft.routineName}</p>
+                            <span className="pt-training-local-draft-tag">Local draft</span>
+                          </div>
+                          <p className="pt-training-local-draft-card__meta">Fitness target: {draft.fitnessTarget}</p>
+                          <p className="pt-training-local-draft-card__note">
+                            Set amount: {draft.setAmount} | Exercise count: {draft.exercises.length}
+                            {draft.timedByDuration ? " | Timed by duration: Yes" : " | Timed by duration: No"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="pt-training-local-draft-remove mobile-focus-ring"
+                          onClick={() => {
+                            removeRoutineDraft(draft.id);
+                          }}
+                          aria-label={`Remove local routine draft ${draft.routineName}`}
                         >
                           Remove
                         </button>
@@ -816,10 +1041,7 @@ export default function PTTrainingPage() {
               title="Some training details are unavailable"
               description="Folder blocks still render from the PT folders route while linked training details stay limited to the package and routine routes that succeeded."
             >
-              <TrainingStateCard
-                title="Partial PT training data"
-                message={detailErrorMessages.join(" ")}
-              />
+              <TrainingStateCard title="Partial PT training data" message={detailErrorMessages.join(" ")} />
             </MobileSection>
           ) : null}
         </>
@@ -853,14 +1075,14 @@ export default function PTTrainingPage() {
               </div>
               <button
                 type="button"
-                className="mobile-pill mobile-pill--purple mobile-focus-ring"
+                className="pt-training-modal__secondary-action mobile-focus-ring"
                 onClick={closeCreateFolderDialog}
               >
                 Close
               </button>
             </div>
 
-            <div className="pt-training-modal__form">
+            <div className="pt-training-modal__form pt-training-builder-form">
               <div className="field">
                 <label htmlFor="pt-training-folder-draft-name">Folder name</label>
                 <input
@@ -883,7 +1105,7 @@ export default function PTTrainingPage() {
               <div className="pt-training-modal__actions">
                 <button
                   type="button"
-                  className="mobile-pill mobile-pill--purple mobile-focus-ring"
+                  className="pt-training-modal__secondary-action mobile-focus-ring"
                   onClick={closeCreateFolderDialog}
                 >
                   Cancel
@@ -902,87 +1124,101 @@ export default function PTTrainingPage() {
         </div>
       ) : null}
 
-      {activeBuilderDefinition ? (
+      {exerciseDialogOpen ? (
         <div
           className="pt-training-modal-backdrop"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
-              closeBuilderDialog();
+              closeExerciseDialog();
             }
           }}
         >
           <section
-            id="pt-training-builder-dialog"
+            id="pt-training-exercise-dialog"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="pt-training-builder-dialog-title"
+            aria-labelledby="pt-training-exercise-dialog-title"
             className="pt-training-modal"
           >
             <div className="pt-training-modal__header">
               <div className="mobile-section__copy">
                 <p className="mobile-section__eyebrow">Local builder staging</p>
-                <h2 id="pt-training-builder-dialog-title" className="mobile-section__title">
-                  {activeBuilderDefinition.dialogTitle}
+                <h2 id="pt-training-exercise-dialog-title" className="mobile-section__title">
+                  Add an Exercise
                 </h2>
                 <p className="mobile-section__description">
-                  This draft stays local to the browser until PT routine save routes are wired. It does not create a backend routine or attach anything to a live folder.
+                  This draft stays local to the browser until PT exercise save routes are wired. It does not create a backend exercise record or attach anything to a live folder.
                 </p>
               </div>
               <button
                 type="button"
-                className="mobile-pill mobile-pill--purple mobile-focus-ring"
-                onClick={closeBuilderDialog}
+                className="pt-training-modal__secondary-action mobile-focus-ring"
+                onClick={closeExerciseDialog}
               >
                 Close
               </button>
             </div>
 
-            <div className="pt-training-modal__form">
-              <div className="field">
-                <label htmlFor="pt-training-builder-primary">{activeBuilderDefinition.primaryLabel}</label>
-                <input
-                  id="pt-training-builder-primary"
-                  value={builderPrimaryValue}
-                  onChange={(event) => setBuilderPrimaryValue(event.target.value)}
-                  placeholder={activeBuilderDefinition.primaryLabel}
+            <div className="pt-training-modal__form pt-training-builder-form">
+              <div className="pt-training-builder-form__field">
+                <label htmlFor="pt-training-exercise-description">Exercise description</label>
+                <textarea
+                  id="pt-training-exercise-description"
+                  value={exerciseDescription}
+                  onChange={(event) => {
+                    setExerciseDescription(event.target.value);
+                    setExerciseErrors((current) => ({ ...current, description: undefined }));
+                  }}
+                  rows={3}
                 />
+                {exerciseErrors.description ? (
+                  <p className="pt-training-builder-form__error" role="alert">
+                    {exerciseErrors.description}
+                  </p>
+                ) : null}
               </div>
-              <div className="field">
-                <label htmlFor="pt-training-builder-secondary">{activeBuilderDefinition.secondaryLabel}</label>
-                {activeBuilderDefinition.kind === "set" ? (
-                  <input
-                    id="pt-training-builder-secondary"
-                    value={builderSecondaryValue}
-                    onChange={(event) => setBuilderSecondaryValue(event.target.value)}
-                    placeholder={activeBuilderDefinition.secondaryLabel}
-                  />
-                ) : (
-                  <textarea
-                    id="pt-training-builder-secondary"
-                    value={builderSecondaryValue}
-                    onChange={(event) => setBuilderSecondaryValue(event.target.value)}
-                    placeholder={activeBuilderDefinition.secondaryLabel}
-                    rows={3}
-                  />
-                )}
+
+              <div className="pt-training-builder-form__field">
+                <label htmlFor="pt-training-exercise-instructions">Instructions</label>
+                <textarea
+                  id="pt-training-exercise-instructions"
+                  value={exerciseInstructions}
+                  onChange={(event) => {
+                    setExerciseInstructions(event.target.value);
+                    setExerciseErrors((current) => ({ ...current, instructions: undefined }));
+                  }}
+                  rows={4}
+                />
+                {exerciseErrors.instructions ? (
+                  <p className="pt-training-builder-form__error" role="alert">
+                    {exerciseErrors.instructions}
+                  </p>
+                ) : null}
               </div>
-              {activeBuilderDefinition.detailLabel ? (
-                <div className="field">
-                  <label htmlFor="pt-training-builder-detail">{activeBuilderDefinition.detailLabel}</label>
-                  <textarea
-                    id="pt-training-builder-detail"
-                    value={builderDetailValue}
-                    onChange={(event) => setBuilderDetailValue(event.target.value)}
-                    placeholder={activeBuilderDefinition.detailLabel}
-                    rows={3}
-                  />
-                </div>
-              ) : null}
+
+              <div className="pt-training-builder-form__field">
+                <label htmlFor="pt-training-exercise-objective">Main objective</label>
+                <textarea
+                  id="pt-training-exercise-objective"
+                  value={exerciseObjective}
+                  onChange={(event) => {
+                    setExerciseObjective(event.target.value);
+                    setExerciseErrors((current) => ({ ...current, objective: undefined }));
+                  }}
+                  rows={3}
+                />
+                {exerciseErrors.objective ? (
+                  <p className="pt-training-builder-form__error" role="alert">
+                    {exerciseErrors.objective}
+                  </p>
+                ) : null}
+              </div>
+
               <div className="pt-training-modal__actions">
                 <button
                   type="button"
-                  className="mobile-pill mobile-pill--purple mobile-focus-ring"
-                  onClick={closeBuilderDialog}
+                  className="pt-training-modal__secondary-action mobile-focus-ring"
+                  onClick={closeExerciseDialog}
                 >
                   Cancel
                 </button>
@@ -990,11 +1226,341 @@ export default function PTTrainingPage() {
                   type="button"
                   className="pt-training-modal__primary-action mobile-focus-ring"
                   onClick={handleSaveExerciseDraft}
-                  disabled={builderPrimaryValue.trim().length === 0}
                 >
                   Save local draft
                 </button>
               </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {routineDialogOpen ? (
+        <div
+          className="pt-training-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeRoutineDialog();
+            }
+          }}
+        >
+          <section
+            id="pt-training-routine-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pt-training-routine-dialog-title"
+            className="pt-training-modal"
+          >
+            <div className="pt-training-modal__header">
+              <div className="mobile-section__copy">
+                <p className="mobile-section__eyebrow">Local builder staging</p>
+                <h2 id="pt-training-routine-dialog-title" className="mobile-section__title">
+                  Create a Routine
+                </h2>
+                <p className="mobile-section__description">
+                  This draft stays local to the browser until PT routine save routes are wired. If Weights Involved is Yes, future client assignments will need a numeric weight input for that exercise.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="pt-training-modal__secondary-action mobile-focus-ring"
+                onClick={closeRoutineDialog}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="pt-training-modal__form pt-training-builder-form">
+              {routineDialogPage === "details" ? (
+                <>
+                  <div className="pt-training-builder-form__section-copy">
+                    <p className="pt-training-builder-form__section-eyebrow">Page 1</p>
+                    <h3 className="pt-training-builder-form__section-title">Routine Details</h3>
+                  </div>
+
+                  <div className="pt-training-builder-form__field">
+                    <label htmlFor="pt-training-routine-name">Routine name</label>
+                    <input
+                      id="pt-training-routine-name"
+                      value={routineName}
+                      onChange={(event) => {
+                        setRoutineName(event.target.value);
+                        setRoutineDetailsErrors((current) => ({ ...current, routineName: undefined }));
+                      }}
+                    />
+                    {routineDetailsErrors.routineName ? (
+                      <p className="pt-training-builder-form__error" role="alert">
+                        {routineDetailsErrors.routineName}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="pt-training-builder-form__field">
+                    <label htmlFor="pt-training-routine-description">Description</label>
+                    <textarea
+                      id="pt-training-routine-description"
+                      value={routineDescription}
+                      onChange={(event) => {
+                        setRoutineDescription(event.target.value);
+                        setRoutineDetailsErrors((current) => ({ ...current, description: undefined }));
+                      }}
+                      rows={4}
+                    />
+                    {routineDetailsErrors.description ? (
+                      <p className="pt-training-builder-form__error" role="alert">
+                        {routineDetailsErrors.description}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="pt-training-builder-form__field">
+                    <label htmlFor="pt-training-routine-fitness-target">Fitness Target</label>
+                    <p className="pt-training-builder-form__helper">
+                      Which areas of the body or physical attributes does this routine contribute to?
+                    </p>
+                    <textarea
+                      id="pt-training-routine-fitness-target"
+                      value={fitnessTarget}
+                      onChange={(event) => {
+                        setFitnessTarget(event.target.value);
+                        setRoutineDetailsErrors((current) => ({ ...current, fitnessTarget: undefined }));
+                      }}
+                      rows={3}
+                    />
+                    {routineDetailsErrors.fitnessTarget ? (
+                      <p className="pt-training-builder-form__error" role="alert">
+                        {routineDetailsErrors.fitnessTarget}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <fieldset className="pt-training-builder-form__field pt-training-builder-form__toggle-field">
+                    <legend>Timed by duration</legend>
+                    <div className="pt-training-builder-form__toggle-group" role="radiogroup" aria-label="Timed by duration">
+                      <label className="pt-training-builder-form__toggle">
+                        <input
+                          type="radio"
+                          name="pt-training-routine-timed"
+                          checked={timedByDuration}
+                          onChange={() => {
+                            setTimedByDuration(true);
+                          }}
+                        />
+                        <span>Yes</span>
+                      </label>
+                      <label className="pt-training-builder-form__toggle">
+                        <input
+                          type="radio"
+                          name="pt-training-routine-timed"
+                          checked={!timedByDuration}
+                          onChange={() => {
+                            setTimedByDuration(false);
+                          }}
+                        />
+                        <span>No</span>
+                      </label>
+                    </div>
+                  </fieldset>
+
+                  <div className="pt-training-builder-form__field">
+                    <label htmlFor="pt-training-routine-set-amount">Set Amount</label>
+                    <input
+                      id="pt-training-routine-set-amount"
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      step="1"
+                      value={setAmount}
+                      onChange={(event) => {
+                        setSetAmount(sanitizeNumericInput(event.target.value));
+                        setRoutineDetailsErrors((current) => ({ ...current, setAmount: undefined }));
+                      }}
+                    />
+                    {routineDetailsErrors.setAmount ? (
+                      <p className="pt-training-builder-form__error" role="alert">
+                        {routineDetailsErrors.setAmount}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="pt-training-modal__actions">
+                    <button
+                      type="button"
+                      className="pt-training-modal__secondary-action mobile-focus-ring"
+                      onClick={closeRoutineDialog}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="pt-training-modal__primary-action mobile-focus-ring"
+                      onClick={handleRoutineNextPage}
+                    >
+                      Next: Exercises
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="pt-training-builder-form__section-copy">
+                    <p className="pt-training-builder-form__section-eyebrow">Page 2</p>
+                    <h3 className="pt-training-builder-form__section-title">Routine Exercises</h3>
+                  </div>
+
+                  <div className="pt-training-builder-form__exercise-list">
+                    {routineRows.map((row, index) => (
+                      <section key={row.id} className="pt-training-builder-form__exercise-row">
+                        <div className="pt-training-builder-form__exercise-row-header">
+                          <p className="pt-training-builder-form__exercise-row-title">Exercise {index + 1}</p>
+                          {routineRows.length > 1 ? (
+                            <button
+                              type="button"
+                              className="pt-training-local-draft-remove mobile-focus-ring"
+                              onClick={() => {
+                                const nextRows = routineRows.filter((item) => item.id !== row.id);
+                                setRoutineRows(nextRows);
+                                setRoutineRowErrors((current) => {
+                                  const nextErrors = { ...current };
+                                  delete nextErrors[row.id];
+                                  return nextErrors;
+                                });
+                              }}
+                            >
+                              Remove exercise row
+                            </button>
+                          ) : null}
+                        </div>
+
+                        <div className="pt-training-builder-form__field">
+                          <label htmlFor={`pt-training-routine-exercise-name-${row.id}`}>Exercise</label>
+                          <input
+                            id={`pt-training-routine-exercise-name-${row.id}`}
+                            value={row.exerciseName}
+                            onChange={(event) => {
+                              handleRoutineRowChange(row.id, "exerciseName", event.target.value);
+                            }}
+                          />
+                          {routineRowErrors[row.id]?.exerciseName ? (
+                            <p className="pt-training-builder-form__error" role="alert">
+                              {routineRowErrors[row.id]?.exerciseName}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className="pt-training-builder-form__field">
+                          <label htmlFor={`pt-training-routine-rep-goal-${row.id}`}>Rep Goal</label>
+                          <input
+                            id={`pt-training-routine-rep-goal-${row.id}`}
+                            type="number"
+                            inputMode="numeric"
+                            min="0"
+                            step="1"
+                            value={row.repGoal}
+                            onChange={(event) => {
+                              handleRoutineRowChange(row.id, "repGoal", sanitizeNumericInput(event.target.value));
+                            }}
+                          />
+                          {routineRowErrors[row.id]?.repGoal ? (
+                            <p className="pt-training-builder-form__error" role="alert">
+                              {routineRowErrors[row.id]?.repGoal}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className="pt-training-builder-form__field">
+                          <label htmlFor={`pt-training-routine-instructions-${row.id}`}>Instructions</label>
+                          <textarea
+                            id={`pt-training-routine-instructions-${row.id}`}
+                            value={row.instructions}
+                            onChange={(event) => {
+                              handleRoutineRowChange(row.id, "instructions", event.target.value);
+                            }}
+                            rows={4}
+                          />
+                          {routineRowErrors[row.id]?.instructions ? (
+                            <p className="pt-training-builder-form__error" role="alert">
+                              {routineRowErrors[row.id]?.instructions}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <fieldset className="pt-training-builder-form__field pt-training-builder-form__toggle-field">
+                          <legend>Weights Involved?</legend>
+                          <p className="pt-training-builder-form__helper">
+                            If Yes, clients will need a numeric weight input when this exercise is assigned in a future training package flow.
+                          </p>
+                          <div
+                            className="pt-training-builder-form__toggle-group"
+                            role="radiogroup"
+                            aria-label={`Weights Involved for exercise ${index + 1}`}
+                          >
+                            <label className="pt-training-builder-form__toggle">
+                              <input
+                                type="radio"
+                                name={`pt-training-routine-weights-${row.id}`}
+                                checked={row.weightsInvolved}
+                                onChange={() => {
+                                  handleRoutineRowChange(row.id, "weightsInvolved", true);
+                                }}
+                              />
+                              <span>Yes</span>
+                            </label>
+                            <label className="pt-training-builder-form__toggle">
+                              <input
+                                type="radio"
+                                name={`pt-training-routine-weights-${row.id}`}
+                                checked={!row.weightsInvolved}
+                                onChange={() => {
+                                  handleRoutineRowChange(row.id, "weightsInvolved", false);
+                                }}
+                              />
+                              <span>No</span>
+                            </label>
+                          </div>
+                        </fieldset>
+                      </section>
+                    ))}
+                  </div>
+
+                  <div className="pt-training-builder-form__row-actions">
+                    <button
+                      type="button"
+                      className="pt-training-modal__secondary-action mobile-focus-ring"
+                      onClick={() => {
+                        setRoutineRows((current) => [...current, createRoutineExerciseRow()]);
+                      }}
+                    >
+                      Add exercise row
+                    </button>
+                  </div>
+
+                  <div className="pt-training-modal__actions">
+                    <button
+                      type="button"
+                      className="pt-training-modal__secondary-action mobile-focus-ring"
+                      onClick={closeRoutineDialog}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="pt-training-modal__secondary-action mobile-focus-ring"
+                      onClick={() => {
+                        setRoutineDialogPage("details");
+                      }}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      className="pt-training-modal__primary-action mobile-focus-ring"
+                      onClick={handleSaveRoutineDraft}
+                    >
+                      Save local routine draft
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </section>
         </div>

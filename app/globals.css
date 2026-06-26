@@ -4085,14 +4085,23 @@ html[data-theme="light"] .mobile-training-form textarea {
 }
 
 .pt-training-create-folder,
+.pt-training-create-folder-card-wrap,
 .pt-training-create-folder-drafts,
 .pt-training-create-folder-drafts__list,
 .pt-training-builder-frame,
 .pt-training-builder-drafts,
 .pt-training-builder-drafts__list,
-.pt-training-modal__form {
+.pt-training-modal__form,
+.pt-training-builder-form,
+.pt-training-builder-form__exercise-list,
+.pt-training-builder-form__field,
+.pt-training-builder-form__section-copy {
   display: grid;
   gap: 1rem;
+}
+
+.pt-training-create-folder-card-wrap {
+  justify-content: center;
 }
 
 .pt-training-create-folder-card {
@@ -4118,6 +4127,12 @@ html[data-theme="light"] .mobile-training-form textarea {
 .pt-training-builder-card:hover,
 .pt-training-builder-card:active,
 .pt-training-builder-card:focus-visible,
+.pt-training-modal__secondary-action:hover,
+.pt-training-modal__secondary-action:active,
+.pt-training-modal__secondary-action:focus-visible,
+.pt-training-modal__primary-action:hover,
+.pt-training-modal__primary-action:active,
+.pt-training-modal__primary-action:focus-visible,
 .pt-training-local-draft-remove:hover,
 .pt-training-local-draft-remove:active,
 .pt-training-local-draft-remove:focus-visible {
@@ -4154,7 +4169,7 @@ html[data-theme="light"] .mobile-training-form textarea {
 
 .pt-training-builder-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.95rem;
 }
 
@@ -4171,20 +4186,12 @@ html[data-theme="light"] .mobile-training-form textarea {
   box-shadow: 0 20px 34px rgba(8, 15, 32, 0.22);
 }
 
-.pt-training-builder-card--rep {
+.pt-training-builder-card--exercise {
   background: linear-gradient(155deg, rgba(30, 64, 175, 0.98), rgba(96, 165, 250, 0.86));
 }
 
-.pt-training-builder-card--set {
-  background: linear-gradient(155deg, rgba(88, 28, 135, 0.98), rgba(192, 132, 252, 0.86));
-}
-
 .pt-training-builder-card--routine {
-  background: linear-gradient(155deg, rgba(22, 101, 52, 0.98), rgba(74, 222, 128, 0.84));
-}
-
-.pt-training-builder-card--cues {
-  background: linear-gradient(155deg, rgba(146, 64, 14, 0.98), rgba(251, 191, 36, 0.84));
+  background: linear-gradient(155deg, rgba(22, 101, 52, 0.98), rgba(250, 204, 21, 0.82));
 }
 
 .pt-training-builder-card__badge {
@@ -4243,6 +4250,10 @@ html[data-theme="light"] .mobile-training-form textarea {
   line-height: 1.45;
 }
 
+.pt-training-local-draft-card__note {
+  overflow-wrap: anywhere;
+}
+
 .pt-training-local-draft-tag {
   display: inline-flex;
   align-items: center;
@@ -4258,9 +4269,9 @@ html[data-theme="light"] .mobile-training-form textarea {
 }
 
 .pt-training-local-draft-remove,
-.pt-training-modal__primary-action {
+.pt-training-modal__primary-action,
+.pt-training-modal__secondary-action {
   min-height: 2.8rem;
-  border: 0;
   border-radius: 999px;
   font-weight: 700;
 }
@@ -4293,6 +4304,7 @@ html[data-theme="light"] .mobile-training-form textarea {
   background:
     linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 0.98));
   box-shadow: 0 32px 54px rgba(2, 6, 23, 0.34);
+  padding-bottom: calc(1.15rem + env(safe-area-inset-bottom, 0px));
 }
 
 .pt-training-modal__header,
@@ -4311,10 +4323,131 @@ html[data-theme="light"] .mobile-training-form textarea {
   flex-wrap: wrap;
 }
 
+.pt-training-modal__secondary-action {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--mobile-text);
+  box-shadow: none;
+}
+
 .pt-training-modal__primary-action {
+  border: 0;
   padding: 0.65rem 1rem;
   background: linear-gradient(140deg, rgba(251, 191, 36, 0.94), rgba(249, 115, 22, 0.92));
   color: #111827;
+}
+
+.pt-training-builder-form__field {
+  gap: 0.45rem;
+}
+
+.pt-training-builder-form__field label,
+.pt-training-builder-form__toggle-field legend {
+  color: var(--mobile-text);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.pt-training-builder-form__field textarea,
+.pt-training-builder-form__field input {
+  min-width: 0;
+}
+
+.pt-training-builder-form__section-eyebrow,
+.pt-training-builder-form__section-title,
+.pt-training-builder-form__exercise-row-title,
+.pt-training-builder-form__helper,
+.pt-training-builder-form__error {
+  margin: 0;
+}
+
+.pt-training-builder-form__section-eyebrow {
+  color: var(--mobile-yellow-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pt-training-builder-form__section-title,
+.pt-training-builder-form__exercise-row-title {
+  color: var(--mobile-text);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.pt-training-builder-form__helper {
+  color: var(--mobile-text-muted);
+  line-height: 1.45;
+}
+
+.pt-training-builder-form__error {
+  color: #fecaca;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.pt-training-builder-form__toggle-field {
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.pt-training-builder-form__toggle-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.pt-training-builder-form__toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.72);
+  color: var(--mobile-text);
+  font-weight: 700;
+}
+
+.pt-training-builder-form__toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pt-training-builder-form__toggle:has(input:checked) {
+  border-color: rgba(250, 204, 21, 0.54);
+  background: rgba(250, 204, 21, 0.14);
+  color: #fff7db;
+}
+
+.pt-training-builder-form__exercise-row {
+  display: grid;
+  gap: 0.95rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 1.2rem;
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.pt-training-builder-form__exercise-row-header,
+.pt-training-builder-form__row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@media (min-width: 390px) {
+  .pt-training-builder-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .mobile-client-metrics-grid,

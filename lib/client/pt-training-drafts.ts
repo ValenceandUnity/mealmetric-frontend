@@ -1,5 +1,6 @@
 export const PT_TRAINING_FOLDER_DRAFTS_STORAGE_KEY = "mealmetric:pt-training:folder-drafts";
 export const PT_TRAINING_EXERCISE_DRAFTS_STORAGE_KEY = "mealmetric:pt-training:exercise-drafts";
+export const PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY = "mealmetric:pt-training:routine-drafts";
 
 export type LocalPTFolderDraft = {
   id: string;
@@ -8,13 +9,32 @@ export type LocalPTFolderDraft = {
   createdAt: string;
 };
 
-export type LocalPTExerciseDraftKind = "rep" | "set" | "routine" | "cues";
-
 export type LocalPTExerciseDraft = {
   id: string;
-  kind: LocalPTExerciseDraftKind;
-  title: string;
-  note: string;
+  type: "exercise";
+  description: string;
+  instructions: string;
+  objective: string;
+  createdAt: string;
+};
+
+export type LocalPTRoutineExerciseDraft = {
+  id: string;
+  exerciseName: string;
+  repGoal: number;
+  instructions: string;
+  weightsInvolved: boolean;
+};
+
+export type LocalPTRoutineDraft = {
+  id: string;
+  type: "routine";
+  routineName: string;
+  description: string;
+  fitnessTarget: string;
+  timedByDuration: boolean;
+  setAmount: number;
+  exercises: LocalPTRoutineExerciseDraft[];
   createdAt: string;
 };
 
@@ -44,7 +64,7 @@ function writeDrafts<T>(key: string, drafts: T[]) {
   window.localStorage.setItem(key, JSON.stringify(drafts));
 }
 
-function createDraftId() {
+export function createLocalPTDraftId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
@@ -65,7 +85,7 @@ export function createLocalPTFolderDraft(input: {
   note: string;
 }): LocalPTFolderDraft {
   return {
-    id: createDraftId(),
+    id: createLocalPTDraftId(),
     name: input.name.trim(),
     note: input.note.trim(),
     createdAt: new Date().toISOString(),
@@ -81,15 +101,51 @@ export function writeLocalPTExerciseDrafts(drafts: LocalPTExerciseDraft[]) {
 }
 
 export function createLocalPTExerciseDraft(input: {
-  kind: LocalPTExerciseDraftKind;
-  title: string;
-  note: string;
+  description: string;
+  instructions: string;
+  objective: string;
 }): LocalPTExerciseDraft {
   return {
-    id: createDraftId(),
-    kind: input.kind,
-    title: input.title.trim(),
-    note: input.note.trim(),
+    id: createLocalPTDraftId(),
+    type: "exercise",
+    description: input.description.trim(),
+    instructions: input.instructions.trim(),
+    objective: input.objective.trim(),
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export function readLocalPTRoutineDrafts(): LocalPTRoutineDraft[] {
+  return readDrafts<LocalPTRoutineDraft>(PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY);
+}
+
+export function writeLocalPTRoutineDrafts(drafts: LocalPTRoutineDraft[]) {
+  writeDrafts(PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY, drafts);
+}
+
+export function createLocalPTRoutineDraft(input: {
+  routineName: string;
+  description: string;
+  fitnessTarget: string;
+  timedByDuration: boolean;
+  setAmount: number;
+  exercises: LocalPTRoutineExerciseDraft[];
+}): LocalPTRoutineDraft {
+  return {
+    id: createLocalPTDraftId(),
+    type: "routine",
+    routineName: input.routineName.trim(),
+    description: input.description.trim(),
+    fitnessTarget: input.fitnessTarget.trim(),
+    timedByDuration: input.timedByDuration,
+    setAmount: input.setAmount,
+    exercises: input.exercises.map((exercise) => ({
+      id: exercise.id,
+      exerciseName: exercise.exerciseName.trim(),
+      repGoal: exercise.repGoal,
+      instructions: exercise.instructions.trim(),
+      weightsInvolved: exercise.weightsInvolved,
+    })),
     createdAt: new Date().toISOString(),
   };
 }
