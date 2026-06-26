@@ -30,6 +30,9 @@ export type LocalPTRoutineExerciseDraft = {
   weightsInvolved: boolean;
 };
 
+export type LocalPTRoutineDraftPublishStatus = "draft" | "ready";
+export type LocalPTRoutineDraftPublishTargetType = "existing-folder" | "local-folder-draft";
+
 export type LocalPTRoutineDraft = {
   id: string;
   type: "routine";
@@ -41,6 +44,11 @@ export type LocalPTRoutineDraft = {
   setAmount: number;
   exercises: LocalPTRoutineExerciseDraft[];
   createdAt: string;
+  editedAt?: string;
+  publishStatus?: LocalPTRoutineDraftPublishStatus;
+  publishTargetType?: LocalPTRoutineDraftPublishTargetType;
+  publishTargetId?: string;
+  publishTargetName?: string;
 };
 
 function readDrafts<T>(key: string): T[] {
@@ -121,7 +129,43 @@ export function createLocalPTExerciseDraft(input: {
 }
 
 export function readLocalPTRoutineDrafts(): LocalPTRoutineDraft[] {
-  return readDrafts<LocalPTRoutineDraft>(PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY);
+  return readDrafts<LocalPTRoutineDraft>(PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY).flatMap((draft) => {
+    if (!draft || draft.type !== "routine") {
+      return [];
+    }
+
+    return [{
+      ...draft,
+      routineName: draft.routineName?.trim() ?? "",
+      description: draft.description?.trim() ?? "",
+      fitnessTargets: Array.isArray(draft.fitnessTargets)
+        ? draft.fitnessTargets.map((item) => item.trim()).filter(Boolean)
+        : [],
+      fitnessAttributes: Array.isArray(draft.fitnessAttributes)
+        ? draft.fitnessAttributes.map((item) => item.trim()).filter(Boolean)
+        : [],
+      timedByDuration: Boolean(draft.timedByDuration),
+      setAmount: typeof draft.setAmount === "number" ? draft.setAmount : 0,
+      exercises: Array.isArray(draft.exercises)
+        ? draft.exercises.map((exercise) => ({
+            id: exercise.id,
+            exerciseName: exercise.exerciseName?.trim() ?? "",
+            repGoal: typeof exercise.repGoal === "number" ? exercise.repGoal : 0,
+            instructions: exercise.instructions?.trim() ?? "",
+            weightsInvolved: Boolean(exercise.weightsInvolved),
+          }))
+        : [],
+      createdAt: draft.createdAt ?? new Date().toISOString(),
+      editedAt: draft.editedAt ?? draft.createdAt,
+      publishStatus: draft.publishStatus === "ready" ? "ready" : "draft",
+      publishTargetType:
+        draft.publishTargetType === "existing-folder" || draft.publishTargetType === "local-folder-draft"
+          ? draft.publishTargetType
+          : undefined,
+      publishTargetId: draft.publishTargetId?.trim() || undefined,
+      publishTargetName: draft.publishTargetName?.trim() || undefined,
+    }];
+  });
 }
 
 export function writeLocalPTRoutineDrafts(drafts: LocalPTRoutineDraft[]) {
@@ -129,6 +173,7 @@ export function writeLocalPTRoutineDrafts(drafts: LocalPTRoutineDraft[]) {
 }
 
 export function createLocalPTRoutineDraft(input: {
+  id?: string;
   routineName: string;
   description: string;
   fitnessTargets: string[];
@@ -136,9 +181,18 @@ export function createLocalPTRoutineDraft(input: {
   timedByDuration: boolean;
   setAmount: number;
   exercises: LocalPTRoutineExerciseDraft[];
+  createdAt?: string;
+  editedAt?: string;
+  publishStatus?: LocalPTRoutineDraftPublishStatus;
+  publishTargetType?: LocalPTRoutineDraftPublishTargetType;
+  publishTargetId?: string;
+  publishTargetName?: string;
 }): LocalPTRoutineDraft {
+  const createdAt = input.createdAt ?? new Date().toISOString();
+  const editedAt = input.editedAt ?? createdAt;
+
   return {
-    id: createLocalPTDraftId(),
+    id: input.id ?? createLocalPTDraftId(),
     type: "routine",
     routineName: input.routineName.trim(),
     description: input.description.trim(),
@@ -153,7 +207,12 @@ export function createLocalPTRoutineDraft(input: {
       instructions: exercise.instructions.trim(),
       weightsInvolved: exercise.weightsInvolved,
     })),
-    createdAt: new Date().toISOString(),
+    createdAt,
+    editedAt,
+    publishStatus: input.publishStatus ?? "draft",
+    publishTargetType: input.publishTargetType,
+    publishTargetId: input.publishTargetId?.trim() || undefined,
+    publishTargetName: input.publishTargetName?.trim() || undefined,
   };
 }
 
