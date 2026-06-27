@@ -26,11 +26,22 @@ export type LocalPTExerciseDraft = {
   type: "rep";
   title: string;
   exerciseName: string;
-  repGoal: number;
+  repGoal?: number;
   instructions: string;
   weightsInvolved: boolean;
+  media?: PTTrainingDraftMedia | null;
   createdAt: string;
   editedAt: string;
+};
+
+export type PTTrainingDraftMedia = {
+  id: string;
+  kind: "image" | "video";
+  name: string;
+  mimeType: string;
+  size: number;
+  dataUrl: string;
+  addedAt: string;
 };
 
 export type LocalPTPortfolioAssetExercise = {
@@ -39,6 +50,7 @@ export type LocalPTPortfolioAssetExercise = {
   repGoal: string;
   instructions: string;
   weightsInvolved: boolean;
+  media?: PTTrainingDraftMedia | null;
 };
 
 export type LocalPTPortfolioRepAsset = {
@@ -51,6 +63,7 @@ export type LocalPTPortfolioRepAsset = {
   instructions?: string;
   objective?: string;
   weightsInvolved?: boolean;
+  media?: PTTrainingDraftMedia | null;
   sourceDraftId?: string;
   createdAt: string;
   updatedAt: string;
@@ -78,7 +91,7 @@ export type LocalPTPortfolioAsset =
 export type LocalPTPortfolioFolderColor = "grey" | "green" | "purple" | "blue" | "amber";
 export type LocalPTPortfolioFolder = {
   id: string;
-  source: "local";
+  source: "local" | "system-local";
   title: string;
   updatedAt: string;
   thumbnailDataUrl?: string;
@@ -108,6 +121,7 @@ export type LocalPTRoutineExerciseDraft = {
   repGoal: number;
   instructions: string;
   weightsInvolved: boolean;
+  media?: PTTrainingDraftMedia | null;
 };
 
 export type LocalPTRoutineDraftPublishStatus = "draft" | "ready";
@@ -171,6 +185,30 @@ export function createLocalPTDraftId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function normalizeDraftMedia(media: PTTrainingDraftMedia | Record<string, unknown> | null | undefined) {
+  if (!media || typeof media !== "object") {
+    return null;
+  }
+
+  const kind = media.kind === "video" ? "video" : media.kind === "image" ? "image" : null;
+  const name = typeof media.name === "string" ? media.name.trim() : "";
+  const mimeType = typeof media.mimeType === "string" ? media.mimeType.trim() : "";
+  const dataUrl = typeof media.dataUrl === "string" ? media.dataUrl.trim() : "";
+  if (!kind || !name || !mimeType || !dataUrl) {
+    return null;
+  }
+
+  return {
+    id: typeof media.id === "string" ? media.id : createLocalPTDraftId(),
+    kind,
+    name,
+    mimeType,
+    size: typeof media.size === "number" ? media.size : 0,
+    dataUrl,
+    addedAt: typeof media.addedAt === "string" ? media.addedAt : new Date().toISOString(),
+  } satisfies PTTrainingDraftMedia;
+}
+
 export function readLocalPTFolderDrafts(): LocalPTFolderDraft[] {
   return readDrafts<LocalPTFolderDraft>(PT_TRAINING_FOLDER_DRAFTS_STORAGE_KEY);
 }
@@ -223,9 +261,10 @@ export function readLocalPTExerciseDrafts(): LocalPTExerciseDraft[] {
       type: "rep",
       title: typeof legacyDraft.title === "string" ? legacyDraft.title.trim() || exerciseName : exerciseName,
       exerciseName,
-      repGoal: Number.isFinite(repGoalValue) ? repGoalValue : 0,
+      repGoal: Number.isFinite(repGoalValue) ? repGoalValue : undefined,
       instructions: typeof legacyDraft.instructions === "string" ? legacyDraft.instructions.trim() : "",
       weightsInvolved: Boolean(legacyDraft.weightsInvolved),
+      media: normalizeDraftMedia(legacyDraft.media as Record<string, unknown> | null | undefined),
       createdAt,
       editedAt: typeof legacyDraft.editedAt === "string" ? legacyDraft.editedAt : createdAt,
     }];
@@ -240,9 +279,10 @@ export function createLocalPTExerciseDraft(input: {
   id?: string;
   title?: string;
   exerciseName: string;
-  repGoal: number;
+  repGoal?: number;
   instructions: string;
   weightsInvolved: boolean;
+  media?: PTTrainingDraftMedia | null;
   createdAt?: string;
   editedAt?: string;
 }): LocalPTExerciseDraft {
@@ -257,6 +297,7 @@ export function createLocalPTExerciseDraft(input: {
     repGoal: input.repGoal,
     instructions: input.instructions.trim(),
     weightsInvolved: input.weightsInvolved,
+    media: normalizeDraftMedia(input.media),
     createdAt,
     editedAt: input.editedAt ?? createdAt,
   };
@@ -278,6 +319,7 @@ function normalizePortfolioAssetExercise(
         : exercise.repGoal?.toString().trim() ?? "",
     instructions: exercise.instructions?.trim() ?? "",
     weightsInvolved: Boolean(exercise.weightsInvolved),
+    media: normalizeDraftMedia(exercise.media),
   };
 }
 
@@ -323,6 +365,7 @@ function normalizePortfolioAsset(asset: LocalPTPortfolioAsset | null | undefined
       objective: asset.objective?.trim() || undefined,
       weightsInvolved:
         typeof asset.weightsInvolved === "boolean" ? asset.weightsInvolved : undefined,
+      media: normalizeDraftMedia(asset.media),
       sourceDraftId: asset.sourceDraftId?.trim() || undefined,
       createdAt: asset.createdAt ?? new Date().toISOString(),
       updatedAt: asset.updatedAt ?? asset.createdAt ?? new Date().toISOString(),
@@ -341,6 +384,7 @@ export function createLocalPTPortfolioRepAsset(input: {
   instructions?: string;
   objective?: string;
   weightsInvolved?: boolean;
+  media?: PTTrainingDraftMedia | null;
   sourceDraftId?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -357,6 +401,7 @@ export function createLocalPTPortfolioRepAsset(input: {
     instructions: input.instructions?.trim() || undefined,
     objective: input.objective?.trim() || undefined,
     weightsInvolved: typeof input.weightsInvolved === "boolean" ? input.weightsInvolved : undefined,
+    media: normalizeDraftMedia(input.media),
     sourceDraftId: input.sourceDraftId?.trim() || undefined,
     createdAt,
     updatedAt: input.updatedAt ?? createdAt,
@@ -405,13 +450,13 @@ export function createLocalPTPortfolioRoutineAsset(input: {
 export function readLocalPTPortfolioFolders(): LocalPTPortfolioFolder[] {
   return readDrafts<LocalPTPortfolioFolder>(PT_TRAINING_LOCAL_PORTFOLIO_FOLDERS_STORAGE_KEY).flatMap(
     (folder) => {
-      if (!folder || folder.source !== "local") {
+      if (!folder || (folder.source !== "local" && folder.source !== "system-local")) {
         return [];
       }
 
       return [{
         id: folder.id,
-        source: "local",
+        source: folder.source === "system-local" ? "system-local" : "local",
         title: folder.title?.trim() ?? "",
         updatedAt: folder.updatedAt ?? new Date().toISOString(),
         thumbnailDataUrl: folder.thumbnailDataUrl?.trim() || undefined,
@@ -445,6 +490,8 @@ export function writeLocalPTPortfolioFolders(folders: LocalPTPortfolioFolder[]) 
 }
 
 export function createLocalPTPortfolioFolder(input: {
+  id?: string;
+  source?: "local" | "system-local";
   title: string;
   thumbnailDataUrl?: string;
   color?: LocalPTPortfolioFolderColor;
@@ -454,8 +501,8 @@ export function createLocalPTPortfolioFolder(input: {
   pinned?: boolean;
 }): LocalPTPortfolioFolder {
   return {
-    id: createLocalPTDraftId(),
-    source: "local",
+    id: input.id ?? createLocalPTDraftId(),
+    source: input.source ?? "local",
     title: input.title.trim(),
     updatedAt: new Date().toISOString(),
     thumbnailDataUrl: input.thumbnailDataUrl?.trim() || undefined,
@@ -595,6 +642,7 @@ export function readLocalPTRoutineDrafts(): LocalPTRoutineDraft[] {
             repGoal: typeof exercise.repGoal === "number" ? exercise.repGoal : 0,
             instructions: exercise.instructions?.trim() ?? "",
             weightsInvolved: Boolean(exercise.weightsInvolved),
+            media: normalizeDraftMedia(exercise.media),
           }))
         : [],
       createdAt: draft.createdAt ?? new Date().toISOString(),
@@ -666,6 +714,7 @@ export function createLocalPTRoutineDraft(input: {
       repGoal: exercise.repGoal,
       instructions: exercise.instructions.trim(),
       weightsInvolved: exercise.weightsInvolved,
+      media: normalizeDraftMedia(exercise.media),
     })),
     createdAt,
     editedAt,

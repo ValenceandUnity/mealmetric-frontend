@@ -31,6 +31,7 @@ import {
   type LocalPTPortfolioFolder,
   type LocalPTPortfolioFolderColor,
   type LocalPTPortfolioFolderOverlay,
+  type PTTrainingDraftMedia,
   type LocalPTRoutineDraft,
   type LocalPTRoutineDraftPublishTarget,
   writeLocalPTCustomFitnessAttributes,
@@ -57,7 +58,7 @@ type SectionErrors = {
 
 type PortfolioDirectoryFolder = {
   id: string;
-  source: "bff" | "local";
+  source: "bff" | "local" | "system-local";
   title: string;
   description: string;
   updatedAt: string;
@@ -92,7 +93,6 @@ type TrainingStateCardProps = {
 
 type ExerciseFormErrors = {
   exerciseName?: string;
-  repGoal?: string;
   instructions?: string;
 };
 
@@ -110,6 +110,7 @@ type RoutineExerciseRow = {
   repGoal: string;
   instructions: string;
   weightsInvolved: boolean;
+  media?: PTTrainingDraftMedia | null;
 };
 
 type RoutineExerciseRowErrors = {
@@ -162,12 +163,28 @@ type ExerciseDraftPublishDialogState = {
   newFolderError: string | null;
 } | null;
 
+type MediaPickerTargetState =
+  | {
+      kind: "exercise-draft";
+    }
+  | {
+      kind: "routine-row";
+      rowId: string;
+    }
+  | null;
+
 const EMPTY_SECTION_ERRORS: SectionErrors = {
   folders: null,
   packages: null,
   routines: null,
 };
 const PORTFOLIO_DIRECTORY_LIMIT = 5;
+const SYSTEM_ALL_SINGULAR_EXERCISES_FOLDER_ID = "system-all-singular-exercises";
+const SYSTEM_ALL_SINGULAR_EXERCISES_FOLDER_TITLE = "All Singular Exercises";
+const TRAINING_IMAGE_MEDIA_MAX_BYTES = 2 * 1024 * 1024;
+const TRAINING_VIDEO_MEDIA_MAX_BYTES = 5 * 1024 * 1024;
+const TRAINING_IMAGE_MEDIA_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
+const TRAINING_VIDEO_MEDIA_ACCEPT = "video/mp4,video/webm";
 
 const BUILDER_OPTIONS: BuilderOption[] = [
   {
@@ -370,6 +387,108 @@ function formatPortfolioAssetTypeLabel(type: LocalPTPortfolioAsset["type"]) {
   return type === "routine" ? "Routine" : "Rep";
 }
 
+function isImageMediaType(mimeType: string) {
+  return ["image/png", "image/jpeg", "image/webp", "image/gif"].includes(mimeType);
+}
+
+function isVideoMediaType(mimeType: string) {
+  return ["video/mp4", "video/webm"].includes(mimeType);
+}
+
+function formatMediaSize(size: number) {
+  if (size >= 1024 * 1024) {
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  if (size >= 1024) {
+    return `${Math.round(size / 1024)} KB`;
+  }
+
+  return `${size} B`;
+}
+
+function renderTrainingMediaPreview(media: PTTrainingDraftMedia, className: string) {
+  if (media.kind === "image") {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- local draft previews use data URLs.
+      <img
+        src={media.dataUrl}
+        alt={media.name}
+        className={className}
+      />
+    );
+  }
+
+  if (media.kind === "video") {
+    return (
+      <video className={className} controls preload="metadata">
+        <source src={media.dataUrl} type={media.mimeType} />
+      </video>
+    );
+  }
+
+  return null;
+}
+
+function createSystemAllSingularExercisesFolder(
+  existing?: Partial<LocalPTPortfolioFolder> | null,
+): LocalPTPortfolioFolder {
+  return createLocalPTPortfolioFolder({
+    id: SYSTEM_ALL_SINGULAR_EXERCISES_FOLDER_ID,
+    source: "system-local",
+    title: SYSTEM_ALL_SINGULAR_EXERCISES_FOLDER_TITLE,
+    thumbnailDataUrl: existing?.thumbnailDataUrl,
+    color: existing?.color ?? "grey",
+    tags: existing?.tags ?? [],
+    assets: existing?.assets ?? [],
+    exercises: [],
+    pinned: existing?.pinned ?? false,
+  });
+}
+
+function ensureAllSingularExercisesFolder(folders: LocalPTPortfolioFolder[]) {
+  const existingFolder = folders.find(
+    (folder) => folder.id === SYSTEM_ALL_SINGULAR_EXERCISES_FOLDER_ID,
+  );
+
+  if (existingFolder) {
+    const nextFolder = createSystemAllSingularExercisesFolder(existingFolder);
+    nextFolder.updatedAt = existingFolder.updatedAt;
+
+    return {
+      folders: folders.map((folder) =>
+        folder.id === SYSTEM_ALL_SINGULAR_EXERCISES_FOLDER_ID ? nextFolder : folder,
+      ),
+      changed:
+        existingFolder.source !== "system-local" ||
+        existingFolder.title !== SYSTEM_ALL_SINGULAR_EXERCISES_FOLDER_TITLE,
+    };
+  }
+
+  return {
+    folders: [createSystemAllSingularExercisesFolder(), ...folders],
+    changed: true,
+  };
+}
+
+function readTrainingMediaFile(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => {
+      reject(new Error("Unable to read that file."));
+    };
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("Unable to read that file."));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function createLegacyRepAsset(title: string, id?: string): LocalPTPortfolioAsset {
   return createLocalPTPortfolioRepAsset({
     id,
@@ -396,6 +515,7 @@ function buildRoutineAssetFromDraft(
       repGoal: String(exercise.repGoal),
       instructions: exercise.instructions,
       weightsInvolved: exercise.weightsInvolved,
+      media: exercise.media,
     })),
     sourceDraftId: draft.id,
     createdAt: draft.createdAt,
@@ -410,9 +530,10 @@ function buildRepAssetFromDraft(
   return createLocalPTPortfolioRepAsset({
     title: draft.title,
     exerciseName: draft.exerciseName,
-    repGoal: String(draft.repGoal),
+    repGoal: typeof draft.repGoal === "number" ? String(draft.repGoal) : undefined,
     instructions: draft.instructions,
     weightsInvolved: draft.weightsInvolved,
+    media: draft.media,
     sourceDraftId: draft.id,
     createdAt: draft.createdAt,
     updatedAt,
@@ -430,6 +551,7 @@ function assetSearchFields(asset: LocalPTPortfolioAsset) {
         exercise.exerciseName,
         exercise.repGoal,
         exercise.instructions,
+        exercise.media?.name,
       ]),
     ].filter((value): value is string => Boolean(value));
   }
@@ -441,6 +563,7 @@ function assetSearchFields(asset: LocalPTPortfolioAsset) {
     asset.description,
     asset.instructions,
     asset.objective,
+    asset.media?.name,
   ].filter((value): value is string => Boolean(value));
 }
 
@@ -469,6 +592,7 @@ function createRoutineExerciseRow(): RoutineExerciseRow {
     repGoal: "",
     instructions: "",
     weightsInvolved: false,
+    media: null,
   };
 }
 
@@ -488,6 +612,51 @@ function appendUniquePortfolioAsset(
   });
 
   return exists ? assets : [asset, ...assets];
+}
+
+function upsertPortfolioAsset(
+  assets: LocalPTPortfolioAsset[],
+  asset: LocalPTPortfolioAsset,
+) {
+  const existingIndex = assets.findIndex((current) => {
+    if (asset.sourceDraftId && current.sourceDraftId) {
+      return current.sourceDraftId === asset.sourceDraftId;
+    }
+
+    return current.id === asset.id;
+  });
+
+  if (existingIndex < 0) {
+    return [asset, ...assets];
+  }
+
+  return assets.map((current, index) => (index === existingIndex ? asset : current));
+}
+
+function upsertRepAssetIntoAllSingularExercisesFolder(
+  folders: LocalPTPortfolioFolder[],
+  repAsset: LocalPTPortfolioAsset,
+  updatedAt: string,
+): LocalPTPortfolioFolder[] {
+  const ensured = ensureAllSingularExercisesFolder(folders);
+
+  return ensured.folders.map((folder) => {
+    if (folder.id !== SYSTEM_ALL_SINGULAR_EXERCISES_FOLDER_ID) {
+      return folder;
+    }
+
+    return {
+      ...folder,
+      source: "system-local",
+      title: SYSTEM_ALL_SINGULAR_EXERCISES_FOLDER_TITLE,
+      assets: upsertPortfolioAsset(
+        folder.assets.filter((asset) => asset.type === "rep"),
+        repAsset,
+      ),
+      exercises: [],
+      updatedAt,
+    };
+  });
 }
 
 function removeLegacyRoutineExerciseStrings(
@@ -570,14 +739,15 @@ function repairPublishedRoutineDraftAssets(input: {
       if (localFolderIndex >= 0) {
         const folder = nextLocalFolders[localFolderIndex];
         const nextAssets = appendUniquePortfolioAsset(folder.assets, routineAsset);
-        if (nextAssets !== folder.assets) {
-          nextLocalFolders[localFolderIndex] = {
-            ...folder,
-            title: target.name.trim() || folder.title,
-            assets: nextAssets,
-            exercises: removeLegacyRoutineExerciseStrings(folder.exercises, draft),
-            updatedAt: routineAsset.updatedAt,
-          };
+      if (nextAssets !== folder.assets) {
+        nextLocalFolders[localFolderIndex] = {
+          ...folder,
+          source: folder.source,
+          title: target.name.trim() || folder.title,
+          assets: nextAssets,
+          exercises: removeLegacyRoutineExerciseStrings(folder.exercises, draft),
+          updatedAt: routineAsset.updatedAt,
+        };
           changed = true;
         }
         assetPlaced = true;
@@ -646,9 +816,9 @@ export default function PTTrainingPage() {
   const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
   const [editingExerciseDraftId, setEditingExerciseDraftId] = useState<string | null>(null);
   const [exerciseName, setExerciseName] = useState("");
-  const [exerciseRepGoal, setExerciseRepGoal] = useState("");
   const [exerciseInstructions, setExerciseInstructions] = useState("");
   const [exerciseWeightsInvolved, setExerciseWeightsInvolved] = useState(false);
+  const [exerciseMedia, setExerciseMedia] = useState<PTTrainingDraftMedia | null>(null);
   const [exerciseErrors, setExerciseErrors] = useState<ExerciseFormErrors>({});
   const [routineDialogOpen, setRoutineDialogOpen] = useState(false);
   const [routineDialogPage, setRoutineDialogPage] = useState<"details" | "exercises">("details");
@@ -672,6 +842,8 @@ export default function PTTrainingPage() {
   const [exerciseDraftPublishDialog, setExerciseDraftPublishDialog] =
     useState<ExerciseDraftPublishDialogState>(null);
   const [exerciseDraftPublishError, setExerciseDraftPublishError] = useState<string | null>(null);
+  const [mediaPickerTarget, setMediaPickerTarget] = useState<MediaPickerTargetState>(null);
+  const [mediaPickerError, setMediaPickerError] = useState<string | null>(null);
   const [routineDraftToRemove, setRoutineDraftToRemove] = useState<LocalPTRoutineDraft | null>(null);
   const [routineDraftPublishDialog, setRoutineDraftPublishDialog] =
     useState<RoutineDraftPublishDialogState>(null);
@@ -679,11 +851,11 @@ export default function PTTrainingPage() {
   const deferredSearch = useDeferredValue(searchValue);
 
   useEffect(() => {
-    const storedLocalFolders = readLocalPTPortfolioFolders();
+    const ensuredFolders = ensureAllSingularExercisesFolder(readLocalPTPortfolioFolders());
     const storedOverlays = readLocalPTPortfolioFolderOverlays();
     const storedRoutineDrafts = readLocalPTRoutineDrafts();
     const repaired = repairPublishedRoutineDraftAssets({
-      localFolders: storedLocalFolders,
+      localFolders: ensuredFolders.folders,
       folderOverlays: storedOverlays,
       routineDrafts: storedRoutineDrafts,
     });
@@ -697,7 +869,7 @@ export default function PTTrainingPage() {
     setCustomFitnessTargets(readLocalPTCustomFitnessTargets());
     setCustomFitnessAttributes(readLocalPTCustomFitnessAttributes());
 
-    if (repaired.changed) {
+    if (repaired.changed || ensuredFolders.changed) {
       writeLocalPTPortfolioFolders(repaired.localFolders);
       writeLocalPTPortfolioFolderOverlays(repaired.folderOverlays);
       writeLocalPTRoutineDrafts(repaired.routineDrafts);
@@ -838,6 +1010,12 @@ export default function PTTrainingPage() {
         return;
       }
 
+      if (mediaPickerTarget) {
+        setMediaPickerTarget(null);
+        setMediaPickerError(null);
+        return;
+      }
+
       if (routineDraftPublishDialog) {
         if (routineDraftPublishDialog.newFolderDialogOpen) {
           setRoutineDraftPublishDialog({
@@ -886,9 +1064,9 @@ export default function PTTrainingPage() {
       setExerciseDialogOpen(false);
       setEditingExerciseDraftId(null);
       setExerciseName("");
-      setExerciseRepGoal("");
       setExerciseInstructions("");
       setExerciseWeightsInvolved(false);
+      setExerciseMedia(null);
       setExerciseErrors({});
       setRoutineDialogOpen(false);
       setRoutineDialogPage("details");
@@ -906,6 +1084,8 @@ export default function PTTrainingPage() {
       setRoutineOptionDialogKind(null);
       setRoutineOptionValue("");
       setRoutineOptionError(null);
+      setMediaPickerTarget(null);
+      setMediaPickerError(null);
     }
 
     window.addEventListener("keydown", handleKeyDown);
@@ -921,6 +1101,7 @@ export default function PTTrainingPage() {
     routineOptionDialogKind,
     exerciseDraftPublishDialog,
     exerciseDraftToRemove,
+    mediaPickerTarget,
     routineDraftPublishDialog,
     routineDraftToRemove,
   ]);
@@ -1037,9 +1218,12 @@ export default function PTTrainingPage() {
 
       return {
         id: folder.id,
-        source: "local" as const,
+        source: folder.source,
         title: folder.title,
-        description: "Stored locally until PT folder save routes are wired.",
+        description:
+          folder.source === "system-local"
+            ? "Local system folder that collects singular Rep assets."
+            : "Stored locally until PT folder save routes are wired.",
         updatedAt: folder.updatedAt,
         thumbnailDataUrl: folder.thumbnailDataUrl,
         color: folder.color ?? "grey",
@@ -1072,13 +1256,29 @@ export default function PTTrainingPage() {
         : [...filteredPortfolioFolders].sort(
             (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
           );
+    const limitedFolders = limitedSource.slice(0, PORTFOLIO_DIRECTORY_LIMIT);
+    const systemFolder = filteredPortfolioFolders.find(
+      (folder) => folder.id === SYSTEM_ALL_SINGULAR_EXERCISES_FOLDER_ID,
+    );
 
-    return limitedSource.slice(0, PORTFOLIO_DIRECTORY_LIMIT);
+    if (
+      !systemFolder ||
+      limitedFolders.some((folder) => folder.id === SYSTEM_ALL_SINGULAR_EXERCISES_FOLDER_ID)
+    ) {
+      return limitedFolders;
+    }
+
+    return [
+      systemFolder,
+      ...limitedFolders.filter((folder) => folder.id !== SYSTEM_ALL_SINGULAR_EXERCISES_FOLDER_ID),
+    ].slice(0, PORTFOLIO_DIRECTORY_LIMIT);
   }, [filteredPortfolioFolders, hasSearchValue, pinnedPortfolioFolderIds, portfolioDisplayMode]);
 
-  const portfolioFolderOptions = useMemo(
+  const publishablePortfolioFolderOptions = useMemo(
     () =>
-      portfolioDirectoryFolders.map((folder) => ({
+      portfolioDirectoryFolders
+        .filter((folder) => folder.source !== "system-local")
+        .map((folder) => ({
         id: folder.id,
         title: folder.title,
       })),
@@ -1132,6 +1332,7 @@ export default function PTTrainingPage() {
     ? routineDrafts.find((draft) => draft.id === routineDraftPublishDialog.draftId) ?? null
     : null;
   const totalDraftCount = exerciseDrafts.length + routineDrafts.length;
+  const selectedMediaPreview = selectedMediaForPicker();
 
   useEffect(() => {
     if (activeRoutineExerciseIndex <= routineRows.length - 1) {
@@ -1226,7 +1427,7 @@ export default function PTTrainingPage() {
   }
 
   function openPortfolioFolderEditMode() {
-    if (!selectedPortfolioFolder) {
+    if (!selectedPortfolioFolder || selectedPortfolioFolder.source === "system-local") {
       return;
     }
 
@@ -1346,7 +1547,7 @@ export default function PTTrainingPage() {
       return;
     }
 
-    if (selectedPortfolioFolder.source === "local") {
+    if (selectedPortfolioFolder.source !== "bff") {
       const nextFolders = localPortfolioFolders.map((folder) =>
         folder.id === selectedPortfolioFolder.id
           ? {
@@ -1391,9 +1592,9 @@ export default function PTTrainingPage() {
   function openExerciseDialog() {
     setEditingExerciseDraftId(null);
     setExerciseName("");
-    setExerciseRepGoal("");
     setExerciseInstructions("");
     setExerciseWeightsInvolved(false);
+    setExerciseMedia(null);
     setExerciseErrors({});
     setExerciseDialogOpen(true);
   }
@@ -1402,9 +1603,9 @@ export default function PTTrainingPage() {
     setExerciseDialogOpen(false);
     setEditingExerciseDraftId(null);
     setExerciseName("");
-    setExerciseRepGoal("");
     setExerciseInstructions("");
     setExerciseWeightsInvolved(false);
+    setExerciseMedia(null);
     setExerciseErrors({});
   }
 
@@ -1412,9 +1613,9 @@ export default function PTTrainingPage() {
     setExerciseDialogOpen(true);
     setEditingExerciseDraftId(draft.id);
     setExerciseName(draft.exerciseName);
-    setExerciseRepGoal(String(draft.repGoal));
     setExerciseInstructions(draft.instructions);
     setExerciseWeightsInvolved(draft.weightsInvolved);
+    setExerciseMedia(draft.media ?? null);
     setExerciseErrors({});
   }
 
@@ -1423,9 +1624,10 @@ export default function PTTrainingPage() {
       id: existingDraft?.id,
       title: exerciseName,
       exerciseName,
-      repGoal: Number(exerciseRepGoal),
+      repGoal: existingDraft?.repGoal,
       instructions: exerciseInstructions,
       weightsInvolved: exerciseWeightsInvolved,
+      media: exerciseMedia,
       createdAt: existingDraft?.createdAt,
       editedAt: new Date().toISOString(),
     });
@@ -1435,6 +1637,16 @@ export default function PTTrainingPage() {
     const nextDrafts = exerciseDrafts.some((draft) => draft.id === nextDraft.id)
       ? exerciseDrafts.map((draft) => (draft.id === nextDraft.id ? nextDraft : draft))
       : [nextDraft, ...exerciseDrafts];
+    const updatedAt = nextDraft.editedAt ?? nextDraft.createdAt;
+    const nextRepAsset = buildRepAssetFromDraft(nextDraft, updatedAt);
+    const nextFolders = upsertRepAssetIntoAllSingularExercisesFolder(
+      localPortfolioFolders,
+      nextRepAsset,
+      updatedAt,
+    );
+
+    setLocalPortfolioFolders(nextFolders);
+    writeLocalPTPortfolioFolders(nextFolders);
     setExerciseDrafts(nextDrafts);
     writeLocalPTExerciseDrafts(nextDrafts);
   }
@@ -1444,16 +1656,6 @@ export default function PTTrainingPage() {
 
     if (exerciseName.trim().length === 0) {
       nextErrors.exerciseName = "Exercise is required.";
-    }
-
-    if (exerciseRepGoal.trim().length === 0) {
-      nextErrors.repGoal = "Rep Goal is required.";
-    } else if (!/^\d+$/.test(exerciseRepGoal.trim())) {
-      nextErrors.repGoal = "Rep Goal must be a whole number.";
-    }
-
-    if (exerciseInstructions.trim().length === 0) {
-      nextErrors.instructions = "Instructions are required.";
     }
 
     if (Object.keys(nextErrors).length > 0) {
@@ -1501,6 +1703,101 @@ export default function PTTrainingPage() {
     closeExerciseDraftRemovalDialog();
   }
 
+  function openMediaPickerForExerciseDraft() {
+    setMediaPickerError(null);
+    setMediaPickerTarget({ kind: "exercise-draft" });
+  }
+
+  function openMediaPickerForRoutineRow(rowId: string) {
+    setMediaPickerError(null);
+    setMediaPickerTarget({ kind: "routine-row", rowId });
+  }
+
+  function closeMediaPicker() {
+    setMediaPickerTarget(null);
+    setMediaPickerError(null);
+  }
+
+  function selectedMediaForPicker() {
+    if (!mediaPickerTarget) {
+      return null;
+    }
+
+    if (mediaPickerTarget.kind === "exercise-draft") {
+      return exerciseMedia;
+    }
+
+    return routineRows.find((row) => row.id === mediaPickerTarget.rowId)?.media ?? null;
+  }
+
+  function applyMediaToPickerTarget(media: PTTrainingDraftMedia | null) {
+    if (!mediaPickerTarget) {
+      return;
+    }
+
+    if (mediaPickerTarget.kind === "exercise-draft") {
+      setExerciseMedia(media);
+      return;
+    }
+
+    setRoutineRows((current) =>
+      current.map((row) =>
+        row.id === mediaPickerTarget.rowId
+          ? {
+              ...row,
+              media,
+            }
+          : row,
+      ),
+    );
+  }
+
+  async function handleMediaSelection(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    const kind = isVideoMediaType(file.type)
+      ? "video"
+      : isImageMediaType(file.type)
+        ? "image"
+        : null;
+
+    if (!kind) {
+      setMediaPickerError("Upload a PNG, JPEG, WEBP, GIF, MP4, or WEBM file.");
+      return;
+    }
+
+    const maxSize = kind === "video" ? TRAINING_VIDEO_MEDIA_MAX_BYTES : TRAINING_IMAGE_MEDIA_MAX_BYTES;
+    if (file.size > maxSize) {
+      setMediaPickerError(
+        `${kind === "video" ? "Video" : "Image"} files must be ${formatMediaSize(maxSize)} or smaller.`,
+      );
+      return;
+    }
+
+    try {
+      const dataUrl = await readTrainingMediaFile(file);
+      applyMediaToPickerTarget({
+        id: createLocalPTDraftId(),
+        kind,
+        name: file.name,
+        mimeType: file.type,
+        size: file.size,
+        dataUrl,
+        addedAt: new Date().toISOString(),
+      });
+      setMediaPickerError(null);
+    } catch (error) {
+      setMediaPickerError(error instanceof Error ? error.message : "Unable to read that file.");
+    }
+  }
+
+  function removeSelectedMedia() {
+    applyMediaToPickerTarget(null);
+    setMediaPickerError(null);
+  }
+
   function resetRoutineDialogState() {
     setRoutineDialogPage("details");
     setEditingRoutineDraftId(null);
@@ -1545,6 +1842,7 @@ export default function PTTrainingPage() {
             repGoal: String(exercise.repGoal),
             instructions: exercise.instructions,
             weightsInvolved: exercise.weightsInvolved,
+            media: exercise.media ?? null,
           }))
         : [createRoutineExerciseRow()],
     );
@@ -1776,6 +2074,7 @@ export default function PTTrainingPage() {
         repGoal: Number(row.repGoal),
         instructions: row.instructions,
         weightsInvolved: row.weightsInvolved,
+        media: row.media ?? null,
       })),
       createdAt: existingDraft?.createdAt,
       editedAt: overrides?.editedAt ?? new Date().toISOString(),
@@ -1983,7 +2282,7 @@ export default function PTTrainingPage() {
     }
 
     const existingNames = [
-      ...portfolioFolderOptions.map((folder) => folder.title),
+      ...publishablePortfolioFolderOptions.map((folder) => folder.title),
       ...exerciseDraftPublishDialog.localFolderOptions.map((folder) => folder.name),
     ];
     if (
@@ -2037,7 +2336,7 @@ export default function PTTrainingPage() {
       exerciseDraftPublishDialog.selectedTargets,
     ).reduce<LocalPTRoutineDraftPublishTarget[]>((next, target) => {
       if (target.type === "existing-folder") {
-        const selectedFolder = portfolioFolderOptions.find((folder) => folder.id === target.id);
+        const selectedFolder = publishablePortfolioFolderOptions.find((folder) => folder.id === target.id);
         if (!selectedFolder) {
           return next;
         }
@@ -2075,7 +2374,11 @@ export default function PTTrainingPage() {
 
     const updatedAt = new Date().toISOString();
     const repAsset = buildRepAssetFromDraft(publishingExerciseDraft, updatedAt);
-    let nextFolders = [...localPortfolioFolders];
+    let nextFolders = upsertRepAssetIntoAllSingularExercisesFolder(
+      localPortfolioFolders,
+      repAsset,
+      updatedAt,
+    );
     let nextOverlays = [...portfolioFolderOverlays];
 
     selectedTargets.forEach((target) => {
@@ -2085,7 +2388,7 @@ export default function PTTrainingPage() {
           const overlay = nextOverlays[overlayIndex];
           nextOverlays[overlayIndex] = {
             ...overlay,
-            assets: appendUniquePortfolioAsset(overlay.assets, repAsset),
+            assets: upsertPortfolioAsset(overlay.assets, repAsset),
             updatedAt,
           };
           return;
@@ -2116,8 +2419,9 @@ export default function PTTrainingPage() {
         const folder = nextFolders[localFolderIndex];
         nextFolders[localFolderIndex] = {
           ...folder,
+          source: folder.source,
           title: target.name.trim() || folder.title,
-          assets: appendUniquePortfolioAsset(folder.assets, repAsset),
+          assets: upsertPortfolioAsset(folder.assets, repAsset),
           updatedAt,
         };
         return;
@@ -2267,7 +2571,7 @@ export default function PTTrainingPage() {
     }
 
     const existingNames = [
-      ...portfolioFolderOptions.map((folder) => folder.title),
+      ...publishablePortfolioFolderOptions.map((folder) => folder.title),
       ...routineDraftPublishDialog.localFolderOptions.map((folder) => folder.name),
     ];
     if (
@@ -2314,7 +2618,7 @@ export default function PTTrainingPage() {
       routineDraftPublishDialog.selectedTargets,
     ).reduce<LocalPTRoutineDraftPublishTarget[]>((next, target) => {
       if (target.type === "existing-folder") {
-        const selectedFolder = portfolioFolderOptions.find((folder) => folder.id === target.id);
+        const selectedFolder = publishablePortfolioFolderOptions.find((folder) => folder.id === target.id);
         if (!selectedFolder) {
           return next;
         }
@@ -2393,6 +2697,7 @@ export default function PTTrainingPage() {
         const folder = nextFolders[localFolderIndex];
         nextFolders[localFolderIndex] = {
           ...folder,
+          source: folder.source,
           title: target.name.trim() || folder.title,
           assets: appendUniquePortfolioAsset(folder.assets, routineAsset),
           exercises: removeLegacyRoutineExerciseStrings(folder.exercises, publishingRoutineDraft),
@@ -2668,12 +2973,16 @@ export default function PTTrainingPage() {
                                 Edited on {formatDraftTimestamp(draft.editedAt ?? draft.createdAt)}
                               </p>
                               <p className="pt-training-local-draft-card__meta">
-                                Rep Goal: {draft.repGoal}
-                              </p>
-                              <p className="pt-training-local-draft-card__meta">
                                 Weights Involved: {draft.weightsInvolved ? "Yes" : "No"}
                               </p>
-                              <p className="pt-training-local-draft-card__note">{draft.instructions}</p>
+                              {draft.media ? (
+                                <p className="pt-training-local-draft-card__meta">
+                                  Media: {draft.media.name}
+                                </p>
+                              ) : null}
+                              {draft.instructions ? (
+                                <p className="pt-training-local-draft-card__note">{draft.instructions}</p>
+                              ) : null}
                             </div>
                           </button>
                           <div className="pt-training-local-draft-card__actions">
@@ -3058,13 +3367,15 @@ export default function PTTrainingPage() {
                   )}
                 </div>
                 <div className="pt-training-modal__actions pt-training-modal__actions--centered">
-                  <button
-                    type="button"
-                    className="pt-training-modal__secondary-action mobile-focus-ring"
-                    onClick={openPortfolioFolderEditMode}
-                  >
-                    Edit Folder
-                  </button>
+                  {selectedPortfolioFolder.source !== "system-local" ? (
+                    <button
+                      type="button"
+                      className="pt-training-modal__secondary-action mobile-focus-ring"
+                      onClick={openPortfolioFolderEditMode}
+                    >
+                      Edit Folder
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ) : (
@@ -3351,6 +3662,17 @@ export default function PTTrainingPage() {
                               <p className="pt-training-portfolio-list-description">
                                 Weights involved: {exercise.weightsInvolved ? "Yes" : "No"}
                               </p>
+                              {exercise.media ? (
+                                <div className="pt-training-media-picker__preview">
+                                  {renderTrainingMediaPreview(
+                                    exercise.media,
+                                    "pt-training-media-picker__preview-media",
+                                  )}
+                                  <p className="pt-training-portfolio-list-description">
+                                    Media: {exercise.media.name}
+                                  </p>
+                                </div>
+                              ) : null}
                             </div>
                           </li>
                         ))}
@@ -3367,15 +3689,28 @@ export default function PTTrainingPage() {
                   <p className="pt-training-builder-form__helper">
                     Exercise: {selectedPortfolioAssetRecord.exerciseName || selectedPortfolioAssetRecord.title}
                   </p>
-                  <p className="pt-training-builder-form__helper">
-                    Rep Goal: {selectedPortfolioAssetRecord.repGoal || "Not set"}
-                  </p>
+                  {selectedPortfolioAssetRecord.repGoal ? (
+                    <p className="pt-training-builder-form__helper">
+                      Rep Goal: {selectedPortfolioAssetRecord.repGoal}
+                    </p>
+                  ) : null}
                   <p className="pt-training-builder-form__helper">
                     Instructions: {selectedPortfolioAssetRecord.instructions || "No instructions added."}
                   </p>
                   <p className="pt-training-builder-form__helper">
                     Weights involved: {selectedPortfolioAssetRecord.weightsInvolved ? "Yes" : "No"}
                   </p>
+                  {selectedPortfolioAssetRecord.media ? (
+                    <div className="pt-training-media-picker__preview">
+                      {renderTrainingMediaPreview(
+                        selectedPortfolioAssetRecord.media,
+                        "pt-training-media-picker__preview-media",
+                      )}
+                      <p className="pt-training-builder-form__helper">
+                        Media: {selectedPortfolioAssetRecord.media.name}
+                      </p>
+                    </div>
+                  ) : null}
                   <p className="pt-training-builder-form__helper">
                     Created on: {formatDraftTimestamp(selectedPortfolioAssetRecord.createdAt)}
                   </p>
@@ -3425,11 +3760,6 @@ export default function PTTrainingPage() {
             </div>
 
             <div className="pt-training-modal__form pt-training-builder-form pt-training-exercise-form">
-              <div className="pt-training-builder-form__section-copy">
-                <p className="pt-training-builder-form__section-eyebrow">Page 2</p>
-                <h3 className="pt-training-builder-form__section-title">Routine Exercises</h3>
-              </div>
-
               <datalist id="pt-training-exercise-suggestions">
                 {exerciseNameSuggestions.map((option) => (
                   <option key={option} value={option} />
@@ -3438,7 +3768,7 @@ export default function PTTrainingPage() {
 
               <section className="pt-training-builder-form__exercise-row pt-training-exercise-form__panel">
                 <div className="pt-training-builder-form__exercise-row-header">
-                  <p className="pt-training-builder-form__exercise-row-title">Exercise 1</p>
+                  <p className="pt-training-builder-form__exercise-row-title">Exercise Details</p>
                 </div>
 
                 <div className="pt-training-builder-form__field pt-training-exercise-form__field">
@@ -3460,28 +3790,7 @@ export default function PTTrainingPage() {
                 </div>
 
                 <div className="pt-training-builder-form__field pt-training-exercise-form__field">
-                  <label htmlFor="pt-training-exercise-rep-goal">Rep Goal</label>
-                  <input
-                    id="pt-training-exercise-rep-goal"
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    step="1"
-                    value={exerciseRepGoal}
-                    onChange={(event) => {
-                      setExerciseRepGoal(sanitizeNumericInput(event.target.value));
-                      setExerciseErrors((current) => ({ ...current, repGoal: undefined }));
-                    }}
-                  />
-                  {exerciseErrors.repGoal ? (
-                    <p className="pt-training-builder-form__error" role="alert">
-                      {exerciseErrors.repGoal}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="pt-training-builder-form__field pt-training-exercise-form__field">
-                  <label htmlFor="pt-training-exercise-instructions">Instructions</label>
+                  <label htmlFor="pt-training-exercise-instructions">Instructions optional</label>
                   <textarea
                     id="pt-training-exercise-instructions"
                     value={exerciseInstructions}
@@ -3491,11 +3800,6 @@ export default function PTTrainingPage() {
                     }}
                     rows={4}
                   />
-                  {exerciseErrors.instructions ? (
-                    <p className="pt-training-builder-form__error" role="alert">
-                      {exerciseErrors.instructions}
-                    </p>
-                  ) : null}
                 </div>
 
                 <fieldset className="pt-training-builder-form__field pt-training-builder-form__toggle-field pt-training-exercise-form__field">
@@ -3532,6 +3836,29 @@ export default function PTTrainingPage() {
                     </label>
                   </div>
                 </fieldset>
+
+                <div className="pt-training-builder-form__field pt-training-exercise-form__field">
+                  <label>Media</label>
+                  <button
+                    type="button"
+                    className="pt-training-modal__secondary-action pt-training-media-picker__trigger mobile-focus-ring"
+                    onClick={openMediaPickerForExerciseDraft}
+                  >
+                    {exerciseMedia ? "Update Media" : "Add Media"}
+                  </button>
+                  {exerciseMedia ? (
+                    <div className="pt-training-media-picker__preview">
+                      {renderTrainingMediaPreview(exerciseMedia, "pt-training-media-picker__preview-media")}
+                      <p className="pt-training-builder-form__helper">
+                        {exerciseMedia.name} ({formatMediaSize(exerciseMedia.size)})
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="pt-training-builder-form__helper">
+                      Add a local image, GIF, or video preview for exercise instructions.
+                    </p>
+                  )}
+                </div>
               </section>
 
               <div className="pt-training-modal__actions pt-training-exercise-form__actions">
@@ -3548,6 +3875,112 @@ export default function PTTrainingPage() {
                   onClick={handleSaveExerciseDraft}
                 >
                   Save Exercise Draft
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {mediaPickerTarget ? (
+        <div
+          className="pt-training-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeMediaPicker();
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pt-training-media-picker-title"
+            className="pt-training-modal pt-training-media-picker"
+          >
+            <div className="pt-training-modal__header">
+              <div className="mobile-section__copy">
+                <p className="mobile-section__eyebrow">Local-only exercise media</p>
+                <h2 id="pt-training-media-picker-title" className="mobile-section__title">
+                  Add Media
+                </h2>
+                <p className="mobile-section__description">
+                  Store visual exercise instructions locally without uploading anything to the backend.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="pt-training-modal__secondary-action mobile-focus-ring"
+                onClick={closeMediaPicker}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="pt-training-modal__form pt-training-builder-form">
+              <div className="pt-training-builder-form__field">
+                <label htmlFor="pt-training-media-image-input">Upload image or GIF</label>
+                <input
+                  id="pt-training-media-image-input"
+                  type="file"
+                  accept={TRAINING_IMAGE_MEDIA_ACCEPT}
+                  onChange={(event) => {
+                    void handleMediaSelection(event.target.files?.[0] ?? null);
+                  }}
+                />
+                <p className="pt-training-builder-form__helper">
+                  Accepts PNG, JPEG, WEBP, and GIF files up to {formatMediaSize(TRAINING_IMAGE_MEDIA_MAX_BYTES)}.
+                </p>
+              </div>
+
+              <div className="pt-training-builder-form__field">
+                <label htmlFor="pt-training-media-video-input">Upload video</label>
+                <input
+                  id="pt-training-media-video-input"
+                  type="file"
+                  accept={TRAINING_VIDEO_MEDIA_ACCEPT}
+                  onChange={(event) => {
+                    void handleMediaSelection(event.target.files?.[0] ?? null);
+                  }}
+                />
+                <p className="pt-training-builder-form__helper">
+                  Accepts MP4 and WEBM files up to {formatMediaSize(TRAINING_VIDEO_MEDIA_MAX_BYTES)}.
+                </p>
+              </div>
+
+              {selectedMediaPreview ? (
+                <div className="pt-training-media-picker__preview">
+                  {renderTrainingMediaPreview(
+                    selectedMediaPreview,
+                    "pt-training-media-picker__preview-media",
+                  )}
+                  <p className="pt-training-builder-form__helper">
+                    {selectedMediaPreview.name} ({formatMediaSize(selectedMediaPreview.size)})
+                  </p>
+                </div>
+              ) : null}
+
+              {mediaPickerError ? (
+                <p className="pt-training-media-picker__error" role="alert">
+                  {mediaPickerError}
+                </p>
+              ) : null}
+
+              <div className="pt-training-modal__actions pt-training-modal__actions--centered">
+                {selectedMediaPreview ? (
+                  <button
+                    type="button"
+                    className="pt-training-modal__secondary-action mobile-focus-ring"
+                    onClick={removeSelectedMedia}
+                  >
+                    Remove Media
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="pt-training-modal__secondary-action mobile-focus-ring"
+                  onClick={closeMediaPicker}
+                >
+                  Cancel
                 </button>
               </div>
             </div>
@@ -3941,6 +4374,34 @@ export default function PTTrainingPage() {
                           </label>
                         </div>
                       </fieldset>
+
+                      <div className="pt-training-builder-form__field">
+                        <label>Media</label>
+                        <button
+                          type="button"
+                          className="pt-training-modal__secondary-action pt-training-media-picker__trigger mobile-focus-ring"
+                          onClick={() => {
+                            openMediaPickerForRoutineRow(activeRoutineRow.id);
+                          }}
+                        >
+                          {activeRoutineRow.media ? "Update Media" : "Add Media"}
+                        </button>
+                        {activeRoutineRow.media ? (
+                          <div className="pt-training-media-picker__preview">
+                            {renderTrainingMediaPreview(
+                              activeRoutineRow.media,
+                              "pt-training-media-picker__preview-media",
+                            )}
+                            <p className="pt-training-builder-form__helper">
+                              {activeRoutineRow.media.name} ({formatMediaSize(activeRoutineRow.media.size)})
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="pt-training-builder-form__helper">
+                            Add a local image, GIF, or video preview for this exercise row.
+                          </p>
+                        )}
+                      </div>
                     </section>
                   ) : null}
 
@@ -4166,8 +4627,8 @@ export default function PTTrainingPage() {
                   </div>
 
                   <div className="pt-training-publish-folder-picker__list">
-                    {portfolioFolderOptions.length > 0 ? (
-                      portfolioFolderOptions.map((folder) => (
+                    {publishablePortfolioFolderOptions.length > 0 ? (
+                      publishablePortfolioFolderOptions.map((folder) => (
                         <label
                           key={folder.id}
                           className="pt-training-publish-folder-picker__option"
@@ -4482,8 +4943,8 @@ export default function PTTrainingPage() {
                   </div>
 
                   <div className="pt-training-publish-folder-picker__list">
-                    {portfolioFolderOptions.length > 0 ? (
-                      portfolioFolderOptions.map((folder) => (
+                    {publishablePortfolioFolderOptions.length > 0 ? (
+                      publishablePortfolioFolderOptions.map((folder) => (
                         <label
                           key={folder.id}
                           className="pt-training-publish-folder-picker__option"
