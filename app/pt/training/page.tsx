@@ -2334,19 +2334,22 @@ export default function PTTrainingPage() {
                   {portfolioFolderEditForm.tags.length > 0 ? (
                     <div className="pt-training-publish-folder-picker__list">
                       {portfolioFolderEditForm.tags.map((tag) => (
-                        <button
-                          key={tag}
-                          type="button"
-                          className="pt-training-publish-folder-picker__local-tag mobile-focus-ring"
-                          onClick={() => {
-                            updatePortfolioFolderEditForm((current) => ({
-                              ...current,
-                              tags: current.tags.filter((item) => item !== tag),
-                            }));
-                          }}
-                        >
-                          {tag}
-                        </button>
+                        <span key={tag} className="pt-training-folder-edit__tag">
+                          <span className="pt-training-folder-edit__tag-label">{tag}</span>
+                          <button
+                            type="button"
+                            className="pt-training-folder-edit__tag-remove mobile-focus-ring"
+                            aria-label={`Remove ${tag} tag`}
+                            onClick={() => {
+                              updatePortfolioFolderEditForm((current) => ({
+                                ...current,
+                                tags: current.tags.filter((item) => item !== tag),
+                              }));
+                            }}
+                          >
+                            ×
+                          </button>
+                        </span>
                       ))}
                     </div>
                   ) : null}
