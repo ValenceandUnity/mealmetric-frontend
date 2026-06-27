@@ -1010,6 +1010,32 @@ describe("PTTrainingPage mobile experience", () => {
       target: { value: "Explosive" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.change(screen.getByLabelText("Tags"), {
+      target: { value: "Stability" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Explosive")).toBeTruthy();
+      expect(screen.getByText("Stability")).toBeTruthy();
+    });
+
+    expect(screen.queryByRole("button", { name: "Explosive" })).toBeNull();
+    fireEvent.click(screen.getByText("Explosive"));
+    fireEvent.click(screen.getByText("Stability").closest(".pt-training-folder-edit__tag") as HTMLElement);
+
+    await waitFor(() => {
+      expect(screen.getByText("Explosive")).toBeTruthy();
+      expect(screen.getByText("Stability")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Stability tag" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Stability")).toBeNull();
+      expect(screen.getByText("Explosive")).toBeTruthy();
+    });
+
     fireEvent.change(screen.getByLabelText("Exercises"), {
       target: { value: "Box Jump" },
     });
