@@ -4337,6 +4337,24 @@ html[data-theme="light"] .mobile-training-form textarea {
   color: var(--mobile-text-muted);
 }
 
+.pt-training-local-draft-card__portfolio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.pt-training-local-draft-card__portfolio-button {
+  min-height: 2rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid rgba(96, 165, 250, 0.24);
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.14);
+  color: #dbeafe;
+  font-size: 0.78rem;
+  font-weight: 700;
+  box-shadow: none;
+}
+
 .pt-training-local-draft-tag {
   display: inline-flex;
   align-items: center;
@@ -4355,6 +4373,176 @@ html[data-theme="light"] .mobile-training-form textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+.pt-training-portfolio-directory {
+  display: grid;
+  gap: 1rem;
+}
+
+.pt-training-portfolio-directory__edit {
+  min-height: 2.6rem;
+  padding: 0.55rem 0.95rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--mobile-text);
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.pt-training-portfolio-directory__search {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.pt-training-portfolio-directory__search input {
+  width: 100%;
+}
+
+.pt-training-portfolio-directory__list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.pt-training-folder-row__item {
+  min-width: 0;
+}
+
+.pt-training-folder-row {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.95rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 1.3rem;
+  background:
+    linear-gradient(180deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.96));
+  color: var(--mobile-text);
+  text-align: left;
+  box-shadow: 0 18px 32px rgba(2, 6, 23, 0.18);
+}
+
+.pt-training-folder-row--grey {
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.pt-training-folder-row--green {
+  border-color: rgba(74, 222, 128, 0.28);
+}
+
+.pt-training-folder-row--purple {
+  border-color: rgba(196, 181, 253, 0.28);
+}
+
+.pt-training-folder-row--blue {
+  border-color: rgba(125, 211, 252, 0.3);
+}
+
+.pt-training-folder-row--amber {
+  border-color: rgba(253, 224, 71, 0.28);
+}
+
+.pt-training-folder-row__thumbnail {
+  width: 3.7rem;
+  height: 3.7rem;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 1rem;
+  background:
+    linear-gradient(145deg, rgba(71, 85, 105, 0.66), rgba(30, 41, 59, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pt-training-folder-row__thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pt-training-folder-row__thumbnail-placeholder {
+  width: 100%;
+  height: 100%;
+  display: inline-grid;
+  place-items: center;
+  color: rgba(226, 232, 240, 0.92);
+}
+
+.pt-training-folder-row__thumbnail-placeholder svg,
+.pt-training-folder-row__action svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pt-training-folder-row__copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.22rem;
+}
+
+.pt-training-folder-row__title,
+.pt-training-folder-row__updated,
+.pt-training-folder-row__source {
+  margin: 0;
+}
+
+.pt-training-folder-row__title {
+  color: #f8fafc;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.pt-training-folder-row__updated {
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.pt-training-folder-row__source {
+  color: #fde68a;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pt-training-folder-row__action {
+  width: 2.35rem;
+  height: 2.35rem;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.96);
+  color: #0f172a;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.2);
+}
+
+.pt-training-folder-detail,
+.pt-training-folder-edit {
+  display: grid;
+  gap: 1rem;
+}
+
+.pt-training-folder-detail .pt-training-publish-folder-picker__list {
+  grid-template-columns: repeat(auto-fit, minmax(5.5rem, max-content));
+}
+
+.pt-training-folder-edit__inline-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
 }
 
 .pt-training-local-draft-action,
@@ -7532,6 +7720,18 @@ html[data-theme="light"] .client-settings-toggle__option {
 }
 
 @media (max-width: 420px) {
+  .pt-training-folder-edit__inline-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pt-training-folder-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .pt-training-folder-row__action {
+    display: none;
+  }
+
   .grid--3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
