@@ -91,9 +91,9 @@ type TrainingStateCardProps = {
 };
 
 type ExerciseFormErrors = {
-  description?: string;
+  exerciseName?: string;
+  repGoal?: string;
   instructions?: string;
-  objective?: string;
 };
 
 type RoutineDetailsErrors = {
@@ -137,6 +137,19 @@ type SelectedPortfolioAssetState = {
 
 type RoutineOptionDialogKind = "target" | "attribute" | null;
 type RoutineDraftPublishDialogState = {
+  draftId: string;
+  selectedTargets: LocalPTRoutineDraftPublishTarget[];
+  localFolderOptions: Array<{
+    id: string;
+    name: string;
+  }>;
+  folderPickerOpen: boolean;
+  newFolderDialogOpen: boolean;
+  newFolderName: string;
+  newFolderError: string | null;
+} | null;
+
+type ExerciseDraftPublishDialogState = {
   draftId: string;
   selectedTargets: LocalPTRoutineDraftPublishTarget[];
   localFolderOptions: Array<{
@@ -390,6 +403,22 @@ function buildRoutineAssetFromDraft(
   });
 }
 
+function buildRepAssetFromDraft(
+  draft: LocalPTExerciseDraft,
+  updatedAt: string,
+): LocalPTPortfolioAsset {
+  return createLocalPTPortfolioRepAsset({
+    title: draft.title,
+    exerciseName: draft.exerciseName,
+    repGoal: String(draft.repGoal),
+    instructions: draft.instructions,
+    weightsInvolved: draft.weightsInvolved,
+    sourceDraftId: draft.id,
+    createdAt: draft.createdAt,
+    updatedAt,
+  });
+}
+
 function assetSearchFields(asset: LocalPTPortfolioAsset) {
   if (asset.type === "routine") {
     return [
@@ -405,9 +434,14 @@ function assetSearchFields(asset: LocalPTPortfolioAsset) {
     ].filter((value): value is string => Boolean(value));
   }
 
-  return [asset.title, asset.description, asset.instructions, asset.objective].filter(
-    (value): value is string => Boolean(value),
-  );
+  return [
+    asset.title,
+    asset.exerciseName,
+    asset.repGoal,
+    asset.description,
+    asset.instructions,
+    asset.objective,
+  ].filter((value): value is string => Boolean(value));
 }
 
 function dedupePortfolioAssets(assets: LocalPTPortfolioAsset[]) {
@@ -610,9 +644,11 @@ export default function PTTrainingPage() {
   const [customFitnessTargets, setCustomFitnessTargets] = useState<string[]>([]);
   const [customFitnessAttributes, setCustomFitnessAttributes] = useState<string[]>([]);
   const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
-  const [exerciseDescription, setExerciseDescription] = useState("");
+  const [editingExerciseDraftId, setEditingExerciseDraftId] = useState<string | null>(null);
+  const [exerciseName, setExerciseName] = useState("");
+  const [exerciseRepGoal, setExerciseRepGoal] = useState("");
   const [exerciseInstructions, setExerciseInstructions] = useState("");
-  const [exerciseObjective, setExerciseObjective] = useState("");
+  const [exerciseWeightsInvolved, setExerciseWeightsInvolved] = useState(false);
   const [exerciseErrors, setExerciseErrors] = useState<ExerciseFormErrors>({});
   const [routineDialogOpen, setRoutineDialogOpen] = useState(false);
   const [routineDialogPage, setRoutineDialogPage] = useState<"details" | "exercises">("details");
@@ -632,6 +668,10 @@ export default function PTTrainingPage() {
   const [routineOptionDialogKind, setRoutineOptionDialogKind] = useState<RoutineOptionDialogKind>(null);
   const [routineOptionValue, setRoutineOptionValue] = useState("");
   const [routineOptionError, setRoutineOptionError] = useState<string | null>(null);
+  const [exerciseDraftToRemove, setExerciseDraftToRemove] = useState<LocalPTExerciseDraft | null>(null);
+  const [exerciseDraftPublishDialog, setExerciseDraftPublishDialog] =
+    useState<ExerciseDraftPublishDialogState>(null);
+  const [exerciseDraftPublishError, setExerciseDraftPublishError] = useState<string | null>(null);
   const [routineDraftToRemove, setRoutineDraftToRemove] = useState<LocalPTRoutineDraft | null>(null);
   const [routineDraftPublishDialog, setRoutineDraftPublishDialog] =
     useState<RoutineDraftPublishDialogState>(null);
@@ -751,6 +791,8 @@ export default function PTTrainingPage() {
       !exerciseDialogOpen &&
       !routineDialogOpen &&
       !routineOptionDialogKind &&
+      !exerciseDraftToRemove &&
+      !exerciseDraftPublishDialog &&
       !routineDraftToRemove &&
       !routineDraftPublishDialog
     ) {
@@ -766,6 +808,33 @@ export default function PTTrainingPage() {
         setRoutineOptionDialogKind(null);
         setRoutineOptionValue("");
         setRoutineOptionError(null);
+        return;
+      }
+
+      if (exerciseDraftPublishDialog) {
+        if (exerciseDraftPublishDialog.newFolderDialogOpen) {
+          setExerciseDraftPublishDialog({
+            ...exerciseDraftPublishDialog,
+            newFolderDialogOpen: false,
+            newFolderName: "",
+            newFolderError: null,
+          });
+          return;
+        }
+
+        if (exerciseDraftPublishDialog.folderPickerOpen) {
+          setExerciseDraftPublishDialog({
+            ...exerciseDraftPublishDialog,
+            folderPickerOpen: false,
+            newFolderDialogOpen: false,
+            newFolderName: "",
+            newFolderError: null,
+          });
+          return;
+        }
+
+        setExerciseDraftPublishDialog(null);
+        setExerciseDraftPublishError(null);
         return;
       }
 
@@ -796,6 +865,11 @@ export default function PTTrainingPage() {
         return;
       }
 
+      if (exerciseDraftToRemove) {
+        setExerciseDraftToRemove(null);
+        return;
+      }
+
       if (routineDraftToRemove) {
         setRoutineDraftToRemove(null);
         return;
@@ -810,9 +884,11 @@ export default function PTTrainingPage() {
       setPortfolioFolderDetailEditMode(false);
       setPortfolioFolderEditForm(null);
       setExerciseDialogOpen(false);
-      setExerciseDescription("");
+      setEditingExerciseDraftId(null);
+      setExerciseName("");
+      setExerciseRepGoal("");
       setExerciseInstructions("");
-      setExerciseObjective("");
+      setExerciseWeightsInvolved(false);
       setExerciseErrors({});
       setRoutineDialogOpen(false);
       setRoutineDialogPage("details");
@@ -843,6 +919,8 @@ export default function PTTrainingPage() {
     exerciseDialogOpen,
     routineDialogOpen,
     routineOptionDialogKind,
+    exerciseDraftPublishDialog,
+    exerciseDraftToRemove,
     routineDraftPublishDialog,
     routineDraftToRemove,
   ]);
@@ -1007,42 +1085,32 @@ export default function PTTrainingPage() {
     [portfolioDirectoryFolders],
   );
 
-  const routineExerciseSuggestions = useMemo(() => {
-    const localExerciseSuggestions = exerciseDrafts.map((draft) => draft.description);
-    const localRoutineSuggestions = routineDrafts.flatMap((draft) =>
-      draft.exercises.map((exercise) => exercise.exerciseName),
-    );
-    const loadedSuggestions = [
-      ...view.routineCards.map((item) => item.title),
-      ...view.packageCards.map((item) => item.title),
-    ];
-    const inProgressRoutineSuggestions = routineRows.map((row) => row.exerciseName);
-
-    return dedupeStringValues([
-      ...localExerciseSuggestions,
-      ...localRoutineSuggestions,
-      ...loadedSuggestions,
-      ...inProgressRoutineSuggestions,
-    ]);
-  }, [exerciseDrafts, routineDrafts, routineRows, view.packageCards, view.routineCards]);
-
-  const portfolioExerciseSuggestions = useMemo(
+  const exerciseNameSuggestions = useMemo(
     () =>
       dedupeStringValues([
-        ...exerciseDrafts.map((draft) => draft.description),
+        ...exerciseDrafts.map((draft) => draft.exerciseName),
         ...routineDrafts.flatMap((draft) => draft.exercises.map((exercise) => exercise.exerciseName)),
-        ...routineDrafts.map((draft) => draft.routineName),
-        ...view.packageCards.map((item) => item.title),
-        ...view.routineCards.map((item) => item.title),
         ...portfolioDirectoryFolders.flatMap((folder) =>
           folder.assets.flatMap((asset) =>
             asset.type === "routine"
               ? asset.exercises.map((exercise) => exercise.exerciseName)
-              : [asset.title],
+              : [asset.exerciseName ?? asset.title],
           ),
         ),
+        ...view.packageCards.map((item) => item.title),
+        ...view.routineCards.map((item) => item.title),
+        ...routineRows.map((row) => row.exerciseName),
+        exerciseName,
       ]),
-    [exerciseDrafts, portfolioDirectoryFolders, routineDrafts, view.packageCards, view.routineCards],
+    [
+      exerciseDrafts,
+      exerciseName,
+      portfolioDirectoryFolders,
+      routineDrafts,
+      routineRows,
+      view.packageCards,
+      view.routineCards,
+    ],
   );
 
   const activeRoutineRow = routineRows[activeRoutineExerciseIndex] ?? null;
@@ -1057,9 +1125,13 @@ export default function PTTrainingPage() {
     selectedPortfolioAsset.folderId === selectedPortfolioFolder.id
       ? selectedPortfolioFolder.assets.find((asset) => asset.id === selectedPortfolioAsset.assetId) ?? null
       : null;
+  const publishingExerciseDraft = exerciseDraftPublishDialog
+    ? exerciseDrafts.find((draft) => draft.id === exerciseDraftPublishDialog.draftId) ?? null
+    : null;
   const publishingRoutineDraft = routineDraftPublishDialog
     ? routineDrafts.find((draft) => draft.id === routineDraftPublishDialog.draftId) ?? null
     : null;
+  const totalDraftCount = exerciseDrafts.length + routineDrafts.length;
 
   useEffect(() => {
     if (activeRoutineExerciseIndex <= routineRows.length - 1) {
@@ -1317,34 +1389,71 @@ export default function PTTrainingPage() {
   }
 
   function openExerciseDialog() {
-    setExerciseDescription("");
+    setEditingExerciseDraftId(null);
+    setExerciseName("");
+    setExerciseRepGoal("");
     setExerciseInstructions("");
-    setExerciseObjective("");
+    setExerciseWeightsInvolved(false);
     setExerciseErrors({});
     setExerciseDialogOpen(true);
   }
 
   function closeExerciseDialog() {
     setExerciseDialogOpen(false);
-    setExerciseDescription("");
+    setEditingExerciseDraftId(null);
+    setExerciseName("");
+    setExerciseRepGoal("");
     setExerciseInstructions("");
-    setExerciseObjective("");
+    setExerciseWeightsInvolved(false);
     setExerciseErrors({});
+  }
+
+  function openExerciseDraftForEdit(draft: LocalPTExerciseDraft) {
+    setExerciseDialogOpen(true);
+    setEditingExerciseDraftId(draft.id);
+    setExerciseName(draft.exerciseName);
+    setExerciseRepGoal(String(draft.repGoal));
+    setExerciseInstructions(draft.instructions);
+    setExerciseWeightsInvolved(draft.weightsInvolved);
+    setExerciseErrors({});
+  }
+
+  function buildExerciseDraft(existingDraft: LocalPTExerciseDraft | null) {
+    return createLocalPTExerciseDraft({
+      id: existingDraft?.id,
+      title: exerciseName,
+      exerciseName,
+      repGoal: Number(exerciseRepGoal),
+      instructions: exerciseInstructions,
+      weightsInvolved: exerciseWeightsInvolved,
+      createdAt: existingDraft?.createdAt,
+      editedAt: new Date().toISOString(),
+    });
+  }
+
+  function saveExerciseDraftRecord(nextDraft: LocalPTExerciseDraft) {
+    const nextDrafts = exerciseDrafts.some((draft) => draft.id === nextDraft.id)
+      ? exerciseDrafts.map((draft) => (draft.id === nextDraft.id ? nextDraft : draft))
+      : [nextDraft, ...exerciseDrafts];
+    setExerciseDrafts(nextDrafts);
+    writeLocalPTExerciseDrafts(nextDrafts);
   }
 
   function handleSaveExerciseDraft() {
     const nextErrors: ExerciseFormErrors = {};
 
-    if (exerciseDescription.trim().length === 0) {
-      nextErrors.description = "Exercise description is required.";
+    if (exerciseName.trim().length === 0) {
+      nextErrors.exerciseName = "Exercise is required.";
+    }
+
+    if (exerciseRepGoal.trim().length === 0) {
+      nextErrors.repGoal = "Rep Goal is required.";
+    } else if (!/^\d+$/.test(exerciseRepGoal.trim())) {
+      nextErrors.repGoal = "Rep Goal must be a whole number.";
     }
 
     if (exerciseInstructions.trim().length === 0) {
       nextErrors.instructions = "Instructions are required.";
-    }
-
-    if (exerciseObjective.trim().length === 0) {
-      nextErrors.objective = "Main objective is required.";
     }
 
     if (Object.keys(nextErrors).length > 0) {
@@ -1352,14 +1461,12 @@ export default function PTTrainingPage() {
       return;
     }
 
-    const nextDraft = createLocalPTExerciseDraft({
-      description: exerciseDescription,
-      instructions: exerciseInstructions,
-      objective: exerciseObjective,
-    });
-    const nextDrafts = [nextDraft, ...exerciseDrafts];
-    setExerciseDrafts(nextDrafts);
-    writeLocalPTExerciseDrafts(nextDrafts);
+    const existingDraft =
+      editingExerciseDraftId !== null
+        ? exerciseDrafts.find((draft) => draft.id === editingExerciseDraftId) ?? null
+        : null;
+    const nextDraft = buildExerciseDraft(existingDraft);
+    saveExerciseDraftRecord(nextDraft);
     closeExerciseDialog();
   }
 
@@ -1367,6 +1474,31 @@ export default function PTTrainingPage() {
     const nextDrafts = exerciseDrafts.filter((draft) => draft.id !== draftId);
     setExerciseDrafts(nextDrafts);
     writeLocalPTExerciseDrafts(nextDrafts);
+
+    if (editingExerciseDraftId === draftId) {
+      closeExerciseDialog();
+    }
+
+    if (nextDrafts.length === 0 && routineDrafts.length === 0) {
+      setRoutineDraftQueueOpen(false);
+    }
+  }
+
+  function openExerciseDraftRemovalDialog(draft: LocalPTExerciseDraft) {
+    setExerciseDraftToRemove(draft);
+  }
+
+  function closeExerciseDraftRemovalDialog() {
+    setExerciseDraftToRemove(null);
+  }
+
+  function confirmExerciseDraftRemoval() {
+    if (!exerciseDraftToRemove) {
+      return;
+    }
+
+    removeExerciseDraft(exerciseDraftToRemove.id);
+    closeExerciseDraftRemovalDialog();
   }
 
   function resetRoutineDialogState() {
@@ -1736,6 +1868,285 @@ export default function PTTrainingPage() {
     closeRoutineDraftRemovalDialog();
   }
 
+  function openExerciseDraftPublishDialog(draft: LocalPTExerciseDraft) {
+    setExerciseDraftPublishError(null);
+    setExerciseDraftPublishDialog({
+      draftId: draft.id,
+      selectedTargets: [],
+      localFolderOptions: [],
+      folderPickerOpen: false,
+      newFolderDialogOpen: false,
+      newFolderName: "",
+      newFolderError: null,
+    });
+  }
+
+  function closeExerciseDraftPublishDialog() {
+    setExerciseDraftPublishDialog(null);
+    setExerciseDraftPublishError(null);
+  }
+
+  function updateExerciseDraftPublishDialog(
+    updater: (current: NonNullable<ExerciseDraftPublishDialogState>) => NonNullable<ExerciseDraftPublishDialogState>,
+  ) {
+    setExerciseDraftPublishDialog((current) => (current ? updater(current) : current));
+    setExerciseDraftPublishError(null);
+  }
+
+  function toggleExerciseDraftPublishTarget(target: LocalPTRoutineDraftPublishTarget) {
+    updateExerciseDraftPublishDialog((current) => {
+      const matchIndex = current.selectedTargets.findIndex((item) => {
+        if (item.type !== target.type) {
+          return false;
+        }
+
+        if (target.type === "existing-folder") {
+          return item.id === target.id;
+        }
+
+        return normalizeOptionValue(item.name) === normalizeOptionValue(target.name);
+      });
+
+      if (matchIndex >= 0) {
+        return {
+          ...current,
+          selectedTargets: current.selectedTargets.filter((_, index) => index !== matchIndex),
+        };
+      }
+
+      return {
+        ...current,
+        selectedTargets: dedupePublishTargets([...current.selectedTargets, target]),
+      };
+    });
+  }
+
+  function hasSelectedExerciseDraftPublishTarget(target: LocalPTRoutineDraftPublishTarget) {
+    if (!exerciseDraftPublishDialog) {
+      return false;
+    }
+
+    return exerciseDraftPublishDialog.selectedTargets.some((item) => {
+      if (item.type !== target.type) {
+        return false;
+      }
+
+      if (target.type === "existing-folder") {
+        return item.id === target.id;
+      }
+
+      return normalizeOptionValue(item.name) === normalizeOptionValue(target.name);
+    });
+  }
+
+  function closeExerciseDraftFolderPicker() {
+    updateExerciseDraftPublishDialog((current) => ({
+      ...current,
+      folderPickerOpen: false,
+      newFolderDialogOpen: false,
+      newFolderName: "",
+      newFolderError: null,
+    }));
+  }
+
+  function openExerciseDraftNewFolderDialog() {
+    updateExerciseDraftPublishDialog((current) => ({
+      ...current,
+      folderPickerOpen: true,
+      newFolderDialogOpen: true,
+      newFolderName: "",
+      newFolderError: null,
+    }));
+  }
+
+  function closeExerciseDraftNewFolderDialog() {
+    updateExerciseDraftPublishDialog((current) => ({
+      ...current,
+      newFolderDialogOpen: false,
+      newFolderName: "",
+      newFolderError: null,
+    }));
+  }
+
+  function handleAddExerciseDraftPublishFolder() {
+    if (!exerciseDraftPublishDialog) {
+      return;
+    }
+
+    const folderName = exerciseDraftPublishDialog.newFolderName.trim();
+    if (!folderName) {
+      updateExerciseDraftPublishDialog((current) => ({
+        ...current,
+        newFolderError: "Folder name is required.",
+      }));
+      return;
+    }
+
+    const existingNames = [
+      ...portfolioFolderOptions.map((folder) => folder.title),
+      ...exerciseDraftPublishDialog.localFolderOptions.map((folder) => folder.name),
+    ];
+    if (
+      existingNames.some(
+        (name) => normalizeOptionValue(name) === normalizeOptionValue(folderName),
+      )
+    ) {
+      updateExerciseDraftPublishDialog((current) => ({
+        ...current,
+        newFolderError: "That folder name already exists.",
+      }));
+      return;
+    }
+
+    const nextFolder = {
+      id: createLocalPTDraftId(),
+      name: folderName,
+    };
+
+    updateExerciseDraftPublishDialog((current) => ({
+      ...current,
+      localFolderOptions: [...current.localFolderOptions, nextFolder],
+      selectedTargets: dedupePublishTargets([
+        ...current.selectedTargets,
+        {
+          type: "local-folder-draft",
+          id: nextFolder.id,
+          name: nextFolder.name,
+        },
+      ]),
+      newFolderDialogOpen: false,
+      newFolderName: "",
+      newFolderError: null,
+    }));
+  }
+
+  function confirmExerciseDraftPublish() {
+    if (!exerciseDraftPublishDialog) {
+      closeExerciseDraftPublishDialog();
+      return;
+    }
+
+    const publishingExerciseDraft =
+      exerciseDrafts.find((draft) => draft.id === exerciseDraftPublishDialog.draftId) ?? null;
+    if (!publishingExerciseDraft) {
+      closeExerciseDraftPublishDialog();
+      return;
+    }
+
+    const selectedTargets = dedupePublishTargets(
+      exerciseDraftPublishDialog.selectedTargets,
+    ).reduce<LocalPTRoutineDraftPublishTarget[]>((next, target) => {
+      if (target.type === "existing-folder") {
+        const selectedFolder = portfolioFolderOptions.find((folder) => folder.id === target.id);
+        if (!selectedFolder) {
+          return next;
+        }
+
+        next.push({
+          type: "existing-folder",
+          id: selectedFolder.id,
+          name: selectedFolder.title,
+        });
+        return next;
+      }
+
+      const localFolder = exerciseDraftPublishDialog.localFolderOptions.find(
+        (folder) =>
+          folder.id === target.id ||
+          normalizeOptionValue(folder.name) === normalizeOptionValue(target.name),
+      );
+      const name = localFolder?.name ?? target.name;
+      if (!name.trim()) {
+        return next;
+      }
+
+      next.push({
+        type: "local-folder-draft",
+        id: localFolder?.id ?? target.id,
+        name,
+      });
+      return next;
+    }, []);
+
+    if (selectedTargets.length === 0) {
+      setExerciseDraftPublishError("Select at least one portfolio folder.");
+      return;
+    }
+
+    const updatedAt = new Date().toISOString();
+    const repAsset = buildRepAssetFromDraft(publishingExerciseDraft, updatedAt);
+    let nextFolders = [...localPortfolioFolders];
+    let nextOverlays = [...portfolioFolderOverlays];
+
+    selectedTargets.forEach((target) => {
+      if (target.type === "existing-folder" && target.id) {
+        const overlayIndex = nextOverlays.findIndex((overlay) => overlay.id === target.id);
+        if (overlayIndex >= 0) {
+          const overlay = nextOverlays[overlayIndex];
+          nextOverlays[overlayIndex] = {
+            ...overlay,
+            assets: appendUniquePortfolioAsset(overlay.assets, repAsset),
+            updatedAt,
+          };
+          return;
+        }
+
+        nextOverlays = [
+          {
+            id: target.id,
+            source: "bff",
+            updatedAt,
+            color: "grey",
+            tags: [],
+            assets: [repAsset],
+            exercises: [],
+          },
+          ...nextOverlays,
+        ];
+        return;
+      }
+
+      const localFolderIndex = nextFolders.findIndex(
+        (folder) =>
+          folder.id === target.id ||
+          normalizeOptionValue(folder.title) === normalizeOptionValue(target.name),
+      );
+
+      if (localFolderIndex >= 0) {
+        const folder = nextFolders[localFolderIndex];
+        nextFolders[localFolderIndex] = {
+          ...folder,
+          title: target.name.trim() || folder.title,
+          assets: appendUniquePortfolioAsset(folder.assets, repAsset),
+          updatedAt,
+        };
+        return;
+      }
+
+      nextFolders = [
+        createLocalPTPortfolioFolder({
+          title: target.name,
+          assets: [repAsset],
+          tags: [],
+          exercises: [],
+        }),
+        ...nextFolders,
+      ];
+    });
+
+    const nextDrafts = exerciseDrafts.filter((draft) => draft.id !== publishingExerciseDraft.id);
+    setLocalPortfolioFolders(nextFolders);
+    writeLocalPTPortfolioFolders(nextFolders);
+    setPortfolioFolderOverlays(nextOverlays);
+    writeLocalPTPortfolioFolderOverlays(nextOverlays);
+    setExerciseDrafts(nextDrafts);
+    writeLocalPTExerciseDrafts(nextDrafts);
+    if (nextDrafts.length === 0 && routineDrafts.length === 0) {
+      setRoutineDraftQueueOpen(false);
+    }
+    closeExerciseDraftPublishDialog();
+  }
+
   function openRoutineDraftPublishDialog(draft: LocalPTRoutineDraft) {
     setRoutineDraftPublishError(null);
     setRoutineDraftPublishDialog({
@@ -2008,7 +2419,7 @@ export default function PTTrainingPage() {
     writeLocalPTPortfolioFolderOverlays(nextOverlays);
     setRoutineDrafts(nextDrafts);
     writeLocalPTRoutineDrafts(nextDrafts);
-    if (nextDrafts.length === 0) {
+    if (nextDrafts.length === 0 && exerciseDrafts.length === 0) {
       setRoutineDraftQueueOpen(false);
     }
     closeRoutineDraftPublishDialog();
@@ -2194,49 +2605,11 @@ export default function PTTrainingPage() {
                 ))}
               </div>
 
-              {exerciseDrafts.length > 0 ? (
-                <div className="pt-training-builder-drafts">
-                  <p className="pt-training-builder-drafts__title">Local exercise drafts</p>
-                  <div className="pt-training-builder-drafts__list">
-                    {exerciseDrafts.map((draft) => (
-                      <MobileCard
-                        key={draft.id}
-                        as="article"
-                        variant="soft"
-                        className="pt-training-local-draft-card"
-                      >
-                        <div className="pt-training-local-draft-card__copy">
-                          <div className="pt-training-local-draft-card__header">
-                            <p className="pt-training-local-draft-card__title">{draft.description}</p>
-                            <div className="pt-training-local-draft-card__asset-tags">
-                              <span className="pt-training-local-draft-tag">Local draft</span>
-                              <span className="pt-training-local-draft-tag">Rep</span>
-                            </div>
-                          </div>
-                          <p className="pt-training-local-draft-card__meta">Main objective: {draft.objective}</p>
-                          <p className="pt-training-local-draft-card__note">{draft.instructions}</p>
-                        </div>
-                        <button
-                          type="button"
-                          className="pt-training-local-draft-remove mobile-focus-ring"
-                          onClick={() => {
-                            removeExerciseDraft(draft.id);
-                          }}
-                          aria-label={`Remove local exercise draft ${draft.description}`}
-                        >
-                          Remove
-                        </button>
-                      </MobileCard>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
-              {routineDrafts.length > 0 ? (
+              {totalDraftCount > 0 ? (
                 <div className="pt-training-builder-drafts">
                   <div className="pt-training-builder-drafts__header">
                     <p className="pt-training-builder-drafts__title">
-                      Routine Draft Queue ({routineDrafts.length})
+                      Training Draft Queue ({totalDraftCount})
                     </p>
                     <button
                       type="button"
@@ -2244,7 +2617,7 @@ export default function PTTrainingPage() {
                       aria-expanded={routineDraftQueueOpen}
                       aria-controls="pt-training-routine-draft-queue"
                       aria-label={
-                        routineDraftQueueOpen ? "Hide routine draft queue" : "Show routine draft queue"
+                        routineDraftQueueOpen ? "Hide training draft queue" : "Show training draft queue"
                       }
                       onClick={() => {
                         setRoutineDraftQueueOpen((current) => !current);
@@ -2266,6 +2639,67 @@ export default function PTTrainingPage() {
 
                   {routineDraftQueueOpen ? (
                     <div id="pt-training-routine-draft-queue" className="pt-training-builder-drafts__list">
+                      {exerciseDrafts.map((draft) => (
+                        <MobileCard
+                          key={draft.id}
+                          as="article"
+                          variant="soft"
+                          className="pt-training-local-draft-card"
+                        >
+                          <button
+                            type="button"
+                            className="pt-training-local-draft-card__body mobile-focus-ring"
+                            onClick={() => {
+                              openExerciseDraftForEdit(draft);
+                            }}
+                            aria-label={`Edit rep draft ${draft.exerciseName}`}
+                          >
+                            <div className="pt-training-local-draft-card__copy">
+                              <div className="pt-training-local-draft-card__header">
+                                <p className="pt-training-local-draft-card__title">{draft.exerciseName}</p>
+                                <div className="pt-training-local-draft-card__asset-tags">
+                                  <span className="pt-training-local-draft-tag">Draft</span>
+                                  <span className="pt-training-local-draft-tag pt-training-local-draft-card__tag--rep">
+                                    Rep
+                                  </span>
+                                </div>
+                              </div>
+                              <p className="pt-training-local-draft-card__meta">
+                                Edited on {formatDraftTimestamp(draft.editedAt ?? draft.createdAt)}
+                              </p>
+                              <p className="pt-training-local-draft-card__meta">
+                                Rep Goal: {draft.repGoal}
+                              </p>
+                              <p className="pt-training-local-draft-card__meta">
+                                Weights Involved: {draft.weightsInvolved ? "Yes" : "No"}
+                              </p>
+                              <p className="pt-training-local-draft-card__note">{draft.instructions}</p>
+                            </div>
+                          </button>
+                          <div className="pt-training-local-draft-card__actions">
+                            <button
+                              type="button"
+                              className="pt-training-local-draft-action mobile-focus-ring"
+                              onClick={() => {
+                                openExerciseDraftPublishDialog(draft);
+                              }}
+                            >
+                              Publish Exercise
+                            </button>
+                            <button
+                              type="button"
+                              className="pt-training-local-draft-remove mobile-focus-ring"
+                              onClick={() => {
+                                openExerciseDraftRemovalDialog(draft);
+                              }}
+                              aria-label={`Remove local rep draft ${draft.exerciseName}`}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </MobileCard>
+                      ))}
+
                       {routineDrafts.map((draft) => (
                         <MobileCard
                           key={draft.id}
@@ -2741,7 +3175,7 @@ export default function PTTrainingPage() {
                 <div className="pt-training-builder-form__field">
                   <label htmlFor="pt-training-folder-edit-exercise-input">Exercises</label>
                   <datalist id="pt-training-portfolio-exercise-suggestions">
-                    {portfolioExerciseSuggestions.map((option) => (
+                    {exerciseNameSuggestions.map((option) => (
                       <option key={option} value={option} />
                     ))}
                   </datalist>
@@ -2930,16 +3364,23 @@ export default function PTTrainingPage() {
                 </>
               ) : (
                 <>
-                  {selectedPortfolioAssetRecord.description ? (
-                    <p className="pt-training-builder-form__helper">
-                      {selectedPortfolioAssetRecord.description}
-                    </p>
-                  ) : null}
+                  <p className="pt-training-builder-form__helper">
+                    Exercise: {selectedPortfolioAssetRecord.exerciseName || selectedPortfolioAssetRecord.title}
+                  </p>
+                  <p className="pt-training-builder-form__helper">
+                    Rep Goal: {selectedPortfolioAssetRecord.repGoal || "Not set"}
+                  </p>
                   <p className="pt-training-builder-form__helper">
                     Instructions: {selectedPortfolioAssetRecord.instructions || "No instructions added."}
                   </p>
                   <p className="pt-training-builder-form__helper">
-                    Main objective: {selectedPortfolioAssetRecord.objective || "No objective added."}
+                    Weights involved: {selectedPortfolioAssetRecord.weightsInvolved ? "Yes" : "No"}
+                  </p>
+                  <p className="pt-training-builder-form__helper">
+                    Created on: {formatDraftTimestamp(selectedPortfolioAssetRecord.createdAt)}
+                  </p>
+                  <p className="pt-training-builder-form__helper">
+                    Edited on: {formatDraftTimestamp(selectedPortfolioAssetRecord.updatedAt)}
                   </p>
                 </>
               )}
@@ -2966,12 +3407,12 @@ export default function PTTrainingPage() {
           >
             <div className="pt-training-modal__header">
               <div className="mobile-section__copy">
-                <p className="mobile-section__eyebrow">Local builder staging</p>
+                <p className="mobile-section__eyebrow">Single exercise draft</p>
                 <h2 id="pt-training-exercise-dialog-title" className="mobile-section__title">
                   Add an Exercise
                 </h2>
                 <p className="mobile-section__description">
-                  This draft stays local to the browser until PT exercise save routes are wired. It does not create a backend exercise record or attach anything to a live folder.
+                  This form mirrors the Create a Routine exercise-entry pattern for one Rep-classified draft. It stays local until you publish it into a training portfolio folder.
                 </p>
               </div>
               <button
@@ -2983,62 +3424,117 @@ export default function PTTrainingPage() {
               </button>
             </div>
 
-            <div className="pt-training-modal__form pt-training-builder-form">
-              <div className="pt-training-builder-form__field">
-                <label htmlFor="pt-training-exercise-description">Exercise description</label>
-                <textarea
-                  id="pt-training-exercise-description"
-                  value={exerciseDescription}
-                  onChange={(event) => {
-                    setExerciseDescription(event.target.value);
-                    setExerciseErrors((current) => ({ ...current, description: undefined }));
-                  }}
-                  rows={3}
-                />
-                {exerciseErrors.description ? (
-                  <p className="pt-training-builder-form__error" role="alert">
-                    {exerciseErrors.description}
-                  </p>
-                ) : null}
+            <div className="pt-training-modal__form pt-training-builder-form pt-training-exercise-form">
+              <div className="pt-training-builder-form__section-copy">
+                <p className="pt-training-builder-form__section-eyebrow">Page 2</p>
+                <h3 className="pt-training-builder-form__section-title">Routine Exercises</h3>
               </div>
 
-              <div className="pt-training-builder-form__field">
-                <label htmlFor="pt-training-exercise-instructions">Instructions</label>
-                <textarea
-                  id="pt-training-exercise-instructions"
-                  value={exerciseInstructions}
-                  onChange={(event) => {
-                    setExerciseInstructions(event.target.value);
-                    setExerciseErrors((current) => ({ ...current, instructions: undefined }));
-                  }}
-                  rows={4}
-                />
-                {exerciseErrors.instructions ? (
-                  <p className="pt-training-builder-form__error" role="alert">
-                    {exerciseErrors.instructions}
-                  </p>
-                ) : null}
-              </div>
+              <datalist id="pt-training-exercise-suggestions">
+                {exerciseNameSuggestions.map((option) => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
 
-              <div className="pt-training-builder-form__field">
-                <label htmlFor="pt-training-exercise-objective">Main objective</label>
-                <textarea
-                  id="pt-training-exercise-objective"
-                  value={exerciseObjective}
-                  onChange={(event) => {
-                    setExerciseObjective(event.target.value);
-                    setExerciseErrors((current) => ({ ...current, objective: undefined }));
-                  }}
-                  rows={3}
-                />
-                {exerciseErrors.objective ? (
-                  <p className="pt-training-builder-form__error" role="alert">
-                    {exerciseErrors.objective}
-                  </p>
-                ) : null}
-              </div>
+              <section className="pt-training-builder-form__exercise-row pt-training-exercise-form__panel">
+                <div className="pt-training-builder-form__exercise-row-header">
+                  <p className="pt-training-builder-form__exercise-row-title">Exercise 1</p>
+                </div>
 
-              <div className="pt-training-modal__actions">
+                <div className="pt-training-builder-form__field pt-training-exercise-form__field">
+                  <label htmlFor="pt-training-exercise-name">Exercise</label>
+                  <input
+                    id="pt-training-exercise-name"
+                    list="pt-training-exercise-suggestions"
+                    value={exerciseName}
+                    onChange={(event) => {
+                      setExerciseName(event.target.value);
+                      setExerciseErrors((current) => ({ ...current, exerciseName: undefined }));
+                    }}
+                  />
+                  {exerciseErrors.exerciseName ? (
+                    <p className="pt-training-builder-form__error" role="alert">
+                      {exerciseErrors.exerciseName}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="pt-training-builder-form__field pt-training-exercise-form__field">
+                  <label htmlFor="pt-training-exercise-rep-goal">Rep Goal</label>
+                  <input
+                    id="pt-training-exercise-rep-goal"
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    step="1"
+                    value={exerciseRepGoal}
+                    onChange={(event) => {
+                      setExerciseRepGoal(sanitizeNumericInput(event.target.value));
+                      setExerciseErrors((current) => ({ ...current, repGoal: undefined }));
+                    }}
+                  />
+                  {exerciseErrors.repGoal ? (
+                    <p className="pt-training-builder-form__error" role="alert">
+                      {exerciseErrors.repGoal}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="pt-training-builder-form__field pt-training-exercise-form__field">
+                  <label htmlFor="pt-training-exercise-instructions">Instructions</label>
+                  <textarea
+                    id="pt-training-exercise-instructions"
+                    value={exerciseInstructions}
+                    onChange={(event) => {
+                      setExerciseInstructions(event.target.value);
+                      setExerciseErrors((current) => ({ ...current, instructions: undefined }));
+                    }}
+                    rows={4}
+                  />
+                  {exerciseErrors.instructions ? (
+                    <p className="pt-training-builder-form__error" role="alert">
+                      {exerciseErrors.instructions}
+                    </p>
+                  ) : null}
+                </div>
+
+                <fieldset className="pt-training-builder-form__field pt-training-builder-form__toggle-field pt-training-exercise-form__field">
+                  <legend>Weights Involved?</legend>
+                  <p className="pt-training-builder-form__helper">
+                    If Yes, clients will need a numeric weight input when this exercise is assigned in a future training package flow.
+                  </p>
+                  <div
+                    className="pt-training-builder-form__toggle-group pt-training-exercise-form__toggle"
+                    role="radiogroup"
+                    aria-label="Weights Involved?"
+                  >
+                    <label className="pt-training-builder-form__toggle">
+                      <input
+                        type="radio"
+                        name="pt-training-exercise-weights"
+                        checked={exerciseWeightsInvolved}
+                        onChange={() => {
+                          setExerciseWeightsInvolved(true);
+                        }}
+                      />
+                      <span>Yes</span>
+                    </label>
+                    <label className="pt-training-builder-form__toggle">
+                      <input
+                        type="radio"
+                        name="pt-training-exercise-weights"
+                        checked={!exerciseWeightsInvolved}
+                        onChange={() => {
+                          setExerciseWeightsInvolved(false);
+                        }}
+                      />
+                      <span>No</span>
+                    </label>
+                  </div>
+                </fieldset>
+              </section>
+
+              <div className="pt-training-modal__actions pt-training-exercise-form__actions">
                 <button
                   type="button"
                   className="pt-training-modal__secondary-action mobile-focus-ring"
@@ -3051,7 +3547,7 @@ export default function PTTrainingPage() {
                   className="pt-training-modal__primary-action mobile-focus-ring"
                   onClick={handleSaveExerciseDraft}
                 >
-                  Save local draft
+                  Save Exercise Draft
                 </button>
               </div>
             </div>
@@ -3329,7 +3825,7 @@ export default function PTTrainingPage() {
                   </div>
 
                   <datalist id="pt-training-routine-exercise-suggestions">
-                    {routineExerciseSuggestions.map((option) => (
+                    {exerciseNameSuggestions.map((option) => (
                       <option key={option} value={option} />
                     ))}
                   </datalist>
@@ -3517,6 +4013,322 @@ export default function PTTrainingPage() {
                   </div>
                 </>
               )}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {exerciseDraftToRemove ? (
+        <div
+          className="pt-training-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeExerciseDraftRemovalDialog();
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pt-training-remove-exercise-draft-title"
+            className="pt-training-modal pt-training-routine-draft-dialog"
+          >
+            <div className="pt-training-modal__header">
+              <div className="mobile-section__copy">
+                <p className="mobile-section__eyebrow">Local draft queue</p>
+                <h2 id="pt-training-remove-exercise-draft-title" className="mobile-section__title">
+                  Remove Rep Draft
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="pt-training-modal__secondary-action mobile-focus-ring"
+                onClick={closeExerciseDraftRemovalDialog}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="pt-training-modal__form pt-training-builder-form">
+              <p className="pt-training-builder-form__helper">
+                Are you sure you want to Remove this Draft
+              </p>
+              <p className="pt-training-local-draft-card__meta">{exerciseDraftToRemove.exerciseName}</p>
+
+              <div className="pt-training-modal__actions pt-training-modal__actions--centered">
+                <button
+                  type="button"
+                  className="pt-training-modal__secondary-action mobile-focus-ring"
+                  onClick={closeExerciseDraftRemovalDialog}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="pt-training-modal__primary-action mobile-focus-ring"
+                  onClick={confirmExerciseDraftRemoval}
+                >
+                  Remove Draft
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {exerciseDraftPublishDialog && publishingExerciseDraft ? (
+        <div
+          className="pt-training-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeExerciseDraftPublishDialog();
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pt-training-publish-exercise-draft-title"
+            className="pt-training-modal pt-training-routine-draft-dialog"
+          >
+            <div className="pt-training-modal__header">
+              <div className="mobile-section__copy">
+                <p className="mobile-section__eyebrow">Local-only publish staging</p>
+                <h2 id="pt-training-publish-exercise-draft-title" className="mobile-section__title">
+                  Publish Exercise
+                </h2>
+                <p className="mobile-section__description">
+                  This publishes one Rep asset into selected training portfolio folders without sending a request.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="pt-training-modal__secondary-action mobile-focus-ring"
+                onClick={closeExerciseDraftPublishDialog}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="pt-training-modal__form pt-training-builder-form">
+              <div className="pt-training-builder-form__section-copy">
+                <p className="pt-training-builder-form__section-eyebrow">Draft target</p>
+                <h3 className="pt-training-builder-form__section-title">
+                  {publishingExerciseDraft.exerciseName}
+                </h3>
+              </div>
+
+              <div className="pt-training-builder-form__field">
+                <button
+                  type="button"
+                  className="pt-training-local-draft-action pt-training-publish-dialog__select-folder-button mobile-focus-ring"
+                  aria-haspopup="dialog"
+                  aria-expanded={exerciseDraftPublishDialog.folderPickerOpen}
+                  aria-controls="pt-training-publish-exercise-folder-picker"
+                  onClick={() => {
+                    updateExerciseDraftPublishDialog((current) => ({
+                      ...current,
+                      folderPickerOpen: true,
+                    }));
+                  }}
+                >
+                  Select Portfolio Folder
+                </button>
+                <p className="pt-training-builder-form__helper">
+                  Selected folders: {formatPublishTargetsSummary(exerciseDraftPublishDialog.selectedTargets)}
+                </p>
+              </div>
+
+              {exerciseDraftPublishDialog.folderPickerOpen ? (
+                <section
+                  id="pt-training-publish-exercise-folder-picker"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="pt-training-publish-exercise-folder-picker-title"
+                  className="pt-training-publish-folder-picker"
+                >
+                  <div className="pt-training-publish-folder-picker__header">
+                    <div className="mobile-section__copy">
+                      <h4
+                        id="pt-training-publish-exercise-folder-picker-title"
+                        className="pt-training-builder-form__section-title"
+                      >
+                        Select Portfolio Folder
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      className="pt-training-modal__secondary-action mobile-focus-ring"
+                      onClick={closeExerciseDraftFolderPicker}
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="pt-training-publish-folder-picker__list">
+                    {portfolioFolderOptions.length > 0 ? (
+                      portfolioFolderOptions.map((folder) => (
+                        <label
+                          key={folder.id}
+                          className="pt-training-publish-folder-picker__option"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={hasSelectedExerciseDraftPublishTarget({
+                              type: "existing-folder",
+                              id: folder.id,
+                              name: folder.title,
+                            })}
+                            onChange={() => {
+                              toggleExerciseDraftPublishTarget({
+                                type: "existing-folder",
+                                id: folder.id,
+                                name: folder.title,
+                              });
+                            }}
+                          />
+                          <span>{folder.title}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <p className="pt-training-builder-form__helper">
+                        No existing portfolio folders are loaded yet. Add a local folder draft below.
+                      </p>
+                    )}
+
+                    {exerciseDraftPublishDialog.localFolderOptions.map((folder) => (
+                      <label
+                        key={folder.id}
+                        className="pt-training-publish-folder-picker__option"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={hasSelectedExerciseDraftPublishTarget({
+                            type: "local-folder-draft",
+                            id: folder.id,
+                            name: folder.name,
+                          })}
+                          onChange={() => {
+                            toggleExerciseDraftPublishTarget({
+                              type: "local-folder-draft",
+                              id: folder.id,
+                              name: folder.name,
+                            });
+                          }}
+                        />
+                        <span>{folder.name}</span>
+                        <span className="pt-training-publish-folder-picker__local-tag">
+                          Local folder draft
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="pt-training-publish-folder-picker__actions">
+                    <button
+                      type="button"
+                      className="pt-training-modal__secondary-action mobile-focus-ring"
+                      onClick={openExerciseDraftNewFolderDialog}
+                    >
+                      Add New Folder
+                    </button>
+                    <button
+                      type="button"
+                      className="pt-training-modal__secondary-action mobile-focus-ring"
+                      onClick={closeExerciseDraftFolderPicker}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="pt-training-modal__primary-action mobile-focus-ring"
+                      onClick={closeExerciseDraftFolderPicker}
+                    >
+                      Done
+                    </button>
+                  </div>
+
+                  {exerciseDraftPublishDialog.newFolderDialogOpen ? (
+                    <section
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="pt-training-publish-exercise-new-folder-title"
+                      className="pt-training-publish-new-folder-dialog"
+                    >
+                      <div className="pt-training-publish-folder-picker__header">
+                        <div className="mobile-section__copy">
+                          <h5
+                            id="pt-training-publish-exercise-new-folder-title"
+                            className="pt-training-builder-form__section-title"
+                          >
+                            Add New Folder
+                          </h5>
+                        </div>
+                      </div>
+
+                      <div className="pt-training-builder-form__field">
+                        <label htmlFor="pt-training-publish-exercise-new-folder-name">Folder name</label>
+                        <input
+                          id="pt-training-publish-exercise-new-folder-name"
+                          value={exerciseDraftPublishDialog.newFolderName}
+                          onChange={(event) => {
+                            updateExerciseDraftPublishDialog((current) => ({
+                              ...current,
+                              newFolderName: event.target.value,
+                              newFolderError: null,
+                            }));
+                          }}
+                        />
+                        {exerciseDraftPublishDialog.newFolderError ? (
+                          <p className="pt-training-builder-form__error" role="alert">
+                            {exerciseDraftPublishDialog.newFolderError}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="pt-training-publish-folder-picker__actions">
+                        <button
+                          type="button"
+                          className="pt-training-modal__secondary-action mobile-focus-ring"
+                          onClick={closeExerciseDraftNewFolderDialog}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="pt-training-modal__primary-action mobile-focus-ring"
+                          onClick={handleAddExerciseDraftPublishFolder}
+                        >
+                          Add Folder
+                        </button>
+                      </div>
+                    </section>
+                  ) : null}
+                </section>
+              ) : null}
+
+              {exerciseDraftPublishError ? (
+                <p className="pt-training-builder-form__error" role="alert">
+                  {exerciseDraftPublishError}
+                </p>
+              ) : null}
+
+              <div className="pt-training-modal__actions pt-training-modal__actions--centered">
+                <button
+                  type="button"
+                  className="pt-training-modal__secondary-action mobile-focus-ring"
+                  onClick={closeExerciseDraftPublishDialog}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="pt-training-modal__primary-action mobile-focus-ring"
+                  onClick={confirmExerciseDraftPublish}
+                >
+                  Publish Exercise
+                </button>
+              </div>
             </div>
           </section>
         </div>
