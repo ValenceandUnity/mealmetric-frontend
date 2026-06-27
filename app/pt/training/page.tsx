@@ -93,7 +93,6 @@ type TrainingStateCardProps = {
 
 type ExerciseFormErrors = {
   exerciseName?: string;
-  instructions?: string;
 };
 
 type RoutineDetailsErrors = {
@@ -136,7 +135,27 @@ type SelectedPortfolioAssetState = {
   assetId: string;
 } | null;
 
-type RoutineOptionDialogKind = "target" | "attribute" | null;
+type FitnessOptionDialogState =
+  | {
+      kind: "target" | "attribute";
+      scope: "routine" | "exercise" | "rep-asset-edit";
+    }
+  | null;
+
+type RepAssetEditForm = {
+  assetId: string;
+  sourceDraftId?: string;
+  exerciseName: string;
+  instructions: string;
+  weightsInvolved: boolean;
+  fitnessTargets: string[];
+  fitnessAttributes: string[];
+  tags: string[];
+  tagInput: string;
+  media: PTTrainingDraftMedia | null;
+  error: string | null;
+};
+
 type RoutineDraftPublishDialogState = {
   draftId: string;
   selectedTargets: LocalPTRoutineDraftPublishTarget[];
@@ -166,6 +185,9 @@ type ExerciseDraftPublishDialogState = {
 type MediaPickerTargetState =
   | {
       kind: "exercise-draft";
+    }
+  | {
+      kind: "rep-asset-edit";
     }
   | {
       kind: "routine-row";
@@ -533,6 +555,9 @@ function buildRepAssetFromDraft(
     repGoal: typeof draft.repGoal === "number" ? String(draft.repGoal) : undefined,
     instructions: draft.instructions,
     weightsInvolved: draft.weightsInvolved,
+    fitnessTargets: draft.fitnessTargets,
+    fitnessAttributes: draft.fitnessAttributes,
+    tags: draft.tags,
     media: draft.media,
     sourceDraftId: draft.id,
     createdAt: draft.createdAt,
@@ -563,6 +588,9 @@ function assetSearchFields(asset: LocalPTPortfolioAsset) {
     asset.description,
     asset.instructions,
     asset.objective,
+    ...asset.fitnessTargets,
+    ...asset.fitnessAttributes,
+    ...asset.tags,
     asset.media?.name,
   ].filter((value): value is string => Boolean(value));
 }
@@ -818,6 +846,10 @@ export default function PTTrainingPage() {
   const [exerciseName, setExerciseName] = useState("");
   const [exerciseInstructions, setExerciseInstructions] = useState("");
   const [exerciseWeightsInvolved, setExerciseWeightsInvolved] = useState(false);
+  const [exerciseFitnessTargets, setExerciseFitnessTargets] = useState<string[]>([]);
+  const [exerciseFitnessAttributes, setExerciseFitnessAttributes] = useState<string[]>([]);
+  const [exerciseTags, setExerciseTags] = useState<string[]>([]);
+  const [exerciseTagInput, setExerciseTagInput] = useState("");
   const [exerciseMedia, setExerciseMedia] = useState<PTTrainingDraftMedia | null>(null);
   const [exerciseErrors, setExerciseErrors] = useState<ExerciseFormErrors>({});
   const [routineDialogOpen, setRoutineDialogOpen] = useState(false);
@@ -835,13 +867,14 @@ export default function PTTrainingPage() {
   const [routineRowErrors, setRoutineRowErrors] = useState<Record<string, RoutineExerciseRowErrors>>(
     {},
   );
-  const [routineOptionDialogKind, setRoutineOptionDialogKind] = useState<RoutineOptionDialogKind>(null);
+  const [routineOptionDialogKind, setRoutineOptionDialogKind] = useState<FitnessOptionDialogState>(null);
   const [routineOptionValue, setRoutineOptionValue] = useState("");
   const [routineOptionError, setRoutineOptionError] = useState<string | null>(null);
   const [exerciseDraftToRemove, setExerciseDraftToRemove] = useState<LocalPTExerciseDraft | null>(null);
   const [exerciseDraftPublishDialog, setExerciseDraftPublishDialog] =
     useState<ExerciseDraftPublishDialogState>(null);
   const [exerciseDraftPublishError, setExerciseDraftPublishError] = useState<string | null>(null);
+  const [portfolioRepAssetEditForm, setPortfolioRepAssetEditForm] = useState<RepAssetEditForm | null>(null);
   const [mediaPickerTarget, setMediaPickerTarget] = useState<MediaPickerTargetState>(null);
   const [mediaPickerError, setMediaPickerError] = useState<string | null>(null);
   const [routineDraftToRemove, setRoutineDraftToRemove] = useState<LocalPTRoutineDraft | null>(null);
@@ -960,6 +993,7 @@ export default function PTTrainingPage() {
       !portfolioDisplayDialogOpen &&
       !selectedPortfolioFolderId &&
       !selectedPortfolioAsset &&
+      !portfolioRepAssetEditForm &&
       !exerciseDialogOpen &&
       !routineDialogOpen &&
       !routineOptionDialogKind &&
@@ -1061,11 +1095,16 @@ export default function PTTrainingPage() {
       setSelectedPortfolioFolderId(null);
       setPortfolioFolderDetailEditMode(false);
       setPortfolioFolderEditForm(null);
+      setPortfolioRepAssetEditForm(null);
       setExerciseDialogOpen(false);
       setEditingExerciseDraftId(null);
       setExerciseName("");
       setExerciseInstructions("");
       setExerciseWeightsInvolved(false);
+      setExerciseFitnessTargets([]);
+      setExerciseFitnessAttributes([]);
+      setExerciseTags([]);
+      setExerciseTagInput("");
       setExerciseMedia(null);
       setExerciseErrors({});
       setRoutineDialogOpen(false);
@@ -1096,6 +1135,7 @@ export default function PTTrainingPage() {
     portfolioDisplayDialogOpen,
     selectedPortfolioFolderId,
     selectedPortfolioAsset,
+    portfolioRepAssetEditForm,
     exerciseDialogOpen,
     routineDialogOpen,
     routineOptionDialogKind,
@@ -1417,6 +1457,7 @@ export default function PTTrainingPage() {
     setSelectedPortfolioFolderId(folderId);
     setPortfolioFolderDetailEditMode(false);
     setPortfolioFolderEditForm(null);
+    setPortfolioRepAssetEditForm(null);
   }
 
   function closePortfolioFolderDetail() {
@@ -1424,6 +1465,7 @@ export default function PTTrainingPage() {
     setSelectedPortfolioFolderId(null);
     setPortfolioFolderDetailEditMode(false);
     setPortfolioFolderEditForm(null);
+    setPortfolioRepAssetEditForm(null);
   }
 
   function openPortfolioFolderEditMode() {
@@ -1451,6 +1493,7 @@ export default function PTTrainingPage() {
   }
 
   function openPortfolioAssetDetail(folderId: string, assetId: string) {
+    setPortfolioRepAssetEditForm(null);
     setSelectedPortfolioAsset({
       folderId,
       assetId,
@@ -1458,6 +1501,7 @@ export default function PTTrainingPage() {
   }
 
   function closePortfolioAssetDetail() {
+    setPortfolioRepAssetEditForm(null);
     setSelectedPortfolioAsset(null);
   }
 
@@ -1594,6 +1638,10 @@ export default function PTTrainingPage() {
     setExerciseName("");
     setExerciseInstructions("");
     setExerciseWeightsInvolved(false);
+    setExerciseFitnessTargets([]);
+    setExerciseFitnessAttributes([]);
+    setExerciseTags([]);
+    setExerciseTagInput("");
     setExerciseMedia(null);
     setExerciseErrors({});
     setExerciseDialogOpen(true);
@@ -1605,6 +1653,10 @@ export default function PTTrainingPage() {
     setExerciseName("");
     setExerciseInstructions("");
     setExerciseWeightsInvolved(false);
+    setExerciseFitnessTargets([]);
+    setExerciseFitnessAttributes([]);
+    setExerciseTags([]);
+    setExerciseTagInput("");
     setExerciseMedia(null);
     setExerciseErrors({});
   }
@@ -1615,6 +1667,10 @@ export default function PTTrainingPage() {
     setExerciseName(draft.exerciseName);
     setExerciseInstructions(draft.instructions);
     setExerciseWeightsInvolved(draft.weightsInvolved);
+    setExerciseFitnessTargets(draft.fitnessTargets);
+    setExerciseFitnessAttributes(draft.fitnessAttributes);
+    setExerciseTags(draft.tags);
+    setExerciseTagInput("");
     setExerciseMedia(draft.media ?? null);
     setExerciseErrors({});
   }
@@ -1627,10 +1683,29 @@ export default function PTTrainingPage() {
       repGoal: existingDraft?.repGoal,
       instructions: exerciseInstructions,
       weightsInvolved: exerciseWeightsInvolved,
+      fitnessTargets: exerciseFitnessTargets,
+      fitnessAttributes: exerciseFitnessAttributes,
+      tags: exerciseTags,
       media: exerciseMedia,
       createdAt: existingDraft?.createdAt,
       editedAt: new Date().toISOString(),
     });
+  }
+
+  function handleAddExerciseTag() {
+    const trimmed = exerciseTagInput.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    setExerciseTags((current) => dedupeStringValues([...current, trimmed]));
+    setExerciseTagInput("");
+  }
+
+  function removeExerciseTag(tag: string) {
+    setExerciseTags((current) =>
+      current.filter((item) => normalizeOptionValue(item) !== normalizeOptionValue(tag)),
+    );
   }
 
   function saveExerciseDraftRecord(nextDraft: LocalPTExerciseDraft) {
@@ -1708,6 +1783,11 @@ export default function PTTrainingPage() {
     setMediaPickerTarget({ kind: "exercise-draft" });
   }
 
+  function openMediaPickerForRepAssetEdit() {
+    setMediaPickerError(null);
+    setMediaPickerTarget({ kind: "rep-asset-edit" });
+  }
+
   function openMediaPickerForRoutineRow(rowId: string) {
     setMediaPickerError(null);
     setMediaPickerTarget({ kind: "routine-row", rowId });
@@ -1727,6 +1807,10 @@ export default function PTTrainingPage() {
       return exerciseMedia;
     }
 
+    if (mediaPickerTarget.kind === "rep-asset-edit") {
+      return portfolioRepAssetEditForm?.media ?? null;
+    }
+
     return routineRows.find((row) => row.id === mediaPickerTarget.rowId)?.media ?? null;
   }
 
@@ -1737,6 +1821,11 @@ export default function PTTrainingPage() {
 
     if (mediaPickerTarget.kind === "exercise-draft") {
       setExerciseMedia(media);
+      return;
+    }
+
+    if (mediaPickerTarget.kind === "rep-asset-edit") {
+      setPortfolioRepAssetEditForm((current) => (current ? { ...current, media } : current));
       return;
     }
 
@@ -1798,6 +1887,187 @@ export default function PTTrainingPage() {
     setMediaPickerError(null);
   }
 
+  function updatePortfolioRepAssetEditForm(
+    updater: (current: RepAssetEditForm) => RepAssetEditForm,
+  ) {
+    setPortfolioRepAssetEditForm((current) => (current ? updater(current) : current));
+  }
+
+  function openPortfolioRepAssetEditForm() {
+    if (!selectedPortfolioAssetRecord || selectedPortfolioAssetRecord.type !== "rep") {
+      return;
+    }
+
+    setPortfolioRepAssetEditForm({
+      assetId: selectedPortfolioAssetRecord.id,
+      sourceDraftId: selectedPortfolioAssetRecord.sourceDraftId,
+      exerciseName: selectedPortfolioAssetRecord.exerciseName || selectedPortfolioAssetRecord.title,
+      instructions: selectedPortfolioAssetRecord.instructions || "",
+      weightsInvolved: Boolean(selectedPortfolioAssetRecord.weightsInvolved),
+      fitnessTargets: [...selectedPortfolioAssetRecord.fitnessTargets],
+      fitnessAttributes: [...selectedPortfolioAssetRecord.fitnessAttributes],
+      tags: [...selectedPortfolioAssetRecord.tags],
+      tagInput: "",
+      media: selectedPortfolioAssetRecord.media ?? null,
+      error: null,
+    });
+  }
+
+  function closePortfolioRepAssetEditForm() {
+    setPortfolioRepAssetEditForm(null);
+  }
+
+  function handleAddPortfolioRepAssetTag() {
+    if (!portfolioRepAssetEditForm) {
+      return;
+    }
+
+    const trimmed = portfolioRepAssetEditForm.tagInput.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    updatePortfolioRepAssetEditForm((current) => ({
+      ...current,
+      tags: dedupeStringValues([...current.tags, trimmed]),
+      tagInput: "",
+      error: null,
+    }));
+  }
+
+  function removePortfolioRepAssetTag(tag: string) {
+    updatePortfolioRepAssetEditForm((current) => ({
+      ...current,
+      tags: current.tags.filter((item) => normalizeOptionValue(item) !== normalizeOptionValue(tag)),
+    }));
+  }
+
+  function matchesRepAssetIdentity(
+    asset: LocalPTPortfolioAsset,
+    identity: { id: string; sourceDraftId?: string },
+  ) {
+    if (asset.type !== "rep") {
+      return false;
+    }
+
+    if (identity.sourceDraftId && asset.sourceDraftId) {
+      return asset.sourceDraftId === identity.sourceDraftId;
+    }
+
+    return asset.id === identity.id;
+  }
+
+  function updateRepAssetCollections(
+    assetIdentity: { id: string; sourceDraftId?: string },
+    nextRepAsset: LocalPTPortfolioAsset,
+  ) {
+    const nextLocalFolders = localPortfolioFolders.map((folder) => ({
+      ...folder,
+      assets: folder.assets.map((asset) =>
+        matchesRepAssetIdentity(asset, assetIdentity) ? nextRepAsset : asset,
+      ),
+    }));
+
+    const nextOverlays = portfolioFolderOverlays.map((overlay) => ({
+      ...overlay,
+      assets: overlay.assets.map((asset) =>
+        matchesRepAssetIdentity(asset, assetIdentity) ? nextRepAsset : asset,
+      ),
+    }));
+
+    return {
+      localFolders: nextLocalFolders,
+      overlays: nextOverlays,
+    };
+  }
+
+  function updateRepDraftsFromAsset(
+    assetIdentity: { id: string; sourceDraftId?: string },
+    nextRepAsset: Extract<LocalPTPortfolioAsset, { type: "rep" }>,
+    updatedAt: string,
+  ) {
+    return exerciseDrafts.map((draft) => {
+      const matchesDraft =
+        (assetIdentity.sourceDraftId && draft.id === assetIdentity.sourceDraftId) ||
+        draft.id === assetIdentity.id;
+
+      if (!matchesDraft) {
+        return draft;
+      }
+
+      return createLocalPTExerciseDraft({
+        id: draft.id,
+        title: nextRepAsset.title,
+        exerciseName: nextRepAsset.exerciseName || nextRepAsset.title,
+        repGoal:
+          typeof nextRepAsset.repGoal === "string" && nextRepAsset.repGoal.trim()
+            ? Number.parseInt(nextRepAsset.repGoal, 10)
+            : draft.repGoal,
+        instructions: nextRepAsset.instructions || "",
+        weightsInvolved: Boolean(nextRepAsset.weightsInvolved),
+        fitnessTargets: nextRepAsset.fitnessTargets,
+        fitnessAttributes: nextRepAsset.fitnessAttributes,
+        tags: nextRepAsset.tags,
+        media: nextRepAsset.media ?? null,
+        createdAt: draft.createdAt,
+        editedAt: updatedAt,
+      });
+    });
+  }
+
+  function handleSavePortfolioRepAssetChanges() {
+    if (
+      !portfolioRepAssetEditForm ||
+      !selectedPortfolioAssetRecord ||
+      selectedPortfolioAssetRecord.type !== "rep"
+    ) {
+      return;
+    }
+
+    const exerciseTitle = portfolioRepAssetEditForm.exerciseName.trim();
+    if (!exerciseTitle) {
+      updatePortfolioRepAssetEditForm((current) => ({
+        ...current,
+        error: "Exercise is required.",
+      }));
+      return;
+    }
+
+    const updatedAt = new Date().toISOString();
+    const nextRepAsset = createLocalPTPortfolioRepAsset({
+      id: selectedPortfolioAssetRecord.id,
+      title: exerciseTitle,
+      exerciseName: exerciseTitle,
+      repGoal: selectedPortfolioAssetRecord.repGoal,
+      description: selectedPortfolioAssetRecord.description,
+      instructions: portfolioRepAssetEditForm.instructions,
+      objective: selectedPortfolioAssetRecord.objective,
+      weightsInvolved: portfolioRepAssetEditForm.weightsInvolved,
+      fitnessTargets: portfolioRepAssetEditForm.fitnessTargets,
+      fitnessAttributes: portfolioRepAssetEditForm.fitnessAttributes,
+      tags: portfolioRepAssetEditForm.tags,
+      media: portfolioRepAssetEditForm.media,
+      sourceDraftId: selectedPortfolioAssetRecord.sourceDraftId,
+      createdAt: selectedPortfolioAssetRecord.createdAt,
+      updatedAt,
+    });
+
+    const assetIdentity = {
+      id: selectedPortfolioAssetRecord.id,
+      sourceDraftId: selectedPortfolioAssetRecord.sourceDraftId,
+    };
+    const nextCollections = updateRepAssetCollections(assetIdentity, nextRepAsset);
+    const nextExerciseDrafts = updateRepDraftsFromAsset(assetIdentity, nextRepAsset, updatedAt);
+
+    setLocalPortfolioFolders(nextCollections.localFolders);
+    writeLocalPTPortfolioFolders(nextCollections.localFolders);
+    setPortfolioFolderOverlays(nextCollections.overlays);
+    writeLocalPTPortfolioFolderOverlays(nextCollections.overlays);
+    setExerciseDrafts(nextExerciseDrafts);
+    writeLocalPTExerciseDrafts(nextExerciseDrafts);
+    setPortfolioRepAssetEditForm(null);
+  }
+
   function resetRoutineDialogState() {
     setRoutineDialogPage("details");
     setEditingRoutineDraftId(null);
@@ -1852,8 +2122,11 @@ export default function PTTrainingPage() {
     closeRoutineOptionDialog();
   }
 
-  function openRoutineOptionDialog(kind: Exclude<RoutineOptionDialogKind, null>) {
-    setRoutineOptionDialogKind(kind);
+  function openRoutineOptionDialog(
+    kind: NonNullable<FitnessOptionDialogState>["kind"],
+    scope: NonNullable<FitnessOptionDialogState>["scope"] = "routine",
+  ) {
+    setRoutineOptionDialogKind({ kind, scope });
     setRoutineOptionValue("");
     setRoutineOptionError(null);
   }
@@ -1884,15 +2157,21 @@ export default function PTTrainingPage() {
     const trimmed = routineOptionValue.trim();
     if (!trimmed) {
       setRoutineOptionError(
-        routineOptionDialogKind === "target"
+        routineOptionDialogKind.kind === "target"
           ? "Body target is required."
           : "Physical attribute is required.",
       );
       return;
     }
 
-    if (routineOptionDialogKind === "target") {
-      const existing = dedupeStringValues([...fitnessTargetOptions, ...fitnessTargets]);
+    if (routineOptionDialogKind.kind === "target") {
+      const selectedTargets =
+        routineOptionDialogKind.scope === "routine"
+          ? fitnessTargets
+          : routineOptionDialogKind.scope === "exercise"
+            ? exerciseFitnessTargets
+            : portfolioRepAssetEditForm?.fitnessTargets ?? [];
+      const existing = dedupeStringValues([...fitnessTargetOptions, ...selectedTargets]);
       if (existing.some((item) => normalizeOptionValue(item) === normalizeOptionValue(trimmed))) {
         setRoutineOptionError("That body target already exists.");
         return;
@@ -1901,13 +2180,27 @@ export default function PTTrainingPage() {
       const nextCustomTargets = [...customFitnessTargets, trimmed];
       setCustomFitnessTargets(nextCustomTargets);
       writeLocalPTCustomFitnessTargets(nextCustomTargets);
-      setFitnessTargets((current) => [...current, trimmed]);
-      setRoutineDetailsErrors((current) => ({ ...current, fitnessTargets: undefined }));
+      if (routineOptionDialogKind.scope === "routine") {
+        setFitnessTargets((current) => [...current, trimmed]);
+        setRoutineDetailsErrors((current) => ({ ...current, fitnessTargets: undefined }));
+      } else if (routineOptionDialogKind.scope === "exercise") {
+        setExerciseFitnessTargets((current) => [...current, trimmed]);
+      } else {
+        setPortfolioRepAssetEditForm((current) =>
+          current ? { ...current, fitnessTargets: [...current.fitnessTargets, trimmed] } : current,
+        );
+      }
       closeRoutineOptionDialog();
       return;
     }
 
-    const existing = dedupeStringValues([...fitnessAttributeOptions, ...fitnessAttributes]);
+    const selectedAttributes =
+      routineOptionDialogKind.scope === "routine"
+        ? fitnessAttributes
+        : routineOptionDialogKind.scope === "exercise"
+          ? exerciseFitnessAttributes
+          : portfolioRepAssetEditForm?.fitnessAttributes ?? [];
+    const existing = dedupeStringValues([...fitnessAttributeOptions, ...selectedAttributes]);
     if (existing.some((item) => normalizeOptionValue(item) === normalizeOptionValue(trimmed))) {
       setRoutineOptionError("That physical attribute already exists.");
       return;
@@ -1916,8 +2209,18 @@ export default function PTTrainingPage() {
     const nextCustomAttributes = [...customFitnessAttributes, trimmed];
     setCustomFitnessAttributes(nextCustomAttributes);
     writeLocalPTCustomFitnessAttributes(nextCustomAttributes);
-    setFitnessAttributes((current) => [...current, trimmed]);
-    setRoutineDetailsErrors((current) => ({ ...current, fitnessAttributes: undefined }));
+    if (routineOptionDialogKind.scope === "routine") {
+      setFitnessAttributes((current) => [...current, trimmed]);
+      setRoutineDetailsErrors((current) => ({ ...current, fitnessAttributes: undefined }));
+    } else if (routineOptionDialogKind.scope === "exercise") {
+      setExerciseFitnessAttributes((current) => [...current, trimmed]);
+    } else {
+      setPortfolioRepAssetEditForm((current) =>
+        current
+          ? { ...current, fitnessAttributes: [...current.fitnessAttributes, trimmed] }
+          : current,
+      );
+    }
     closeRoutineOptionDialog();
   }
 
@@ -2975,6 +3278,21 @@ export default function PTTrainingPage() {
                               <p className="pt-training-local-draft-card__meta">
                                 Weights Involved: {draft.weightsInvolved ? "Yes" : "No"}
                               </p>
+                              {draft.fitnessTargets.length > 0 ? (
+                                <p className="pt-training-local-draft-card__meta">
+                                  Fitness targets: {formatSummaryList(draft.fitnessTargets)}
+                                </p>
+                              ) : null}
+                              {draft.fitnessAttributes.length > 0 ? (
+                                <p className="pt-training-local-draft-card__meta">
+                                  Fitness attributes: {formatSummaryList(draft.fitnessAttributes)}
+                                </p>
+                              ) : null}
+                              {draft.tags.length > 0 ? (
+                                <p className="pt-training-local-draft-card__meta">
+                                  Tags: {formatSummaryList(draft.tags)}
+                                </p>
+                              ) : null}
                               {draft.media ? (
                                 <p className="pt-training-local-draft-card__meta">
                                   Media: {draft.media.name}
@@ -3159,7 +3477,7 @@ export default function PTTrainingPage() {
               </button>
             </div>
 
-            <div className="pt-training-modal__form pt-training-builder-form">
+            <div className="pt-training-modal__form pt-training-builder-form pt-training-portfolio-asset-detail">
               <fieldset className="pt-training-builder-form__field pt-training-builder-form__toggle-field">
                 <legend>Display mode</legend>
                 <div
@@ -3685,39 +4003,319 @@ export default function PTTrainingPage() {
                   </div>
                 </>
               ) : (
-                <>
-                  <p className="pt-training-builder-form__helper">
-                    Exercise: {selectedPortfolioAssetRecord.exerciseName || selectedPortfolioAssetRecord.title}
-                  </p>
-                  {selectedPortfolioAssetRecord.repGoal ? (
-                    <p className="pt-training-builder-form__helper">
-                      Rep Goal: {selectedPortfolioAssetRecord.repGoal}
-                    </p>
-                  ) : null}
-                  <p className="pt-training-builder-form__helper">
-                    Instructions: {selectedPortfolioAssetRecord.instructions || "No instructions added."}
-                  </p>
-                  <p className="pt-training-builder-form__helper">
-                    Weights involved: {selectedPortfolioAssetRecord.weightsInvolved ? "Yes" : "No"}
-                  </p>
-                  {selectedPortfolioAssetRecord.media ? (
-                    <div className="pt-training-media-picker__preview">
-                      {renderTrainingMediaPreview(
-                        selectedPortfolioAssetRecord.media,
-                        "pt-training-media-picker__preview-media",
-                      )}
-                      <p className="pt-training-builder-form__helper">
-                        Media: {selectedPortfolioAssetRecord.media.name}
-                      </p>
+                portfolioRepAssetEditForm ? (
+                  <>
+                    <div className="pt-training-builder-form__field">
+                      <label htmlFor="pt-training-rep-asset-edit-name">Exercise</label>
+                      <input
+                        id="pt-training-rep-asset-edit-name"
+                        value={portfolioRepAssetEditForm.exerciseName}
+                        onChange={(event) => {
+                          updatePortfolioRepAssetEditForm((current) => ({
+                            ...current,
+                            exerciseName: event.target.value,
+                            error: null,
+                          }));
+                        }}
+                      />
                     </div>
-                  ) : null}
-                  <p className="pt-training-builder-form__helper">
-                    Created on: {formatDraftTimestamp(selectedPortfolioAssetRecord.createdAt)}
-                  </p>
-                  <p className="pt-training-builder-form__helper">
-                    Edited on: {formatDraftTimestamp(selectedPortfolioAssetRecord.updatedAt)}
-                  </p>
-                </>
+
+                    <div className="pt-training-builder-form__field">
+                      <label htmlFor="pt-training-rep-asset-edit-instructions">Instructions (optional)</label>
+                      <textarea
+                        id="pt-training-rep-asset-edit-instructions"
+                        value={portfolioRepAssetEditForm.instructions}
+                        onChange={(event) => {
+                          updatePortfolioRepAssetEditForm((current) => ({
+                            ...current,
+                            instructions: event.target.value,
+                          }));
+                        }}
+                        rows={4}
+                      />
+                    </div>
+
+                    <fieldset className="pt-training-builder-form__field pt-training-builder-form__toggle-field">
+                      <legend>Weights Involved?</legend>
+                      <div className="pt-training-builder-form__toggle-group" role="radiogroup" aria-label="Weights Involved?">
+                        <label className="pt-training-builder-form__toggle">
+                          <input
+                            type="radio"
+                            name="pt-training-rep-asset-edit-weights"
+                            checked={portfolioRepAssetEditForm.weightsInvolved}
+                            onChange={() => {
+                              updatePortfolioRepAssetEditForm((current) => ({
+                                ...current,
+                                weightsInvolved: true,
+                              }));
+                            }}
+                          />
+                          <span>Yes</span>
+                        </label>
+                        <label className="pt-training-builder-form__toggle">
+                          <input
+                            type="radio"
+                            name="pt-training-rep-asset-edit-weights"
+                            checked={!portfolioRepAssetEditForm.weightsInvolved}
+                            onChange={() => {
+                              updatePortfolioRepAssetEditForm((current) => ({
+                                ...current,
+                                weightsInvolved: false,
+                              }));
+                            }}
+                          />
+                          <span>No</span>
+                        </label>
+                      </div>
+                    </fieldset>
+
+                    <fieldset className="pt-training-builder-form__field pt-training-routine-form__checkbox-fieldset">
+                      <legend className="pt-training-routine-form__field-header">
+                        <span>Fitness Target</span>
+                        <button
+                          type="button"
+                          className="pt-training-routine-form__field-action mobile-focus-ring"
+                          onClick={() => {
+                            openRoutineOptionDialog("target", "rep-asset-edit");
+                          }}
+                        >
+                          Add Target
+                        </button>
+                      </legend>
+                      <div className="pt-training-routine-form__checkbox-grid">
+                        {fitnessTargetOptions.map((option) => {
+                          const optionId = `pt-training-rep-asset-target-${option.toLowerCase().replace(/\s+/g, "-")}`;
+                          const checked = portfolioRepAssetEditForm.fitnessTargets.some(
+                            (item) => normalizeOptionValue(item) === normalizeOptionValue(option),
+                          );
+
+                          return (
+                            <label key={option} htmlFor={optionId} className="pt-training-routine-form__checkbox-option">
+                              <input
+                                id={optionId}
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {
+                                  updatePortfolioRepAssetEditForm((current) => ({
+                                    ...current,
+                                    fitnessTargets: current.fitnessTargets.some(
+                                      (item) => normalizeOptionValue(item) === normalizeOptionValue(option),
+                                    )
+                                      ? current.fitnessTargets.filter(
+                                          (item) => normalizeOptionValue(item) !== normalizeOptionValue(option),
+                                        )
+                                      : [...current.fitnessTargets, option],
+                                  }));
+                                }}
+                              />
+                              <span>{option}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </fieldset>
+
+                    <fieldset className="pt-training-builder-form__field pt-training-routine-form__checkbox-fieldset">
+                      <legend className="pt-training-routine-form__field-header">
+                        <span>Fitness Attributes</span>
+                        <button
+                          type="button"
+                          className="pt-training-routine-form__field-action mobile-focus-ring"
+                          onClick={() => {
+                            openRoutineOptionDialog("attribute", "rep-asset-edit");
+                          }}
+                        >
+                          Add Attribute
+                        </button>
+                      </legend>
+                      <div className="pt-training-routine-form__checkbox-grid">
+                        {fitnessAttributeOptions.map((option) => {
+                          const optionId = `pt-training-rep-asset-attribute-${option.toLowerCase().replace(/\s+/g, "-")}`;
+                          const checked = portfolioRepAssetEditForm.fitnessAttributes.some(
+                            (item) => normalizeOptionValue(item) === normalizeOptionValue(option),
+                          );
+
+                          return (
+                            <label key={option} htmlFor={optionId} className="pt-training-routine-form__checkbox-option">
+                              <input
+                                id={optionId}
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {
+                                  updatePortfolioRepAssetEditForm((current) => ({
+                                    ...current,
+                                    fitnessAttributes: current.fitnessAttributes.some(
+                                      (item) => normalizeOptionValue(item) === normalizeOptionValue(option),
+                                    )
+                                      ? current.fitnessAttributes.filter(
+                                          (item) => normalizeOptionValue(item) !== normalizeOptionValue(option),
+                                        )
+                                      : [...current.fitnessAttributes, option],
+                                  }));
+                                }}
+                              />
+                              <span>{option}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </fieldset>
+
+                    <div className="pt-training-builder-form__field">
+                      <label htmlFor="pt-training-rep-asset-tag-input">Tags</label>
+                      <div className="pt-training-folder-edit__inline-actions">
+                        <input
+                          id="pt-training-rep-asset-tag-input"
+                          value={portfolioRepAssetEditForm.tagInput}
+                          onChange={(event) => {
+                            updatePortfolioRepAssetEditForm((current) => ({
+                              ...current,
+                              tagInput: event.target.value,
+                            }));
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="pt-training-modal__secondary-action mobile-focus-ring"
+                          onClick={handleAddPortfolioRepAssetTag}
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {portfolioRepAssetEditForm.tags.length > 0 ? (
+                        <div className="pt-training-publish-folder-picker__list">
+                          {portfolioRepAssetEditForm.tags.map((tag) => (
+                            <span key={tag} className="pt-training-folder-edit__tag">
+                              <span className="pt-training-folder-edit__tag-label">{tag}</span>
+                              <button
+                                type="button"
+                                className="pt-training-folder-edit__tag-remove mobile-focus-ring"
+                                aria-label={`Remove ${tag} tag`}
+                                onClick={() => {
+                                  removePortfolioRepAssetTag(tag);
+                                }}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="pt-training-builder-form__field">
+                      <label>Media</label>
+                      <button
+                        type="button"
+                        className="pt-training-modal__secondary-action pt-training-media-picker__trigger mobile-focus-ring"
+                        onClick={openMediaPickerForRepAssetEdit}
+                      >
+                        {portfolioRepAssetEditForm.media ? "Update Media" : "Add Media"}
+                      </button>
+                      {portfolioRepAssetEditForm.media ? (
+                        <div className="pt-training-media-picker__preview">
+                          {renderTrainingMediaPreview(
+                            portfolioRepAssetEditForm.media,
+                            "pt-training-media-picker__preview-media",
+                          )}
+                          <p className="pt-training-builder-form__helper">
+                            {portfolioRepAssetEditForm.media.name} ({formatMediaSize(portfolioRepAssetEditForm.media.size)})
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="pt-training-builder-form__helper">
+                          Add a local image, GIF, or video preview for exercise instructions.
+                        </p>
+                      )}
+                    </div>
+
+                    {portfolioRepAssetEditForm.error ? (
+                      <p className="pt-training-builder-form__error" role="alert">
+                        {portfolioRepAssetEditForm.error}
+                      </p>
+                    ) : null}
+
+                    <div className="pt-training-modal__actions pt-training-modal__actions--centered">
+                      <button
+                        type="button"
+                        className="pt-training-modal__secondary-action mobile-focus-ring"
+                        onClick={closePortfolioRepAssetEditForm}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="pt-training-modal__primary-action mobile-focus-ring"
+                        onClick={handleSavePortfolioRepAssetChanges}
+                      >
+                        Save local changes
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="pt-training-builder-form__helper">
+                      Exercise: {selectedPortfolioAssetRecord.exerciseName || selectedPortfolioAssetRecord.title}
+                    </p>
+                    {selectedPortfolioAssetRecord.repGoal ? (
+                      <p className="pt-training-builder-form__helper">
+                        Rep Goal: {selectedPortfolioAssetRecord.repGoal}
+                      </p>
+                    ) : null}
+                    <p className="pt-training-builder-form__helper">
+                      Instructions: {selectedPortfolioAssetRecord.instructions || "No instructions added."}
+                    </p>
+                    <p className="pt-training-builder-form__helper">
+                      Weights involved: {selectedPortfolioAssetRecord.weightsInvolved ? "Yes" : "No"}
+                    </p>
+                    <p className="pt-training-builder-form__helper">
+                      Fitness targets: {formatSummaryList(selectedPortfolioAssetRecord.fitnessTargets)}
+                    </p>
+                    <p className="pt-training-builder-form__helper">
+                      Fitness attributes: {formatSummaryList(selectedPortfolioAssetRecord.fitnessAttributes)}
+                    </p>
+                    <div className="pt-training-builder-form__field">
+                      <label>Tags</label>
+                      {selectedPortfolioAssetRecord.tags.length > 0 ? (
+                        <div className="pt-training-publish-folder-picker__list">
+                          {selectedPortfolioAssetRecord.tags.map((tag) => (
+                            <span key={tag} className="pt-training-folder-edit__tag">
+                              <span className="pt-training-folder-edit__tag-label">{tag}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="pt-training-builder-form__helper">No tags added.</p>
+                      )}
+                    </div>
+                    {selectedPortfolioAssetRecord.media ? (
+                      <div className="pt-training-media-picker__preview">
+                        {renderTrainingMediaPreview(
+                          selectedPortfolioAssetRecord.media,
+                          "pt-training-media-picker__preview-media",
+                        )}
+                        <p className="pt-training-builder-form__helper">
+                          Media: {selectedPortfolioAssetRecord.media.name}
+                        </p>
+                      </div>
+                    ) : null}
+                    <p className="pt-training-builder-form__helper">
+                      Created on: {formatDraftTimestamp(selectedPortfolioAssetRecord.createdAt)}
+                    </p>
+                    <p className="pt-training-builder-form__helper">
+                      Edited on: {formatDraftTimestamp(selectedPortfolioAssetRecord.updatedAt)}
+                    </p>
+                    <div className="pt-training-modal__actions pt-training-modal__actions--centered">
+                      <button
+                        type="button"
+                        className="pt-training-modal__secondary-action mobile-focus-ring"
+                        onClick={openPortfolioRepAssetEditForm}
+                      >
+                        Edit Exercise
+                      </button>
+                    </div>
+                  </>
+                )
               )}
             </div>
           </section>
@@ -3790,13 +4388,12 @@ export default function PTTrainingPage() {
                 </div>
 
                 <div className="pt-training-builder-form__field pt-training-exercise-form__field">
-                  <label htmlFor="pt-training-exercise-instructions">Instructions optional</label>
+                  <label htmlFor="pt-training-exercise-instructions">Instructions (optional)</label>
                   <textarea
                     id="pt-training-exercise-instructions"
                     value={exerciseInstructions}
                     onChange={(event) => {
                       setExerciseInstructions(event.target.value);
-                      setExerciseErrors((current) => ({ ...current, instructions: undefined }));
                     }}
                     rows={4}
                   />
@@ -3836,6 +4433,129 @@ export default function PTTrainingPage() {
                     </label>
                   </div>
                 </fieldset>
+
+                <fieldset className="pt-training-builder-form__field pt-training-routine-form__checkbox-fieldset pt-training-exercise-form__field">
+                  <legend className="pt-training-routine-form__field-header">
+                    <span>Fitness Target</span>
+                    <button
+                      type="button"
+                      className="pt-training-routine-form__field-action mobile-focus-ring"
+                      onClick={() => {
+                        openRoutineOptionDialog("target", "exercise");
+                      }}
+                    >
+                      Add Target
+                    </button>
+                  </legend>
+                  <p className="pt-training-builder-form__helper">
+                    Which body targets does this exercise contribute to?
+                  </p>
+                  <div className="pt-training-routine-form__checkbox-grid">
+                    {fitnessTargetOptions.map((option) => {
+                      const optionId = `pt-training-exercise-target-${option.toLowerCase().replace(/\s+/g, "-")}`;
+                      const checked = exerciseFitnessTargets.some(
+                        (item) => normalizeOptionValue(item) === normalizeOptionValue(option),
+                      );
+
+                      return (
+                        <label key={option} htmlFor={optionId} className="pt-training-routine-form__checkbox-option">
+                          <input
+                            id={optionId}
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              toggleSelection(option, exerciseFitnessTargets, setExerciseFitnessTargets);
+                            }}
+                          />
+                          <span>{option}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+
+                <fieldset className="pt-training-builder-form__field pt-training-routine-form__checkbox-fieldset pt-training-exercise-form__field">
+                  <legend className="pt-training-routine-form__field-header">
+                    <span>Fitness Attributes</span>
+                    <button
+                      type="button"
+                      className="pt-training-routine-form__field-action mobile-focus-ring"
+                      onClick={() => {
+                        openRoutineOptionDialog("attribute", "exercise");
+                      }}
+                    >
+                      Add Attribute
+                    </button>
+                  </legend>
+                  <p className="pt-training-builder-form__helper">
+                    Which physical attributes does this exercise contribute to?
+                  </p>
+                  <div className="pt-training-routine-form__checkbox-grid">
+                    {fitnessAttributeOptions.map((option) => {
+                      const optionId = `pt-training-exercise-attribute-${option.toLowerCase().replace(/\s+/g, "-")}`;
+                      const checked = exerciseFitnessAttributes.some(
+                        (item) => normalizeOptionValue(item) === normalizeOptionValue(option),
+                      );
+
+                      return (
+                        <label key={option} htmlFor={optionId} className="pt-training-routine-form__checkbox-option">
+                          <input
+                            id={optionId}
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              toggleSelection(option, exerciseFitnessAttributes, setExerciseFitnessAttributes);
+                            }}
+                          />
+                          <span>{option}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+
+                <div className="pt-training-builder-form__field pt-training-exercise-form__field">
+                  <label htmlFor="pt-training-exercise-tag-input">Tags</label>
+                  <div className="pt-training-folder-edit__inline-actions">
+                    <input
+                      id="pt-training-exercise-tag-input"
+                      value={exerciseTagInput}
+                      onChange={(event) => {
+                        setExerciseTagInput(event.target.value);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="pt-training-modal__secondary-action mobile-focus-ring"
+                      onClick={handleAddExerciseTag}
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {exerciseTags.length > 0 ? (
+                    <div className="pt-training-publish-folder-picker__list">
+                      {exerciseTags.map((tag) => (
+                        <span key={tag} className="pt-training-folder-edit__tag">
+                          <span className="pt-training-folder-edit__tag-label">{tag}</span>
+                          <button
+                            type="button"
+                            className="pt-training-folder-edit__tag-remove mobile-focus-ring"
+                            aria-label={`Remove ${tag} tag`}
+                            onClick={() => {
+                              removeExerciseTag(tag);
+                            }}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="pt-training-builder-form__helper">
+                      Add local-only tags to help search and organize rep assets.
+                    </p>
+                  )}
+                </div>
 
                 <div className="pt-training-builder-form__field pt-training-exercise-form__field">
                   <label>Media</label>
@@ -5124,7 +5844,7 @@ export default function PTTrainingPage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={
-              routineOptionDialogKind === "target"
+              routineOptionDialogKind.kind === "target"
                 ? "pt-training-add-target-dialog-title"
                 : "pt-training-add-attribute-dialog-title"
             }
@@ -5135,13 +5855,13 @@ export default function PTTrainingPage() {
                 <p className="mobile-section__eyebrow">Local-only option</p>
                 <h2
                   id={
-                    routineOptionDialogKind === "target"
+                    routineOptionDialogKind.kind === "target"
                       ? "pt-training-add-target-dialog-title"
                       : "pt-training-add-attribute-dialog-title"
                   }
                   className="mobile-section__title"
                 >
-                  {routineOptionDialogKind === "target" ? "Add Fitness Target" : "Add Fitness Attribute"}
+                  {routineOptionDialogKind.kind === "target" ? "Add Fitness Target" : "Add Fitness Attribute"}
                 </h2>
               </div>
               <button
@@ -5156,7 +5876,7 @@ export default function PTTrainingPage() {
             <div className="pt-training-modal__form pt-training-builder-form">
               <div className="pt-training-builder-form__field">
                 <label htmlFor="pt-training-routine-option-value">
-                  {routineOptionDialogKind === "target" ? "Body target" : "Physical attribute"}
+                  {routineOptionDialogKind.kind === "target" ? "Body target" : "Physical attribute"}
                 </label>
                 <input
                   id="pt-training-routine-option-value"
@@ -5186,7 +5906,7 @@ export default function PTTrainingPage() {
                   className="pt-training-modal__primary-action mobile-focus-ring"
                   onClick={handleAddRoutineOption}
                 >
-                  {routineOptionDialogKind === "target" ? "Add Target" : "Add Attribute"}
+                  {routineOptionDialogKind.kind === "target" ? "Add Target" : "Add Attribute"}
                 </button>
               </div>
             </div>
