@@ -1954,35 +1954,35 @@ export default function PTTrainingPage() {
                                   <p className="pt-training-local-draft-card__portfolio">
                                     Portfolio folders: {formatPublishTargetsSummary(draft.publishTargets ?? [])}
                                   </p>
-                                  {(draft.publishTargets ?? []).length > 0 ? (
-                                    <div className="pt-training-local-draft-card__portfolio-actions">
-                                      {dedupePublishTargets(draft.publishTargets ?? []).map((target) =>
-                                        target.type === "existing-folder" && target.id ? (
-                                          <button
-                                            key={`${target.type}:${target.id}`}
-                                            type="button"
-                                            className="pt-training-local-draft-card__portfolio-button mobile-focus-ring"
-                                            onClick={() => {
-                                              openPortfolioFolderDetail(target.id as string);
-                                            }}
-                                          >
-                                            {target.name}
-                                          </button>
-                                        ) : (
-                                          <span
-                                            key={`${target.type}:${target.id ?? target.name}`}
-                                            className="pt-training-publish-folder-picker__local-tag"
-                                          >
-                                            {target.name}
-                                          </span>
-                                        ),
-                                      )}
-                                    </div>
-                                  ) : null}
                                 </>
                               ) : null}
                             </div>
                           </button>
+                          {draft.publishStatus === "ready" && (draft.publishTargets ?? []).length > 0 ? (
+                            <div className="pt-training-local-draft-card__portfolio-targets">
+                              {dedupePublishTargets(draft.publishTargets ?? []).map((target) =>
+                                target.type === "existing-folder" && target.id ? (
+                                  <button
+                                    key={`${target.type}:${target.id}`}
+                                    type="button"
+                                    className="pt-training-local-draft-card__portfolio-button mobile-focus-ring"
+                                    onClick={() => {
+                                      openPortfolioFolderDetail(target.id as string);
+                                    }}
+                                  >
+                                    {target.name}
+                                  </button>
+                                ) : (
+                                  <span
+                                    key={`${target.type}:${target.id ?? target.name}`}
+                                    className="pt-training-local-draft-card__portfolio-pill"
+                                  >
+                                    {target.name}
+                                  </span>
+                                ),
+                              )}
+                            </div>
+                          ) : null}
                           <div className="pt-training-local-draft-card__actions">
                             <button
                               type="button"
