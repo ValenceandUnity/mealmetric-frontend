@@ -339,8 +339,14 @@ describe("PTTrainingPage mobile experience", () => {
     expect(screen.getByLabelText("Exercise")).toBeTruthy();
     expect(screen.queryByText("Page 2")).toBeNull();
     expect(screen.queryByLabelText("Rep Goal")).toBeNull();
-    expect(screen.getByLabelText("Instructions optional")).toBeTruthy();
+    expect(screen.getByLabelText("Instructions (optional)")).toBeTruthy();
     expect(screen.getByText("Weights Involved?")).toBeTruthy();
+    expect(screen.getByText("Fitness Target")).toBeTruthy();
+    expect(screen.getByText("Fitness Attributes")).toBeTruthy();
+    expect(screen.getByLabelText("Tags")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add Target" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add Attribute" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add" })).toBeTruthy();
     expect(screen.getByText("Media")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Add Media" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save Exercise Draft" })).toBeTruthy();
@@ -354,6 +360,72 @@ describe("PTTrainingPage mobile experience", () => {
     expect((screen.getByLabelText("Exercise") as HTMLInputElement).getAttribute("list")).toBe(
       "pt-training-exercise-suggestions",
     );
+    expect(screen.getByLabelText("Biceps")).toBeTruthy();
+    expect(screen.getByLabelText("Strength")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Target" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Add Fitness Target" })).toBeTruthy();
+    });
+
+    const addExerciseTargetDialog = screen.getByRole("dialog", { name: "Add Fitness Target" });
+    fireEvent.change(within(addExerciseTargetDialog).getByLabelText("Body target"), {
+      target: { value: "Chest" },
+    });
+    fireEvent.click(within(addExerciseTargetDialog).getByRole("button", { name: "Add Target" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Chest")).toBeTruthy();
+    });
+
+    expect((screen.getByLabelText("Chest") as HTMLInputElement).checked).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Attribute" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Add Fitness Attribute" })).toBeTruthy();
+    });
+
+    const addExerciseAttributeDialog = screen.getByRole("dialog", { name: "Add Fitness Attribute" });
+    fireEvent.change(within(addExerciseAttributeDialog).getByLabelText("Physical attribute"), {
+      target: { value: "Power Output" },
+    });
+    fireEvent.click(within(addExerciseAttributeDialog).getByRole("button", { name: "Add Attribute" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Power Output")).toBeTruthy();
+    });
+
+    expect((screen.getByLabelText("Power Output") as HTMLInputElement).checked).toBe(true);
+
+    fireEvent.click(screen.getByLabelText("Biceps"));
+    fireEvent.click(screen.getByLabelText("Strength"));
+    fireEvent.change(screen.getByLabelText("Tags"), {
+      target: { value: "Explosive" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Explosive")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("Explosive"));
+    expect(screen.getByText("Explosive")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Remove Explosive tag" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Explosive")).toBeNull();
+    });
+
+    fireEvent.change(screen.getByLabelText("Tags"), {
+      target: { value: "Explosive" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.change(screen.getByLabelText("Tags"), {
+      target: { value: "Barbell" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Add Media" }));
 
@@ -421,6 +493,9 @@ describe("PTTrainingPage mobile experience", () => {
           exerciseName: "Bench Press",
           instructions: "",
           weightsInvolved: true,
+          fitnessTargets: expect.arrayContaining(["Biceps", "Chest"]),
+          fitnessAttributes: expect.arrayContaining(["Strength", "Power Output"]),
+          tags: expect.arrayContaining(["Explosive", "Barbell"]),
           media: expect.objectContaining({
             kind: "image",
             name: "bench-demo.png",
@@ -441,6 +516,9 @@ describe("PTTrainingPage mobile experience", () => {
     const repDraftCard = repDraftButton.closest("article") as HTMLElement;
     expect(within(repDraftCard).getByText("Rep")).toBeTruthy();
     expect(within(repDraftCard).queryByText("Routine")).toBeNull();
+    expect(within(repDraftCard).getByText(/Fitness targets: /)).toBeTruthy();
+    expect(within(repDraftCard).getByText(/Fitness attributes: /)).toBeTruthy();
+    expect(within(repDraftCard).getByText(/Tags: /)).toBeTruthy();
 
     fireEvent.click(repDraftButton);
 
@@ -449,8 +527,8 @@ describe("PTTrainingPage mobile experience", () => {
     });
 
     expect((screen.getByLabelText("Exercise") as HTMLInputElement).value).toBe("Bench Press");
-    expect((screen.getByLabelText("Instructions optional") as HTMLTextAreaElement).value).toBe("");
-    fireEvent.change(screen.getByLabelText("Instructions optional"), {
+    expect((screen.getByLabelText("Instructions (optional)") as HTMLTextAreaElement).value).toBe("");
+    fireEvent.change(screen.getByLabelText("Instructions (optional)"), {
       target: { value: "Lower with control and drive upward." },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save Exercise Draft" }));
@@ -466,6 +544,9 @@ describe("PTTrainingPage mobile experience", () => {
         expect.objectContaining({
           exerciseName: "Bench Press",
           instructions: "Lower with control and drive upward.",
+          fitnessTargets: expect.arrayContaining(["Biceps", "Chest"]),
+          fitnessAttributes: expect.arrayContaining(["Strength", "Power Output"]),
+          tags: expect.arrayContaining(["Explosive", "Barbell"]),
           media: expect.objectContaining({
             name: "bench-demo.png",
           }),
@@ -544,13 +625,54 @@ describe("PTTrainingPage mobile experience", () => {
     expect(within(benchPressDialog).getAllByText("Rep").length).toBeGreaterThan(0);
     expect(within(benchPressDialog).getByText("Instructions: Lower with control and drive upward.")).toBeTruthy();
     expect(within(benchPressDialog).getByText("Weights involved: Yes")).toBeTruthy();
+    expect(within(benchPressDialog).getByText(/Fitness targets: /)).toBeTruthy();
+    expect(within(benchPressDialog).getByText(/Fitness attributes: /)).toBeTruthy();
+    expect(within(benchPressDialog).getByText("Explosive")).toBeTruthy();
+    expect(within(benchPressDialog).getByText("Barbell")).toBeTruthy();
     expect(within(benchPressDialog).getByText("Media: bench-demo.png")).toBeTruthy();
+    expect(within(benchPressDialog).getByRole("button", { name: "Edit Exercise" })).toBeTruthy();
     expect(within(benchPressDialog).queryByText(/Rep Goal:/i)).toBeNull();
     expect(within(benchPressDialog).queryByText(/Main objective/i)).toBeNull();
-    fireEvent.click(within(benchPressDialog).getByRole("button", { name: "Close" }));
+    fireEvent.click(within(benchPressDialog).getByRole("button", { name: "Edit Exercise" }));
 
     await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: "Bench Press" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Save local changes" })).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText("Exercise"), {
+      target: { value: "Incline Bench Press" },
+    });
+    fireEvent.change(screen.getByLabelText("Instructions (optional)"), {
+      target: { value: "Drive through the incline path." },
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "No" }));
+    fireEvent.click(screen.getByLabelText("Back"));
+    fireEvent.click(screen.getByLabelText("Speed"));
+    fireEvent.click(screen.getByText("Barbell"));
+    expect(screen.getByText("Barbell")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Remove Barbell tag" }));
+    fireEvent.change(screen.getByLabelText("Tags"), {
+      target: { value: "Tempo" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save local changes" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Incline Bench Press" })).toBeTruthy();
+    });
+
+    const inclineBenchDialog = screen.getByRole("dialog", { name: "Incline Bench Press" });
+    expect(within(inclineBenchDialog).getByText("Exercise: Incline Bench Press")).toBeTruthy();
+    expect(within(inclineBenchDialog).getByText("Instructions: Drive through the incline path.")).toBeTruthy();
+    expect(within(inclineBenchDialog).getByText("Weights involved: No")).toBeTruthy();
+    expect(within(inclineBenchDialog).getByText("Tempo")).toBeTruthy();
+    expect(within(inclineBenchDialog).queryByText("Barbell")).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
+
+    fireEvent.click(within(inclineBenchDialog).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Incline Bench Press" })).toBeNull();
     });
 
     fireEvent.click(within(strengthDialog).getByRole("button", { name: "Close" }));
@@ -560,11 +682,56 @@ describe("PTTrainingPage mobile experience", () => {
     });
 
     fireEvent.change(screen.getByRole("searchbox", { name: "Search training portfolios" }), {
-      target: { value: "Bench Press" },
+      target: { value: "Tempo" },
     });
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Open training portfolio All Singular Exercises" })).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search training portfolios" }), {
+      target: { value: "Chest" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open training portfolio All Singular Exercises" })).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search training portfolios" }), {
+      target: { value: "Power Output" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open training portfolio All Singular Exercises" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open training portfolio All Singular Exercises" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "All Singular Exercises" })).toBeTruthy();
+    });
+
+    const updatedSingularDialog = screen.getByRole("dialog", { name: "All Singular Exercises" });
+    expect(within(updatedSingularDialog).getByRole("button", { name: "Open Rep asset Incline Bench Press" })).toBeTruthy();
+    fireEvent.click(within(updatedSingularDialog).getByRole("button", { name: "Open Rep asset Incline Bench Press" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Incline Bench Press" })).toBeTruthy();
+    });
+
+    const syncedRepDialog = screen.getByRole("dialog", { name: "Incline Bench Press" });
+    expect(within(syncedRepDialog).getByText("Tempo")).toBeTruthy();
+    expect(within(syncedRepDialog).getByText("Instructions: Drive through the incline path.")).toBeTruthy();
+    fireEvent.click(within(syncedRepDialog).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Incline Bench Press" })).toBeNull();
+    });
+
+    fireEvent.click(within(updatedSingularDialog).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "All Singular Exercises" })).toBeNull();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Create a Routine" }));
@@ -596,7 +763,7 @@ describe("PTTrainingPage mobile experience", () => {
     expect(screen.getByText("Media")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Add Media" })).toBeTruthy();
     const datalist = document.getElementById("pt-training-routine-exercise-suggestions");
-    expect((datalist as HTMLElement).querySelector('option[value="Bench Press"]')).toBeTruthy();
+    expect((datalist as HTMLElement).querySelector('option[value="Incline Bench Press"]')).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
   });
 

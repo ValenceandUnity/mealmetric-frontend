@@ -29,6 +29,9 @@ export type LocalPTExerciseDraft = {
   repGoal?: number;
   instructions: string;
   weightsInvolved: boolean;
+  fitnessTargets: string[];
+  fitnessAttributes: string[];
+  tags: string[];
   media?: PTTrainingDraftMedia | null;
   createdAt: string;
   editedAt: string;
@@ -63,6 +66,9 @@ export type LocalPTPortfolioRepAsset = {
   instructions?: string;
   objective?: string;
   weightsInvolved?: boolean;
+  fitnessTargets: string[];
+  fitnessAttributes: string[];
+  tags: string[];
   media?: PTTrainingDraftMedia | null;
   sourceDraftId?: string;
   createdAt: string;
@@ -209,6 +215,12 @@ function normalizeDraftMedia(media: PTTrainingDraftMedia | Record<string, unknow
   } satisfies PTTrainingDraftMedia;
 }
 
+function normalizeStringArray(values: unknown): string[] {
+  return Array.isArray(values)
+    ? values.flatMap((value) => (typeof value === "string" ? [value.trim()] : [])).filter(Boolean)
+    : [];
+}
+
 export function readLocalPTFolderDrafts(): LocalPTFolderDraft[] {
   return readDrafts<LocalPTFolderDraft>(PT_TRAINING_FOLDER_DRAFTS_STORAGE_KEY);
 }
@@ -264,6 +276,9 @@ export function readLocalPTExerciseDrafts(): LocalPTExerciseDraft[] {
       repGoal: Number.isFinite(repGoalValue) ? repGoalValue : undefined,
       instructions: typeof legacyDraft.instructions === "string" ? legacyDraft.instructions.trim() : "",
       weightsInvolved: Boolean(legacyDraft.weightsInvolved),
+      fitnessTargets: normalizeStringArray(legacyDraft.fitnessTargets),
+      fitnessAttributes: normalizeStringArray(legacyDraft.fitnessAttributes),
+      tags: normalizeStringArray(legacyDraft.tags),
       media: normalizeDraftMedia(legacyDraft.media as Record<string, unknown> | null | undefined),
       createdAt,
       editedAt: typeof legacyDraft.editedAt === "string" ? legacyDraft.editedAt : createdAt,
@@ -282,6 +297,9 @@ export function createLocalPTExerciseDraft(input: {
   repGoal?: number;
   instructions: string;
   weightsInvolved: boolean;
+  fitnessTargets?: string[];
+  fitnessAttributes?: string[];
+  tags?: string[];
   media?: PTTrainingDraftMedia | null;
   createdAt?: string;
   editedAt?: string;
@@ -297,6 +315,9 @@ export function createLocalPTExerciseDraft(input: {
     repGoal: input.repGoal,
     instructions: input.instructions.trim(),
     weightsInvolved: input.weightsInvolved,
+    fitnessTargets: normalizeStringArray(input.fitnessTargets),
+    fitnessAttributes: normalizeStringArray(input.fitnessAttributes),
+    tags: normalizeStringArray(input.tags),
     media: normalizeDraftMedia(input.media),
     createdAt,
     editedAt: input.editedAt ?? createdAt,
@@ -365,6 +386,9 @@ function normalizePortfolioAsset(asset: LocalPTPortfolioAsset | null | undefined
       objective: asset.objective?.trim() || undefined,
       weightsInvolved:
         typeof asset.weightsInvolved === "boolean" ? asset.weightsInvolved : undefined,
+      fitnessTargets: normalizeStringArray(asset.fitnessTargets),
+      fitnessAttributes: normalizeStringArray(asset.fitnessAttributes),
+      tags: normalizeStringArray(asset.tags),
       media: normalizeDraftMedia(asset.media),
       sourceDraftId: asset.sourceDraftId?.trim() || undefined,
       createdAt: asset.createdAt ?? new Date().toISOString(),
@@ -384,6 +408,9 @@ export function createLocalPTPortfolioRepAsset(input: {
   instructions?: string;
   objective?: string;
   weightsInvolved?: boolean;
+  fitnessTargets?: string[];
+  fitnessAttributes?: string[];
+  tags?: string[];
   media?: PTTrainingDraftMedia | null;
   sourceDraftId?: string;
   createdAt?: string;
@@ -401,6 +428,9 @@ export function createLocalPTPortfolioRepAsset(input: {
     instructions: input.instructions?.trim() || undefined,
     objective: input.objective?.trim() || undefined,
     weightsInvolved: typeof input.weightsInvolved === "boolean" ? input.weightsInvolved : undefined,
+    fitnessTargets: normalizeStringArray(input.fitnessTargets),
+    fitnessAttributes: normalizeStringArray(input.fitnessAttributes),
+    tags: normalizeStringArray(input.tags),
     media: normalizeDraftMedia(input.media),
     sourceDraftId: input.sourceDraftId?.trim() || undefined,
     createdAt,
