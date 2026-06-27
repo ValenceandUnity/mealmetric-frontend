@@ -23,11 +23,14 @@ export type LocalPTFolderDraft = {
 
 export type LocalPTExerciseDraft = {
   id: string;
-  type: "exercise";
-  description: string;
+  type: "rep";
+  title: string;
+  exerciseName: string;
+  repGoal: number;
   instructions: string;
-  objective: string;
+  weightsInvolved: boolean;
   createdAt: string;
+  editedAt: string;
 };
 
 export type LocalPTPortfolioAssetExercise = {
@@ -42,9 +45,12 @@ export type LocalPTPortfolioRepAsset = {
   id: string;
   type: "rep";
   title: string;
+  exerciseName?: string;
+  repGoal?: string;
   description?: string;
   instructions?: string;
   objective?: string;
+  weightsInvolved?: boolean;
   sourceDraftId?: string;
   createdAt: string;
   updatedAt: string;
@@ -186,7 +192,44 @@ export function createLocalPTFolderDraft(input: {
 }
 
 export function readLocalPTExerciseDrafts(): LocalPTExerciseDraft[] {
-  return readDrafts<LocalPTExerciseDraft>(PT_TRAINING_EXERCISE_DRAFTS_STORAGE_KEY);
+  return readDrafts<LocalPTExerciseDraft>(PT_TRAINING_EXERCISE_DRAFTS_STORAGE_KEY).flatMap((draft) => {
+    if (!draft || typeof draft !== "object") {
+      return [];
+    }
+
+    const legacyDraft = draft as Record<string, unknown>;
+    const exerciseName =
+      (typeof legacyDraft.exerciseName === "string" ? legacyDraft.exerciseName.trim() : "") ||
+      (typeof legacyDraft.title === "string" ? legacyDraft.title.trim() : "") ||
+      (typeof legacyDraft.description === "string" ? legacyDraft.description.trim() : "") ||
+      "";
+
+    if (!exerciseName) {
+      return [];
+    }
+
+    const repGoalValue =
+      typeof legacyDraft.repGoal === "number"
+        ? legacyDraft.repGoal
+        : Number.parseInt(
+            typeof legacyDraft.repGoal === "string" ? legacyDraft.repGoal : "",
+            10,
+          );
+    const createdAt =
+      typeof legacyDraft.createdAt === "string" ? legacyDraft.createdAt : new Date().toISOString();
+
+    return [{
+      id: typeof legacyDraft.id === "string" ? legacyDraft.id : createLocalPTDraftId(),
+      type: "rep",
+      title: typeof legacyDraft.title === "string" ? legacyDraft.title.trim() || exerciseName : exerciseName,
+      exerciseName,
+      repGoal: Number.isFinite(repGoalValue) ? repGoalValue : 0,
+      instructions: typeof legacyDraft.instructions === "string" ? legacyDraft.instructions.trim() : "",
+      weightsInvolved: Boolean(legacyDraft.weightsInvolved),
+      createdAt,
+      editedAt: typeof legacyDraft.editedAt === "string" ? legacyDraft.editedAt : createdAt,
+    }];
+  });
 }
 
 export function writeLocalPTExerciseDrafts(drafts: LocalPTExerciseDraft[]) {
@@ -194,17 +237,28 @@ export function writeLocalPTExerciseDrafts(drafts: LocalPTExerciseDraft[]) {
 }
 
 export function createLocalPTExerciseDraft(input: {
-  description: string;
+  id?: string;
+  title?: string;
+  exerciseName: string;
+  repGoal: number;
   instructions: string;
-  objective: string;
+  weightsInvolved: boolean;
+  createdAt?: string;
+  editedAt?: string;
 }): LocalPTExerciseDraft {
+  const createdAt = input.createdAt ?? new Date().toISOString();
+  const exerciseName = input.exerciseName.trim();
+
   return {
-    id: createLocalPTDraftId(),
-    type: "exercise",
-    description: input.description.trim(),
+    id: input.id ?? createLocalPTDraftId(),
+    type: "rep",
+    title: input.title?.trim() || exerciseName,
+    exerciseName,
+    repGoal: input.repGoal,
     instructions: input.instructions.trim(),
-    objective: input.objective.trim(),
-    createdAt: new Date().toISOString(),
+    weightsInvolved: input.weightsInvolved,
+    createdAt,
+    editedAt: input.editedAt ?? createdAt,
   };
 }
 
@@ -262,9 +316,13 @@ function normalizePortfolioAsset(asset: LocalPTPortfolioAsset | null | undefined
       id: asset.id ?? createLocalPTDraftId(),
       type: "rep",
       title: asset.title?.trim() ?? "",
+      exerciseName: asset.exerciseName?.trim() || asset.title?.trim() || undefined,
+      repGoal: asset.repGoal?.toString().trim() || undefined,
       description: asset.description?.trim() || undefined,
       instructions: asset.instructions?.trim() || undefined,
       objective: asset.objective?.trim() || undefined,
+      weightsInvolved:
+        typeof asset.weightsInvolved === "boolean" ? asset.weightsInvolved : undefined,
       sourceDraftId: asset.sourceDraftId?.trim() || undefined,
       createdAt: asset.createdAt ?? new Date().toISOString(),
       updatedAt: asset.updatedAt ?? asset.createdAt ?? new Date().toISOString(),
@@ -277,9 +335,12 @@ function normalizePortfolioAsset(asset: LocalPTPortfolioAsset | null | undefined
 export function createLocalPTPortfolioRepAsset(input: {
   id?: string;
   title: string;
+  exerciseName?: string;
+  repGoal?: string;
   description?: string;
   instructions?: string;
   objective?: string;
+  weightsInvolved?: boolean;
   sourceDraftId?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -290,9 +351,12 @@ export function createLocalPTPortfolioRepAsset(input: {
     id: input.id ?? createLocalPTDraftId(),
     type: "rep",
     title: input.title.trim(),
+    exerciseName: input.exerciseName?.trim() || input.title.trim(),
+    repGoal: input.repGoal?.trim() || undefined,
     description: input.description?.trim() || undefined,
     instructions: input.instructions?.trim() || undefined,
     objective: input.objective?.trim() || undefined,
+    weightsInvolved: typeof input.weightsInvolved === "boolean" ? input.weightsInvolved : undefined,
     sourceDraftId: input.sourceDraftId?.trim() || undefined,
     createdAt,
     updatedAt: input.updatedAt ?? createdAt,

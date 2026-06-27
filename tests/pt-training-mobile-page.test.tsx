@@ -333,30 +333,46 @@ describe("PTTrainingPage mobile experience", () => {
       expect(screen.getByRole("dialog", { name: "Add an Exercise" })).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Save local draft" }));
+    expect(screen.getByLabelText("Exercise")).toBeTruthy();
+    expect(screen.getByLabelText("Rep Goal")).toBeTruthy();
+    expect(screen.getByLabelText("Instructions")).toBeTruthy();
+    expect(screen.getByText("Weights Involved?")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save Exercise Draft" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
+    expect(screen.queryByText("Exercise description")).toBeNull();
+    expect(screen.queryByText("Main objective")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add Another Exercise" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Previous exercise" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Next exercise" })).toBeNull();
+    expect((screen.getByLabelText("Rep Goal") as HTMLInputElement).type).toBe("number");
+    expect(screen.queryByRole("textbox", { name: "Weights Involved?" })).toBeNull();
+    expect((screen.getByLabelText("Exercise") as HTMLInputElement).getAttribute("list")).toBe(
+      "pt-training-exercise-suggestions",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Exercise Draft" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Exercise description is required.")).toBeTruthy();
+      expect(screen.getByText("Exercise is required.")).toBeTruthy();
+      expect(screen.getByText("Rep Goal is required.")).toBeTruthy();
       expect(screen.getByText("Instructions are required.")).toBeTruthy();
-      expect(screen.getByText("Main objective is required.")).toBeTruthy();
     });
 
-    fireEvent.change(screen.getByLabelText("Exercise description"), {
+    fireEvent.change(screen.getByLabelText("Exercise"), {
       target: { value: "Bench Press" },
+    });
+    fireEvent.change(screen.getByLabelText("Rep Goal"), {
+      target: { value: "8" },
     });
     fireEvent.change(screen.getByLabelText("Instructions"), {
       target: { value: "Lower with control and drive upward." },
     });
-    fireEvent.change(screen.getByLabelText("Main objective"), {
-      target: { value: "Upper-body pressing strength" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Save local draft" }));
+    fireEvent.click(screen.getByLabelText("Yes"));
+    fireEvent.click(screen.getByRole("button", { name: "Save Exercise Draft" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Local exercise drafts")).toBeTruthy();
+      expect(screen.getByText("Training Draft Queue (1)")).toBeTruthy();
     });
-
-    expect(screen.getByText("Rep")).toBeTruthy();
 
     expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
     expect(
@@ -364,13 +380,123 @@ describe("PTTrainingPage mobile experience", () => {
     ).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          type: "exercise",
-          description: "Bench Press",
+          type: "rep",
+          title: "Bench Press",
+          exerciseName: "Bench Press",
+          repGoal: 8,
           instructions: "Lower with control and drive upward.",
-          objective: "Upper-body pressing strength",
+          weightsInvolved: true,
         }),
       ]),
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "Show training draft queue" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Edit rep draft Bench Press" })).toBeTruthy();
+    });
+
+    const repDraftButton = screen.getByRole("button", { name: "Edit rep draft Bench Press" });
+    const repDraftCard = repDraftButton.closest("article") as HTMLElement;
+    expect(within(repDraftCard).getByText("Rep")).toBeTruthy();
+    expect(within(repDraftCard).queryByText("Routine")).toBeNull();
+
+    fireEvent.click(repDraftButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Add an Exercise" })).toBeTruthy();
+    });
+
+    expect((screen.getByLabelText("Exercise") as HTMLInputElement).value).toBe("Bench Press");
+    expect((screen.getByLabelText("Rep Goal") as HTMLInputElement).value).toBe("8");
+    fireEvent.change(screen.getByLabelText("Rep Goal"), {
+      target: { value: "10" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Exercise Draft" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Add an Exercise" })).toBeNull();
+    });
+
+    expect(
+      JSON.parse(window.localStorage.getItem(PT_TRAINING_EXERCISE_DRAFTS_STORAGE_KEY) ?? "[]"),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          exerciseName: "Bench Press",
+          repGoal: 10,
+          editedAt: expect.any(String),
+        }),
+      ]),
+    );
+    expect(
+      JSON.parse(window.localStorage.getItem(PT_TRAINING_EXERCISE_DRAFTS_STORAGE_KEY) ?? "[]"),
+    ).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish Exercise" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Publish Exercise" })).toBeTruthy();
+    });
+
+    const publishDialog = screen.getByRole("dialog", { name: "Publish Exercise" });
+    fireEvent.click(within(publishDialog).getByRole("button", { name: "Publish Exercise" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Select at least one portfolio folder.")).toBeTruthy();
+    });
+
+    fireEvent.click(within(publishDialog).getByRole("button", { name: "Select Portfolio Folder" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Select Portfolio Folder" })).toBeTruthy();
+    });
+
+    const folderPicker = screen.getByRole("dialog", { name: "Select Portfolio Folder" });
+    fireEvent.click(within(folderPicker).getByRole("checkbox", { name: "Strength" }));
+    fireEvent.click(within(folderPicker).getByRole("button", { name: "Done" }));
+    fireEvent.click(within(publishDialog).getByRole("button", { name: "Publish Exercise" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Publish Exercise" })).toBeNull();
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Training Draft Queue (1)")).toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open training portfolio Strength" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Strength" })).toBeTruthy();
+    });
+
+    const strengthDialog = screen.getByRole("dialog", { name: "Strength" });
+    expect(within(strengthDialog).getByRole("button", { name: "Open Rep asset Bench Press" })).toBeTruthy();
+
+    fireEvent.click(within(strengthDialog).getByRole("button", { name: "Open Rep asset Bench Press" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Bench Press" })).toBeTruthy();
+    });
+
+    const benchPressDialog = screen.getByRole("dialog", { name: "Bench Press" });
+    expect(within(benchPressDialog).getAllByText("Rep").length).toBeGreaterThan(0);
+    expect(within(benchPressDialog).getByText("Rep Goal: 10")).toBeTruthy();
+    expect(within(benchPressDialog).getByText("Instructions: Lower with control and drive upward.")).toBeTruthy();
+    expect(within(benchPressDialog).getByText("Weights involved: Yes")).toBeTruthy();
+    expect(within(benchPressDialog).queryByText(/Main objective/i)).toBeNull();
+    fireEvent.click(within(benchPressDialog).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Bench Press" })).toBeNull();
+    });
+
+    fireEvent.click(within(strengthDialog).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Strength" })).toBeNull();
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Create a Routine" }));
 
@@ -399,6 +525,7 @@ describe("PTTrainingPage mobile experience", () => {
     expect(exerciseInput.getAttribute("list")).toBe("pt-training-routine-exercise-suggestions");
     const datalist = document.getElementById("pt-training-routine-exercise-suggestions");
     expect((datalist as HTMLElement).querySelector('option[value="Bench Press"]')).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
   });
 
   it("validates Page 1 targets and attributes, keeps the routine draft queue collapsed by default, and saves the routine draft locally", async () => {
@@ -544,11 +671,11 @@ describe("PTTrainingPage mobile experience", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save Routine Draft" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Routine Draft Queue (1)")).toBeTruthy();
+      expect(screen.getByText("Training Draft Queue (1)")).toBeTruthy();
     });
 
     expect(screen.queryByText("Full Body Builder")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Show routine draft queue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show training draft queue" }));
 
     await waitFor(() => {
       expect(screen.getByText("Full Body Builder")).toBeTruthy();
@@ -727,12 +854,12 @@ describe("PTTrainingPage mobile experience", () => {
     render(React.createElement(PTTrainingPage));
 
     await waitFor(() => {
-      expect(screen.getByText("Routine Draft Queue (1)")).toBeTruthy();
+      expect(screen.getByText("Training Draft Queue (1)")).toBeTruthy();
     });
 
     const fetchCallCount = fetchMock.mock.calls.length;
 
-    fireEvent.click(screen.getByRole("button", { name: "Show routine draft queue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show training draft queue" }));
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Edit routine draft Original Builder" })).toBeTruthy();
@@ -803,7 +930,7 @@ describe("PTTrainingPage mobile experience", () => {
       expect(screen.queryByRole("dialog", { name: "Create a Routine" })).toBeNull();
     });
 
-    expect(screen.getByText("Routine Draft Queue (1)")).toBeTruthy();
+    expect(screen.getByText("Training Draft Queue (1)")).toBeTruthy();
     expect(screen.queryByText("Original Builder")).toBeNull();
     expect(screen.getByText("Updated Builder")).toBeTruthy();
 
@@ -880,7 +1007,7 @@ describe("PTTrainingPage mobile experience", () => {
       expect(screen.queryByRole("button", { name: "Edit routine draft Updated Builder" })).toBeNull();
     });
 
-    expect(screen.queryByText("Routine Draft Queue (1)")).toBeNull();
+    expect(screen.queryByText("Training Draft Queue (1)")).toBeNull();
     expect(screen.getByRole("button", { name: "Open training portfolio Mobility Builder" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Open training portfolio Mobility Builder" }));
@@ -997,7 +1124,7 @@ describe("PTTrainingPage mobile experience", () => {
       expect(screen.getByRole("button", { name: "Open training portfolio Legacy Folder" })).toBeTruthy();
     });
 
-    expect(screen.queryByText("Routine Draft Queue (1)")).toBeNull();
+    expect(screen.queryByText("Training Draft Queue (1)")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Open training portfolio Legacy Folder" }));
 

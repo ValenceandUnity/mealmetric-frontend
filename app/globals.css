@@ -4392,6 +4392,12 @@ html[data-theme="light"] .mobile-training-form textarea {
   font-weight: 700;
 }
 
+.pt-training-local-draft-card__tag--rep {
+  border-color: rgba(250, 204, 21, 0.22);
+  background: rgba(250, 204, 21, 0.14);
+  color: #fef3c7;
+}
+
 .pt-training-local-draft-card__actions {
   display: flex;
   flex-wrap: wrap;
@@ -4963,6 +4969,24 @@ html[data-theme="light"] .mobile-training-form textarea {
   border-color: rgba(250, 204, 21, 0.54);
   background: rgba(250, 204, 21, 0.14);
   color: #fff7db;
+}
+
+.pt-training-exercise-form {
+  gap: 1rem;
+}
+
+.pt-training-exercise-form__panel,
+.pt-training-exercise-form__field {
+  min-width: 0;
+}
+
+.pt-training-exercise-form__toggle {
+  min-width: 0;
+}
+
+.pt-training-exercise-form__actions {
+  justify-content: center;
+  padding-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px));
 }
 
 .pt-training-builder-form__exercise-row {
