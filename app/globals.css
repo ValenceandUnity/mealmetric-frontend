@@ -4127,6 +4127,9 @@ html[data-theme="light"] .mobile-training-form textarea {
 .pt-training-builder-card:hover,
 .pt-training-builder-card:active,
 .pt-training-builder-card:focus-visible,
+.pt-training-portfolio-asset-row:hover,
+.pt-training-portfolio-asset-row:active,
+.pt-training-portfolio-asset-row:focus-visible,
 .pt-training-routine-form__field-action:hover,
 .pt-training-routine-form__field-action:active,
 .pt-training-routine-form__field-action:focus-visible,
@@ -4301,6 +4304,13 @@ html[data-theme="light"] .mobile-training-form textarea {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+.pt-training-local-draft-card__asset-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
 }
 
 .pt-training-local-draft-card__title,
@@ -4545,6 +4555,61 @@ html[data-theme="light"] .mobile-training-form textarea {
 .pt-training-folder-edit {
   display: grid;
   gap: 1rem;
+}
+
+.pt-training-portfolio-assets {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.pt-training-portfolio-asset-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 1rem;
+  background: rgba(2, 6, 23, 0.36);
+  color: var(--mobile-text);
+  text-align: left;
+  box-shadow: none;
+}
+
+.pt-training-portfolio-asset-row__copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.22rem;
+}
+
+.pt-training-portfolio-asset-row__tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.75rem;
+  padding: 0.16rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pt-training-portfolio-asset-row__tag--rep {
+  border: 1px solid rgba(250, 204, 21, 0.22);
+  background: rgba(250, 204, 21, 0.14);
+  color: #fef3c7;
+}
+
+.pt-training-portfolio-asset-row__tag--routine {
+  border: 1px solid rgba(96, 165, 250, 0.24);
+  background: rgba(37, 99, 235, 0.14);
+  color: #dbeafe;
+}
+
+.pt-training-portfolio-asset-detail {
+  display: grid;
+  gap: 0.95rem;
 }
 
 .pt-training-folder-detail .pt-training-publish-folder-picker__list {

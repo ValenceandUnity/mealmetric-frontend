@@ -30,6 +30,45 @@ export type LocalPTExerciseDraft = {
   createdAt: string;
 };
 
+export type LocalPTPortfolioAssetExercise = {
+  id: string;
+  exerciseName: string;
+  repGoal: string;
+  instructions: string;
+  weightsInvolved: boolean;
+};
+
+export type LocalPTPortfolioRepAsset = {
+  id: string;
+  type: "rep";
+  title: string;
+  description?: string;
+  instructions?: string;
+  objective?: string;
+  sourceDraftId?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LocalPTPortfolioRoutineAsset = {
+  id: string;
+  type: "routine";
+  title: string;
+  description?: string;
+  fitnessTargets: string[];
+  fitnessAttributes: string[];
+  timedByDuration: boolean;
+  setAmount: string;
+  exercises: LocalPTPortfolioAssetExercise[];
+  sourceDraftId?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LocalPTPortfolioAsset =
+  | LocalPTPortfolioRepAsset
+  | LocalPTPortfolioRoutineAsset;
+
 export type LocalPTPortfolioFolderColor = "grey" | "green" | "purple" | "blue" | "amber";
 export type LocalPTPortfolioFolder = {
   id: string;
@@ -39,6 +78,7 @@ export type LocalPTPortfolioFolder = {
   thumbnailDataUrl?: string;
   color?: LocalPTPortfolioFolderColor;
   tags: string[];
+  assets: LocalPTPortfolioAsset[];
   exercises: string[];
   pinned: boolean;
 };
@@ -50,6 +90,7 @@ export type LocalPTPortfolioFolderOverlay = {
   thumbnailDataUrl?: string;
   color?: LocalPTPortfolioFolderColor;
   tags: string[];
+  assets: LocalPTPortfolioAsset[];
   exercises: string[];
 };
 
@@ -167,6 +208,136 @@ export function createLocalPTExerciseDraft(input: {
   };
 }
 
+function normalizePortfolioAssetExercise(
+  exercise: LocalPTPortfolioAssetExercise | LocalPTRoutineExerciseDraft | null | undefined,
+): LocalPTPortfolioAssetExercise | null {
+  if (!exercise || typeof exercise.exerciseName !== "string") {
+    return null;
+  }
+
+  return {
+    id: exercise.id ?? createLocalPTDraftId(),
+    exerciseName: exercise.exerciseName.trim(),
+    repGoal:
+      typeof exercise.repGoal === "number"
+        ? String(exercise.repGoal)
+        : exercise.repGoal?.toString().trim() ?? "",
+    instructions: exercise.instructions?.trim() ?? "",
+    weightsInvolved: Boolean(exercise.weightsInvolved),
+  };
+}
+
+function normalizePortfolioAsset(asset: LocalPTPortfolioAsset | null | undefined): LocalPTPortfolioAsset | null {
+  if (!asset || typeof asset.type !== "string") {
+    return null;
+  }
+
+  if (asset.type === "routine") {
+    return {
+      id: asset.id ?? createLocalPTDraftId(),
+      type: "routine",
+      title: asset.title?.trim() ?? "",
+      description: asset.description?.trim() || undefined,
+      fitnessTargets: Array.isArray(asset.fitnessTargets)
+        ? asset.fitnessTargets.map((item) => item.trim()).filter(Boolean)
+        : [],
+      fitnessAttributes: Array.isArray(asset.fitnessAttributes)
+        ? asset.fitnessAttributes.map((item) => item.trim()).filter(Boolean)
+        : [],
+      timedByDuration: Boolean(asset.timedByDuration),
+      setAmount: asset.setAmount?.toString().trim() ?? "",
+      exercises: Array.isArray(asset.exercises)
+        ? asset.exercises
+            .map((exercise) => normalizePortfolioAssetExercise(exercise))
+            .filter((exercise): exercise is LocalPTPortfolioAssetExercise => exercise !== null)
+        : [],
+      sourceDraftId: asset.sourceDraftId?.trim() || undefined,
+      createdAt: asset.createdAt ?? new Date().toISOString(),
+      updatedAt: asset.updatedAt ?? asset.createdAt ?? new Date().toISOString(),
+    };
+  }
+
+  if (asset.type === "rep") {
+    return {
+      id: asset.id ?? createLocalPTDraftId(),
+      type: "rep",
+      title: asset.title?.trim() ?? "",
+      description: asset.description?.trim() || undefined,
+      instructions: asset.instructions?.trim() || undefined,
+      objective: asset.objective?.trim() || undefined,
+      sourceDraftId: asset.sourceDraftId?.trim() || undefined,
+      createdAt: asset.createdAt ?? new Date().toISOString(),
+      updatedAt: asset.updatedAt ?? asset.createdAt ?? new Date().toISOString(),
+    };
+  }
+
+  return null;
+}
+
+export function createLocalPTPortfolioRepAsset(input: {
+  id?: string;
+  title: string;
+  description?: string;
+  instructions?: string;
+  objective?: string;
+  sourceDraftId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}): LocalPTPortfolioRepAsset {
+  const createdAt = input.createdAt ?? new Date().toISOString();
+
+  return {
+    id: input.id ?? createLocalPTDraftId(),
+    type: "rep",
+    title: input.title.trim(),
+    description: input.description?.trim() || undefined,
+    instructions: input.instructions?.trim() || undefined,
+    objective: input.objective?.trim() || undefined,
+    sourceDraftId: input.sourceDraftId?.trim() || undefined,
+    createdAt,
+    updatedAt: input.updatedAt ?? createdAt,
+  };
+}
+
+export function createLocalPTPortfolioRoutineAsset(input: {
+  id?: string;
+  title: string;
+  description?: string;
+  fitnessTargets?: string[];
+  fitnessAttributes?: string[];
+  timedByDuration?: boolean;
+  setAmount?: string;
+  exercises?: LocalPTPortfolioAssetExercise[];
+  sourceDraftId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}): LocalPTPortfolioRoutineAsset {
+  const createdAt = input.createdAt ?? new Date().toISOString();
+
+  return {
+    id: input.id ?? createLocalPTDraftId(),
+    type: "routine",
+    title: input.title.trim(),
+    description: input.description?.trim() || undefined,
+    fitnessTargets: Array.isArray(input.fitnessTargets)
+      ? input.fitnessTargets.map((item) => item.trim()).filter(Boolean)
+      : [],
+    fitnessAttributes: Array.isArray(input.fitnessAttributes)
+      ? input.fitnessAttributes.map((item) => item.trim()).filter(Boolean)
+      : [],
+    timedByDuration: Boolean(input.timedByDuration),
+    setAmount: input.setAmount?.trim() ?? "",
+    exercises: Array.isArray(input.exercises)
+      ? input.exercises
+          .map((exercise) => normalizePortfolioAssetExercise(exercise))
+          .filter((exercise): exercise is LocalPTPortfolioAssetExercise => exercise !== null)
+      : [],
+    sourceDraftId: input.sourceDraftId?.trim() || undefined,
+    createdAt,
+    updatedAt: input.updatedAt ?? createdAt,
+  };
+}
+
 export function readLocalPTPortfolioFolders(): LocalPTPortfolioFolder[] {
   return readDrafts<LocalPTPortfolioFolder>(PT_TRAINING_LOCAL_PORTFOLIO_FOLDERS_STORAGE_KEY).flatMap(
     (folder) => {
@@ -191,6 +362,11 @@ export function readLocalPTPortfolioFolders(): LocalPTPortfolioFolder[] {
         tags: Array.isArray(folder.tags)
           ? folder.tags.map((item) => item.trim()).filter(Boolean)
           : [],
+        assets: Array.isArray(folder.assets)
+          ? folder.assets
+              .map((asset) => normalizePortfolioAsset(asset))
+              .filter((asset): asset is LocalPTPortfolioAsset => asset !== null)
+          : [],
         exercises: Array.isArray(folder.exercises)
           ? folder.exercises.map((item) => item.trim()).filter(Boolean)
           : [],
@@ -209,6 +385,7 @@ export function createLocalPTPortfolioFolder(input: {
   thumbnailDataUrl?: string;
   color?: LocalPTPortfolioFolderColor;
   tags?: string[];
+  assets?: LocalPTPortfolioAsset[];
   exercises?: string[];
   pinned?: boolean;
 }): LocalPTPortfolioFolder {
@@ -220,6 +397,11 @@ export function createLocalPTPortfolioFolder(input: {
     thumbnailDataUrl: input.thumbnailDataUrl?.trim() || undefined,
     color: input.color ?? "grey",
     tags: Array.isArray(input.tags) ? input.tags.map((item) => item.trim()).filter(Boolean) : [],
+    assets: Array.isArray(input.assets)
+      ? input.assets
+          .map((asset) => normalizePortfolioAsset(asset))
+          .filter((asset): asset is LocalPTPortfolioAsset => asset !== null)
+      : [],
     exercises: Array.isArray(input.exercises)
       ? input.exercises.map((item) => item.trim()).filter(Boolean)
       : [],
@@ -250,6 +432,11 @@ export function readLocalPTPortfolioFolderOverlays(): LocalPTPortfolioFolderOver
           : "grey",
       tags: Array.isArray(overlay.tags)
         ? overlay.tags.map((item) => item.trim()).filter(Boolean)
+        : [],
+      assets: Array.isArray(overlay.assets)
+        ? overlay.assets
+            .map((asset) => normalizePortfolioAsset(asset))
+            .filter((asset): asset is LocalPTPortfolioAsset => asset !== null)
         : [],
       exercises: Array.isArray(overlay.exercises)
         ? overlay.exercises.map((item) => item.trim()).filter(Boolean)
