@@ -356,6 +356,8 @@ describe("PTTrainingPage mobile experience", () => {
       expect(screen.getByText("Local exercise drafts")).toBeTruthy();
     });
 
+    expect(screen.getByText("Rep")).toBeTruthy();
+
     expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
     expect(
       JSON.parse(window.localStorage.getItem(PT_TRAINING_EXERCISE_DRAFTS_STORAGE_KEY) ?? "[]"),
@@ -736,6 +738,10 @@ describe("PTTrainingPage mobile experience", () => {
       expect(screen.getByRole("button", { name: "Edit routine draft Original Builder" })).toBeTruthy();
     });
 
+    const initialDraftEditButton = screen.getByRole("button", { name: "Edit routine draft Original Builder" });
+    expect(initialDraftEditButton.querySelector("button")).toBeNull();
+    expect(within(initialDraftEditButton).getByText("Routine")).toBeTruthy();
+
     fireEvent.click(screen.getByRole("button", { name: "Edit routine draft Original Builder" }));
 
     await waitFor(() => {
@@ -801,6 +807,17 @@ describe("PTTrainingPage mobile experience", () => {
     expect(screen.queryByText("Original Builder")).toBeNull();
     expect(screen.getByText("Updated Builder")).toBeTruthy();
 
+    fireEvent.click(screen.getByRole("button", { name: "Remove local routine draft Updated Builder" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Remove Routine Draft" })).toBeTruthy();
+    });
+
+    expect(screen.getByText("Are you sure you want to Remove this Draft")).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Create a Routine" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByText("Updated Builder")).toBeTruthy();
+
     fireEvent.click(screen.getByRole("button", { name: "Publish Routine" }));
 
     await waitFor(() => {
@@ -859,53 +876,84 @@ describe("PTTrainingPage mobile experience", () => {
       expect(screen.queryByRole("dialog", { name: "Publish Routine" })).toBeNull();
     });
 
-    expect(screen.getByText("Ready to publish")).toBeTruthy();
-    expect(screen.getByText("Portfolio folders: Strength, Recovery, Mobility Builder")).toBeTruthy();
-    const draftEditButton = screen.getByRole("button", { name: "Edit routine draft Updated Builder" });
-    expect(draftEditButton.querySelector("button")).toBeNull();
-    expect(within(draftEditButton).queryByRole("button", { name: "Strength" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Strength" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Recovery" })).toBeTruthy();
-    fireEvent.click(screen.getByText("Mobility Builder"));
-    expect(screen.queryByRole("dialog", { name: "Create a Routine" })).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: "Strength" }));
-
     await waitFor(() => {
-      expect(screen.getByRole("dialog", { name: "Strength" })).toBeTruthy();
-    });
-
-    expect(screen.queryByRole("dialog", { name: "Create a Routine" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: "Strength" })).toBeNull();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Remove local routine draft Updated Builder" }));
-
-    await waitFor(() => {
-      expect(screen.getByRole("dialog", { name: "Remove Routine Draft" })).toBeTruthy();
-    });
-
-    expect(screen.getByText("Are you sure you want to Remove this Draft")).toBeTruthy();
-    expect(screen.queryByRole("dialog", { name: "Create a Routine" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.getByText("Updated Builder")).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Remove local routine draft Updated Builder" }));
-
-    await waitFor(() => {
-      expect(screen.getByRole("dialog", { name: "Remove Routine Draft" })).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Remove Draft" }));
-
-    await waitFor(() => {
-      expect(screen.queryByText("Updated Builder")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Edit routine draft Updated Builder" })).toBeNull();
     });
 
     expect(screen.queryByText("Routine Draft Queue (1)")).toBeNull();
+    expect(screen.getByRole("button", { name: "Open training portfolio Mobility Builder" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open training portfolio Mobility Builder" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Mobility Builder" })).toBeTruthy();
+    });
+
+    const mobilityFolderDialog = screen.getByRole("dialog", { name: "Mobility Builder" });
+    expect(within(mobilityFolderDialog).getByText("Portfolio Folder")).toBeTruthy();
+    expect(within(mobilityFolderDialog).getByRole("button", { name: "Edit Folder" })).toBeTruthy();
+    expect(within(mobilityFolderDialog).getByRole("button", { name: "Open Routine asset Updated Builder" })).toBeTruthy();
+    expect(within(mobilityFolderDialog).getByText("Routine")).toBeTruthy();
+    expect(within(mobilityFolderDialog).queryByRole("button", { name: "Open Rep asset Push Up" })).toBeNull();
+    expect(within(mobilityFolderDialog).queryByRole("button", { name: "Open Rep asset Leg Extension" })).toBeNull();
+
+    fireEvent.click(within(mobilityFolderDialog).getByRole("button", { name: "Open Routine asset Updated Builder" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Updated Builder" })).toBeTruthy();
+    });
+
+    const updatedBuilderDialog = screen.getByRole("dialog", { name: "Updated Builder" });
+    expect(within(updatedBuilderDialog).getAllByText("Routine").length).toBeGreaterThan(0);
+    expect(within(updatedBuilderDialog).getByText("Fitness targets: Back")).toBeTruthy();
+    expect(within(updatedBuilderDialog).getByText("Fitness attributes: Endurance")).toBeTruthy();
+    expect(within(updatedBuilderDialog).getByText("Push Up")).toBeTruthy();
+    expect(within(updatedBuilderDialog).getByText("Rep goal: 12")).toBeTruthy();
+    expect(within(updatedBuilderDialog).getByText("Drive through the full range.")).toBeTruthy();
+    fireEvent.click(within(updatedBuilderDialog).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Updated Builder" })).toBeNull();
+    });
+
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Mobility Builder" })).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Mobility Builder" })).toBeNull();
+    });
+
+    const searchbox = screen.getByRole("searchbox", { name: "Search training portfolios" });
+    fireEvent.change(searchbox, {
+      target: { value: "Updated Builder" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open training portfolio Mobility Builder" })).toBeTruthy();
+    });
+
+    fireEvent.change(searchbox, {
+      target: { value: "Push Up" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open training portfolio Mobility Builder" })).toBeTruthy();
+    });
+
+    fireEvent.change(searchbox, {
+      target: { value: "Back" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open training portfolio Mobility Builder" })).toBeTruthy();
+    });
+
+    fireEvent.change(searchbox, {
+      target: { value: "Endurance" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open training portfolio Mobility Builder" })).toBeTruthy();
+    });
     expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
     expect(
       JSON.parse(window.localStorage.getItem(PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY) ?? "[]"),
@@ -946,17 +994,26 @@ describe("PTTrainingPage mobile experience", () => {
     render(React.createElement(PTTrainingPage));
 
     await waitFor(() => {
-      expect(screen.getByText("Routine Draft Queue (1)")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Open training portfolio Legacy Folder" })).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Show routine draft queue" }));
+    expect(screen.queryByText("Routine Draft Queue (1)")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open training portfolio Legacy Folder" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Legacy Builder")).toBeTruthy();
+      expect(screen.getByRole("dialog", { name: "Legacy Folder" })).toBeTruthy();
     });
 
-    expect(screen.getByText("Ready to publish")).toBeTruthy();
-    expect(screen.getByText("Portfolio folders: Legacy Folder")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open Routine asset Legacy Builder" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Open Routine asset Legacy Builder" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Legacy Builder" })).toBeTruthy();
+    });
+
+    expect(screen.getByText("Row")).toBeTruthy();
+    expect(screen.getByText("Rep goal: 10")).toBeTruthy();
   });
 
   it("shows 5 most recent folders by default, supports pinned display, and enforces the 5-folder pin limit", async () => {
@@ -1019,7 +1076,8 @@ describe("PTTrainingPage mobile experience", () => {
       expect(screen.getByRole("dialog", { name: "Strength" })).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByText("Portfolio Folder")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Edit Folder" }));
 
     await waitFor(() => {
       expect(screen.getByLabelText("Folder title")).toBeTruthy();
@@ -1065,7 +1123,25 @@ describe("PTTrainingPage mobile experience", () => {
       expect(screen.getByText("Explosive")).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    const strengthDialog = screen.getByRole("dialog", { name: "Strength" });
+    expect(within(strengthDialog).getByRole("button", { name: "Open Rep asset Box Jump" })).toBeTruthy();
+    expect(within(strengthDialog).getAllByText("Rep").length).toBeGreaterThan(0);
+    fireEvent.click(within(strengthDialog).getByRole("button", { name: "Open Rep asset Box Jump" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Box Jump" })).toBeTruthy();
+    });
+
+    const boxJumpDialog = screen.getByRole("dialog", { name: "Box Jump" });
+    expect(within(boxJumpDialog).getAllByText("Rep").length).toBeGreaterThan(0);
+    expect(within(boxJumpDialog).getByText("Instructions: No instructions added.")).toBeTruthy();
+    fireEvent.click(within(boxJumpDialog).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Box Jump" })).toBeNull();
+    });
+
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Strength" })).getByRole("button", { name: "Close" }));
 
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "Strength" })).toBeNull();

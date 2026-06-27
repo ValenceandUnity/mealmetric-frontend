@@ -13,6 +13,8 @@ import {
   createLocalPTDraftId,
   createLocalPTExerciseDraft,
   createLocalPTPortfolioFolder,
+  createLocalPTPortfolioRepAsset,
+  createLocalPTPortfolioRoutineAsset,
   createLocalPTRoutineDraft,
   readLocalPTCustomFitnessAttributes,
   readLocalPTCustomFitnessTargets,
@@ -23,6 +25,8 @@ import {
   readLocalPTPortfolioFolders,
   readLocalPTRoutineDrafts,
   type LocalPTExerciseDraft,
+  type LocalPTPortfolioAsset,
+  type LocalPTPortfolioAssetExercise,
   type LocalPTPortfolioDisplayMode,
   type LocalPTPortfolioFolder,
   type LocalPTPortfolioFolderColor,
@@ -60,6 +64,7 @@ type PortfolioDirectoryFolder = {
   thumbnailDataUrl?: string;
   color: LocalPTPortfolioFolderColor;
   tags: string[];
+  assets: LocalPTPortfolioAsset[];
   exercises: string[];
   routines: string[];
   searchFields: string[];
@@ -119,11 +124,16 @@ type PortfolioFolderEditForm = {
   color: LocalPTPortfolioFolderColor;
   tags: string[];
   tagInput: string;
-  exercises: string[];
+  assets: LocalPTPortfolioAsset[];
   exerciseInput: string;
   error: string | null;
   thumbnailError: string | null;
 };
+
+type SelectedPortfolioAssetState = {
+  folderId: string;
+  assetId: string;
+} | null;
 
 type RoutineOptionDialogKind = "target" | "attribute" | null;
 type RoutineDraftPublishDialogState = {
@@ -343,6 +353,81 @@ function dedupeFolderEntityValues(values: string[]) {
   return dedupeStringValues(values);
 }
 
+function formatPortfolioAssetTypeLabel(type: LocalPTPortfolioAsset["type"]) {
+  return type === "routine" ? "Routine" : "Rep";
+}
+
+function createLegacyRepAsset(title: string, id?: string): LocalPTPortfolioAsset {
+  return createLocalPTPortfolioRepAsset({
+    id,
+    title,
+    createdAt: new Date(0).toISOString(),
+    updatedAt: new Date(0).toISOString(),
+  });
+}
+
+function buildRoutineAssetFromDraft(
+  draft: LocalPTRoutineDraft,
+  updatedAt: string,
+): LocalPTPortfolioAsset {
+  return createLocalPTPortfolioRoutineAsset({
+    title: draft.routineName,
+    description: draft.description,
+    fitnessTargets: draft.fitnessTargets,
+    fitnessAttributes: draft.fitnessAttributes,
+    timedByDuration: draft.timedByDuration,
+    setAmount: String(draft.setAmount),
+    exercises: draft.exercises.map((exercise) => ({
+      id: exercise.id,
+      exerciseName: exercise.exerciseName,
+      repGoal: String(exercise.repGoal),
+      instructions: exercise.instructions,
+      weightsInvolved: exercise.weightsInvolved,
+    })),
+    sourceDraftId: draft.id,
+    createdAt: draft.createdAt,
+    updatedAt,
+  });
+}
+
+function assetSearchFields(asset: LocalPTPortfolioAsset) {
+  if (asset.type === "routine") {
+    return [
+      asset.title,
+      asset.description,
+      ...asset.fitnessTargets,
+      ...asset.fitnessAttributes,
+      ...asset.exercises.flatMap((exercise) => [
+        exercise.exerciseName,
+        exercise.repGoal,
+        exercise.instructions,
+      ]),
+    ].filter((value): value is string => Boolean(value));
+  }
+
+  return [asset.title, asset.description, asset.instructions, asset.objective].filter(
+    (value): value is string => Boolean(value),
+  );
+}
+
+function dedupePortfolioAssets(assets: LocalPTPortfolioAsset[]) {
+  const seen = new Set<string>();
+
+  return assets.filter((asset) => {
+    const key =
+      asset.id ||
+      asset.sourceDraftId ||
+      `${asset.type}:${normalizeOptionValue(asset.title)}`;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
 function createRoutineExerciseRow(): RoutineExerciseRow {
   return {
     id: createLocalPTDraftId(),
@@ -350,6 +435,147 @@ function createRoutineExerciseRow(): RoutineExerciseRow {
     repGoal: "",
     instructions: "",
     weightsInvolved: false,
+  };
+}
+
+function appendUniquePortfolioAsset(
+  assets: LocalPTPortfolioAsset[],
+  asset: LocalPTPortfolioAsset,
+) {
+  const exists = assets.some((current) => {
+    if (asset.sourceDraftId && current.sourceDraftId) {
+      return current.sourceDraftId === asset.sourceDraftId;
+    }
+
+    return (
+      current.type === asset.type &&
+      normalizeOptionValue(current.title) === normalizeOptionValue(asset.title)
+    );
+  });
+
+  return exists ? assets : [asset, ...assets];
+}
+
+function removeLegacyRoutineExerciseStrings(
+  exercises: string[],
+  draft: LocalPTRoutineDraft,
+) {
+  const routineExerciseNames = new Set(
+    draft.exercises.map((exercise) => normalizeOptionValue(exercise.exerciseName)).filter(Boolean),
+  );
+
+  if (routineExerciseNames.size === 0) {
+    return exercises;
+  }
+
+  return exercises.filter((exercise) => !routineExerciseNames.has(normalizeOptionValue(exercise)));
+}
+
+function repairPublishedRoutineDraftAssets(input: {
+  localFolders: LocalPTPortfolioFolder[];
+  folderOverlays: LocalPTPortfolioFolderOverlay[];
+  routineDrafts: LocalPTRoutineDraft[];
+}) {
+  let changed = false;
+  let nextLocalFolders = [...input.localFolders];
+  let nextOverlays = [...input.folderOverlays];
+  const remainingDrafts: LocalPTRoutineDraft[] = [];
+
+  input.routineDrafts.forEach((draft) => {
+    const targets = dedupePublishTargets(draft.publishTargets ?? []);
+    if (draft.publishStatus !== "ready" || targets.length === 0) {
+      remainingDrafts.push(draft);
+      return;
+    }
+
+    const routineAsset = buildRoutineAssetFromDraft(draft, new Date().toISOString());
+    let assetPlaced = false;
+
+    targets.forEach((target) => {
+      if (target.type === "existing-folder" && target.id) {
+        const overlayIndex = nextOverlays.findIndex((overlay) => overlay.id === target.id);
+        if (overlayIndex >= 0) {
+          const overlay = nextOverlays[overlayIndex];
+          const nextAssets = appendUniquePortfolioAsset(overlay.assets, routineAsset);
+          if (nextAssets !== overlay.assets) {
+            nextOverlays[overlayIndex] = {
+              ...overlay,
+              assets: nextAssets,
+              exercises: removeLegacyRoutineExerciseStrings(overlay.exercises, draft),
+              updatedAt: routineAsset.updatedAt,
+            };
+            changed = true;
+          }
+          assetPlaced = true;
+          return;
+        }
+
+        nextOverlays = [
+          {
+            id: target.id,
+            source: "bff",
+            updatedAt: routineAsset.updatedAt,
+            color: "grey",
+            tags: [],
+            assets: [routineAsset],
+            exercises: [],
+          },
+          ...nextOverlays,
+        ];
+        assetPlaced = true;
+        changed = true;
+        return;
+      }
+
+      const localFolderIndex = nextLocalFolders.findIndex(
+        (folder) =>
+          folder.id === target.id ||
+          normalizeOptionValue(folder.title) === normalizeOptionValue(target.name),
+      );
+
+      if (localFolderIndex >= 0) {
+        const folder = nextLocalFolders[localFolderIndex];
+        const nextAssets = appendUniquePortfolioAsset(folder.assets, routineAsset);
+        if (nextAssets !== folder.assets) {
+          nextLocalFolders[localFolderIndex] = {
+            ...folder,
+            title: target.name.trim() || folder.title,
+            assets: nextAssets,
+            exercises: removeLegacyRoutineExerciseStrings(folder.exercises, draft),
+            updatedAt: routineAsset.updatedAt,
+          };
+          changed = true;
+        }
+        assetPlaced = true;
+        return;
+      }
+
+      nextLocalFolders = [
+        createLocalPTPortfolioFolder({
+          title: target.name,
+          assets: [routineAsset],
+          exercises: [],
+          tags: [],
+        }),
+        ...nextLocalFolders,
+      ];
+      assetPlaced = true;
+      changed = true;
+    });
+
+    if (!assetPlaced) {
+      remainingDrafts.push(draft);
+      return;
+    }
+
+    changed = true;
+  });
+
+  return {
+    changed,
+    localFolders: nextLocalFolders,
+    folderOverlays: nextOverlays,
+    routineDrafts: remainingDrafts,
   };
 }
 
@@ -375,6 +601,7 @@ export default function PTTrainingPage() {
   const [portfolioNewFolderName, setPortfolioNewFolderName] = useState("");
   const [portfolioDisplayError, setPortfolioDisplayError] = useState<string | null>(null);
   const [selectedPortfolioFolderId, setSelectedPortfolioFolderId] = useState<string | null>(null);
+  const [selectedPortfolioAsset, setSelectedPortfolioAsset] = useState<SelectedPortfolioAssetState>(null);
   const [portfolioFolderDetailEditMode, setPortfolioFolderDetailEditMode] = useState(false);
   const [portfolioFolderEditForm, setPortfolioFolderEditForm] = useState<PortfolioFolderEditForm | null>(null);
   const [exerciseDrafts, setExerciseDrafts] = useState<LocalPTExerciseDraft[]>([]);
@@ -412,14 +639,29 @@ export default function PTTrainingPage() {
   const deferredSearch = useDeferredValue(searchValue);
 
   useEffect(() => {
-    setLocalPortfolioFolders(readLocalPTPortfolioFolders());
-    setPortfolioFolderOverlays(readLocalPTPortfolioFolderOverlays());
+    const storedLocalFolders = readLocalPTPortfolioFolders();
+    const storedOverlays = readLocalPTPortfolioFolderOverlays();
+    const storedRoutineDrafts = readLocalPTRoutineDrafts();
+    const repaired = repairPublishedRoutineDraftAssets({
+      localFolders: storedLocalFolders,
+      folderOverlays: storedOverlays,
+      routineDrafts: storedRoutineDrafts,
+    });
+
+    setLocalPortfolioFolders(repaired.localFolders);
+    setPortfolioFolderOverlays(repaired.folderOverlays);
     setPortfolioDisplayMode(readLocalPTPortfolioDisplayMode());
     setPinnedPortfolioFolderIds(readLocalPTPinnedPortfolioFolders());
     setExerciseDrafts(readLocalPTExerciseDrafts());
-    setRoutineDrafts(readLocalPTRoutineDrafts());
+    setRoutineDrafts(repaired.routineDrafts);
     setCustomFitnessTargets(readLocalPTCustomFitnessTargets());
     setCustomFitnessAttributes(readLocalPTCustomFitnessAttributes());
+
+    if (repaired.changed) {
+      writeLocalPTPortfolioFolders(repaired.localFolders);
+      writeLocalPTPortfolioFolderOverlays(repaired.folderOverlays);
+      writeLocalPTRoutineDrafts(repaired.routineDrafts);
+    }
   }, []);
 
   useEffect(() => {
@@ -505,6 +747,7 @@ export default function PTTrainingPage() {
     if (
       !portfolioDisplayDialogOpen &&
       !selectedPortfolioFolderId &&
+      !selectedPortfolioAsset &&
       !exerciseDialogOpen &&
       !routineDialogOpen &&
       !routineOptionDialogKind &&
@@ -562,6 +805,7 @@ export default function PTTrainingPage() {
       setPortfolioCreateFolderOpen(false);
       setPortfolioNewFolderName("");
       setPortfolioDisplayError(null);
+      setSelectedPortfolioAsset(null);
       setSelectedPortfolioFolderId(null);
       setPortfolioFolderDetailEditMode(false);
       setPortfolioFolderEditForm(null);
@@ -595,6 +839,7 @@ export default function PTTrainingPage() {
   }, [
     portfolioDisplayDialogOpen,
     selectedPortfolioFolderId,
+    selectedPortfolioAsset,
     exerciseDialogOpen,
     routineDialogOpen,
     routineOptionDialogKind,
@@ -639,34 +884,47 @@ export default function PTTrainingPage() {
 
     const bffFolders = view.folderTiles.map((folder, index) => {
       const overlay = overlayMap.get(folder.id);
-      const packageTitles = view.packageCards
-        .filter((item) => item.folderId === folder.id)
-        .map((item) => item.title);
-      const routineTitles = view.routineCards
-        .filter((item) => item.folderId === folder.id)
-        .map((item) => item.title);
-      const publishedRoutineDrafts = routineDrafts.filter((draft) =>
-        (draft.publishTargets ?? []).some(
-          (target) =>
-            target.id === folder.id ||
-            normalizeOptionValue(target.name) === normalizeOptionValue(folder.title),
+      const legacyAssets = [
+        ...view.packageCards
+          .filter((item) => item.folderId === folder.id)
+          .map((item) =>
+            createLocalPTPortfolioRepAsset({
+              id: `package:${item.id}`,
+              title: item.title,
+              description: item.description,
+              createdAt: new Date(Date.now() - index * 60_000).toISOString(),
+              updatedAt: new Date(Date.now() - index * 60_000).toISOString(),
+            }),
+          ),
+        ...view.routineCards
+          .filter((item) => item.folderId === folder.id)
+          .map((item) =>
+            createLocalPTPortfolioRoutineAsset({
+              id: `routine:${item.id}`,
+              title: item.title,
+              description: item.description,
+              createdAt: new Date(Date.now() - index * 60_000).toISOString(),
+              updatedAt: new Date(Date.now() - index * 60_000).toISOString(),
+            }),
+          ),
+        ...(overlay?.exercises ?? []).map((exercise) =>
+          createLegacyRepAsset(exercise, `overlay:${folder.id}:${normalizeOptionValue(exercise)}`),
+        ),
+      ];
+      const assets = dedupePortfolioAssets([...(overlay?.assets ?? []), ...legacyAssets]);
+      const exercises = dedupeFolderEntityValues(
+        assets.flatMap((asset) =>
+          asset.type === "routine"
+            ? asset.exercises.map((exercise) => exercise.exerciseName)
+            : [asset.title],
         ),
       );
-      const exercises = dedupeFolderEntityValues([
-        ...(overlay?.exercises ?? []),
-        ...packageTitles,
-        ...routineTitles,
-        ...publishedRoutineDrafts.flatMap((draft) => draft.exercises.map((exercise) => exercise.exerciseName)),
-        ...publishedRoutineDrafts.map((draft) => draft.routineName),
-      ]);
       const searchFields = [
         folder.title,
         folder.description,
         ...(overlay?.tags ?? []),
-        ...exercises,
-        ...publishedRoutineDrafts.flatMap((draft) => draft.fitnessTargets),
-        ...publishedRoutineDrafts.flatMap((draft) => draft.fitnessAttributes),
-      ];
+        ...assets.flatMap((asset) => assetSearchFields(asset)),
+      ].filter((value): value is string => Boolean(value));
 
       return {
         id: folder.id,
@@ -677,25 +935,27 @@ export default function PTTrainingPage() {
         thumbnailDataUrl: overlay?.thumbnailDataUrl,
         color: overlay?.color ?? "grey",
         tags: overlay?.tags ?? [],
+        assets,
         exercises,
-        routines: dedupeFolderEntityValues([...packageTitles, ...routineTitles]),
+        routines: assets
+          .filter((asset) => asset.type === "routine")
+          .map((asset) => asset.title),
         searchFields,
       };
     });
 
     const localFolders = localPortfolioFolders.map((folder) => {
-      const publishedRoutineDrafts = routineDrafts.filter((draft) =>
-        (draft.publishTargets ?? []).some(
-          (target) =>
-            target.id === folder.id ||
-            normalizeOptionValue(target.name) === normalizeOptionValue(folder.title),
+      const legacyAssets = folder.exercises.map((exercise) =>
+        createLegacyRepAsset(exercise, `local:${folder.id}:${normalizeOptionValue(exercise)}`),
+      );
+      const assets = dedupePortfolioAssets([...folder.assets, ...legacyAssets]);
+      const exercises = dedupeFolderEntityValues(
+        assets.flatMap((asset) =>
+          asset.type === "routine"
+            ? asset.exercises.map((exercise) => exercise.exerciseName)
+            : [asset.title],
         ),
       );
-      const exercises = dedupeFolderEntityValues([
-        ...folder.exercises,
-        ...publishedRoutineDrafts.flatMap((draft) => draft.exercises.map((exercise) => exercise.exerciseName)),
-        ...publishedRoutineDrafts.map((draft) => draft.routineName),
-      ]);
 
       return {
         id: folder.id,
@@ -706,20 +966,21 @@ export default function PTTrainingPage() {
         thumbnailDataUrl: folder.thumbnailDataUrl,
         color: folder.color ?? "grey",
         tags: folder.tags,
+        assets,
         exercises,
-        routines: publishedRoutineDrafts.map((draft) => draft.routineName),
+        routines: assets
+          .filter((asset) => asset.type === "routine")
+          .map((asset) => asset.title),
         searchFields: [
           folder.title,
           ...folder.tags,
-          ...exercises,
-          ...publishedRoutineDrafts.flatMap((draft) => draft.fitnessTargets),
-          ...publishedRoutineDrafts.flatMap((draft) => draft.fitnessAttributes),
-        ],
+          ...assets.flatMap((asset) => assetSearchFields(asset)),
+        ].filter((value): value is string => Boolean(value)),
       };
     });
 
     return [...localFolders, ...bffFolders];
-  }, [localPortfolioFolders, portfolioFolderOverlays, routineDrafts, view.folderTiles, view.packageCards, view.routineCards]);
+  }, [localPortfolioFolders, portfolioFolderOverlays, view.folderTiles, view.packageCards, view.routineCards]);
 
   const filteredPortfolioFolders = hasSearchValue
     ? portfolioDirectoryFolders.filter((folder) => matchesTrainingQuery(query, folder.searchFields))
@@ -773,7 +1034,13 @@ export default function PTTrainingPage() {
         ...routineDrafts.map((draft) => draft.routineName),
         ...view.packageCards.map((item) => item.title),
         ...view.routineCards.map((item) => item.title),
-        ...portfolioDirectoryFolders.flatMap((folder) => folder.exercises),
+        ...portfolioDirectoryFolders.flatMap((folder) =>
+          folder.assets.flatMap((asset) =>
+            asset.type === "routine"
+              ? asset.exercises.map((exercise) => exercise.exerciseName)
+              : [asset.title],
+          ),
+        ),
       ]),
     [exerciseDrafts, portfolioDirectoryFolders, routineDrafts, view.packageCards, view.routineCards],
   );
@@ -783,6 +1050,12 @@ export default function PTTrainingPage() {
   const selectedPortfolioFolder =
     selectedPortfolioFolderId !== null
       ? portfolioDirectoryFolders.find((folder) => folder.id === selectedPortfolioFolderId) ?? null
+      : null;
+  const selectedPortfolioAssetRecord =
+    selectedPortfolioFolder &&
+    selectedPortfolioAsset &&
+    selectedPortfolioAsset.folderId === selectedPortfolioFolder.id
+      ? selectedPortfolioFolder.assets.find((asset) => asset.id === selectedPortfolioAsset.assetId) ?? null
       : null;
   const publishingRoutineDraft = routineDraftPublishDialog
     ? routineDrafts.find((draft) => draft.id === routineDraftPublishDialog.draftId) ?? null
@@ -867,12 +1140,14 @@ export default function PTTrainingPage() {
   }
 
   function openPortfolioFolderDetail(folderId: string) {
+    setSelectedPortfolioAsset(null);
     setSelectedPortfolioFolderId(folderId);
     setPortfolioFolderDetailEditMode(false);
     setPortfolioFolderEditForm(null);
   }
 
   function closePortfolioFolderDetail() {
+    setSelectedPortfolioAsset(null);
     setSelectedPortfolioFolderId(null);
     setPortfolioFolderDetailEditMode(false);
     setPortfolioFolderEditForm(null);
@@ -890,7 +1165,7 @@ export default function PTTrainingPage() {
       color: selectedPortfolioFolder.color,
       tags: [...selectedPortfolioFolder.tags],
       tagInput: "",
-      exercises: [...selectedPortfolioFolder.exercises],
+      assets: [...selectedPortfolioFolder.assets],
       exerciseInput: "",
       error: null,
       thumbnailError: null,
@@ -900,6 +1175,17 @@ export default function PTTrainingPage() {
   function closePortfolioFolderEditMode() {
     setPortfolioFolderDetailEditMode(false);
     setPortfolioFolderEditForm(null);
+  }
+
+  function openPortfolioAssetDetail(folderId: string, assetId: string) {
+    setSelectedPortfolioAsset({
+      folderId,
+      assetId,
+    });
+  }
+
+  function closePortfolioAssetDetail() {
+    setSelectedPortfolioAsset(null);
   }
 
   function updatePortfolioFolderEditForm(
@@ -956,14 +1242,19 @@ export default function PTTrainingPage() {
       return;
     }
 
-    const exerciseName = portfolioFolderEditForm.exerciseInput.trim();
-    if (!exerciseName) {
+    const assetTitle = portfolioFolderEditForm.exerciseInput.trim();
+    if (!assetTitle) {
       return;
     }
 
     updatePortfolioFolderEditForm((current) => ({
       ...current,
-      exercises: dedupeStringValues([...current.exercises, exerciseName]),
+      assets: appendUniquePortfolioAsset(
+        current.assets,
+        createLocalPTPortfolioRepAsset({
+          title: assetTitle,
+        }),
+      ),
       exerciseInput: "",
       error: null,
     }));
@@ -992,7 +1283,8 @@ export default function PTTrainingPage() {
               thumbnailDataUrl: portfolioFolderEditForm.thumbnailDataUrl,
               color: portfolioFolderEditForm.color,
               tags: portfolioFolderEditForm.tags,
-              exercises: portfolioFolderEditForm.exercises,
+              assets: portfolioFolderEditForm.assets,
+              exercises: [],
               updatedAt: new Date().toISOString(),
             }
           : folder,
@@ -1008,7 +1300,8 @@ export default function PTTrainingPage() {
         thumbnailDataUrl: portfolioFolderEditForm.thumbnailDataUrl,
         color: portfolioFolderEditForm.color,
         tags: portfolioFolderEditForm.tags,
-        exercises: portfolioFolderEditForm.exercises,
+        assets: portfolioFolderEditForm.assets,
+        exercises: [],
       };
       const nextOverlays = existingOverlay
         ? portfolioFolderOverlays.map((overlay) =>
@@ -1645,22 +1938,79 @@ export default function PTTrainingPage() {
       setRoutineDraftPublishError("Select at least one portfolio folder.");
       return;
     }
+    const updatedAt = new Date().toISOString();
+    const routineAsset = buildRoutineAssetFromDraft(publishingRoutineDraft, updatedAt);
+    let nextFolders = [...localPortfolioFolders];
+    let nextOverlays = [...portfolioFolderOverlays];
 
-    const nextDraft = createLocalPTRoutineDraft({
-      id: publishingRoutineDraft.id,
-      routineName: publishingRoutineDraft.routineName,
-      description: publishingRoutineDraft.description,
-      fitnessTargets: publishingRoutineDraft.fitnessTargets,
-      fitnessAttributes: publishingRoutineDraft.fitnessAttributes,
-      timedByDuration: publishingRoutineDraft.timedByDuration,
-      setAmount: publishingRoutineDraft.setAmount,
-      exercises: publishingRoutineDraft.exercises,
-      createdAt: publishingRoutineDraft.createdAt,
-      editedAt: new Date().toISOString(),
-      publishStatus: "ready",
-      publishTargets: selectedTargets,
+    selectedTargets.forEach((target) => {
+      if (target.type === "existing-folder" && target.id) {
+        const overlayIndex = nextOverlays.findIndex((overlay) => overlay.id === target.id);
+        if (overlayIndex >= 0) {
+          const overlay = nextOverlays[overlayIndex];
+          nextOverlays[overlayIndex] = {
+            ...overlay,
+            assets: appendUniquePortfolioAsset(overlay.assets, routineAsset),
+            exercises: removeLegacyRoutineExerciseStrings(overlay.exercises, publishingRoutineDraft),
+            updatedAt,
+          };
+          return;
+        }
+
+        nextOverlays = [
+          {
+            id: target.id,
+            source: "bff",
+            updatedAt,
+            color: "grey",
+            tags: [],
+            assets: [routineAsset],
+            exercises: [],
+          },
+          ...nextOverlays,
+        ];
+        return;
+      }
+
+      const localFolderIndex = nextFolders.findIndex(
+        (folder) =>
+          folder.id === target.id ||
+          normalizeOptionValue(folder.title) === normalizeOptionValue(target.name),
+      );
+
+      if (localFolderIndex >= 0) {
+        const folder = nextFolders[localFolderIndex];
+        nextFolders[localFolderIndex] = {
+          ...folder,
+          title: target.name.trim() || folder.title,
+          assets: appendUniquePortfolioAsset(folder.assets, routineAsset),
+          exercises: removeLegacyRoutineExerciseStrings(folder.exercises, publishingRoutineDraft),
+          updatedAt,
+        };
+        return;
+      }
+
+      nextFolders = [
+        createLocalPTPortfolioFolder({
+          title: target.name,
+          assets: [routineAsset],
+          tags: [],
+          exercises: [],
+        }),
+        ...nextFolders,
+      ];
     });
-    saveRoutineDraftRecord(nextDraft);
+
+    const nextDrafts = routineDrafts.filter((draft) => draft.id !== publishingRoutineDraft.id);
+    setLocalPortfolioFolders(nextFolders);
+    writeLocalPTPortfolioFolders(nextFolders);
+    setPortfolioFolderOverlays(nextOverlays);
+    writeLocalPTPortfolioFolderOverlays(nextOverlays);
+    setRoutineDrafts(nextDrafts);
+    writeLocalPTRoutineDrafts(nextDrafts);
+    if (nextDrafts.length === 0) {
+      setRoutineDraftQueueOpen(false);
+    }
     closeRoutineDraftPublishDialog();
   }
 
@@ -1858,7 +2208,10 @@ export default function PTTrainingPage() {
                         <div className="pt-training-local-draft-card__copy">
                           <div className="pt-training-local-draft-card__header">
                             <p className="pt-training-local-draft-card__title">{draft.description}</p>
-                            <span className="pt-training-local-draft-tag">Local draft</span>
+                            <div className="pt-training-local-draft-card__asset-tags">
+                              <span className="pt-training-local-draft-tag">Local draft</span>
+                              <span className="pt-training-local-draft-tag">Rep</span>
+                            </div>
                           </div>
                           <p className="pt-training-local-draft-card__meta">Main objective: {draft.objective}</p>
                           <p className="pt-training-local-draft-card__note">{draft.instructions}</p>
@@ -1931,7 +2284,10 @@ export default function PTTrainingPage() {
                             <div className="pt-training-local-draft-card__copy">
                               <div className="pt-training-local-draft-card__header">
                                 <p className="pt-training-local-draft-card__title">{draft.routineName}</p>
-                                <span className="pt-training-local-draft-tag">Draft</span>
+                                <div className="pt-training-local-draft-card__asset-tags">
+                                  <span className="pt-training-local-draft-tag">Draft</span>
+                                  <span className="pt-training-local-draft-tag">Routine</span>
+                                </div>
                               </div>
                               <p className="pt-training-local-draft-card__meta">
                                 Edited on {formatDraftTimestamp(draft.editedAt ?? draft.createdAt)}
@@ -2187,9 +2543,7 @@ export default function PTTrainingPage() {
           >
             <div className="pt-training-modal__header">
               <div className="mobile-section__copy">
-                <p className="mobile-section__eyebrow">
-                  {selectedPortfolioFolder.source === "local" ? "Stored locally" : "PT folder detail"}
-                </p>
+                <p className="mobile-section__eyebrow">Portfolio Folder</p>
                 <h2 id="pt-training-folder-detail-title" className="mobile-section__title">
                   {portfolioFolderDetailEditMode && portfolioFolderEditForm
                     ? portfolioFolderEditForm.title || selectedPortfolioFolder.title
@@ -2225,18 +2579,47 @@ export default function PTTrainingPage() {
                   </div>
                 ) : null}
                 <div className="pt-training-builder-form__field">
-                  <label>Exercises</label>
-                  {selectedPortfolioFolder.exercises.length > 0 ? (
-                    <ul className="pt-training-portfolio-list-items">
-                      {selectedPortfolioFolder.exercises.map((exercise) => (
-                        <li key={exercise} className="pt-training-portfolio-list-item">
-                          <p className="pt-training-portfolio-list-title">{exercise}</p>
-                        </li>
+                  <label>Portfolio Assets</label>
+                  {selectedPortfolioFolder.assets.length > 0 ? (
+                    <div className="pt-training-portfolio-assets">
+                      {selectedPortfolioFolder.assets.map((asset) => (
+                        <button
+                          key={asset.id}
+                          type="button"
+                          className="pt-training-portfolio-asset-row mobile-focus-ring"
+                          aria-label={`Open ${formatPortfolioAssetTypeLabel(asset.type)} asset ${asset.title}`}
+                          onClick={() => {
+                            openPortfolioAssetDetail(selectedPortfolioFolder.id, asset.id);
+                          }}
+                        >
+                          <span className="pt-training-portfolio-asset-row__copy">
+                            <span className="pt-training-portfolio-list-title">{asset.title}</span>
+                            {asset.type === "routine" ? (
+                              <span className="pt-training-portfolio-list-description">
+                                {asset.exercises.length} exercise{asset.exercises.length === 1 ? "" : "s"}
+                              </span>
+                            ) : asset.objective || asset.description ? (
+                              <span className="pt-training-portfolio-list-description">
+                                {asset.objective ?? asset.description}
+                              </span>
+                            ) : null}
+                          </span>
+                          <span
+                            className={[
+                              "pt-training-portfolio-asset-row__tag",
+                              asset.type === "routine"
+                                ? "pt-training-portfolio-asset-row__tag--routine"
+                                : "pt-training-portfolio-asset-row__tag--rep",
+                            ].join(" ")}
+                          >
+                            {formatPortfolioAssetTypeLabel(asset.type)}
+                          </span>
+                        </button>
                       ))}
-                    </ul>
+                    </div>
                   ) : (
                     <p className="pt-training-builder-form__helper">
-                      No exercises have been added to this portfolio folder yet.
+                      No assets have been added to this portfolio folder yet.
                     </p>
                   )}
                 </div>
@@ -2246,7 +2629,7 @@ export default function PTTrainingPage() {
                     className="pt-training-modal__secondary-action mobile-focus-ring"
                     onClick={openPortfolioFolderEditMode}
                   >
-                    Edit
+                    Edit Folder
                   </button>
                 </div>
               </div>
@@ -2382,19 +2765,31 @@ export default function PTTrainingPage() {
                       Add Exercise
                     </button>
                   </div>
-                  {portfolioFolderEditForm.exercises.length > 0 ? (
+                  {portfolioFolderEditForm.assets.length > 0 ? (
                     <ul className="pt-training-portfolio-list-items">
-                      {portfolioFolderEditForm.exercises.map((exercise) => (
-                        <li key={exercise} className="pt-training-portfolio-list-item">
+                      {portfolioFolderEditForm.assets.map((asset) => (
+                        <li key={asset.id} className="pt-training-portfolio-list-item">
                           <div className="pt-training-folder-edit__inline-actions">
-                            <p className="pt-training-portfolio-list-title">{exercise}</p>
+                            <div className="pt-training-portfolio-asset-row__copy">
+                              <p className="pt-training-portfolio-list-title">{asset.title}</p>
+                              <span
+                                className={[
+                                  "pt-training-portfolio-asset-row__tag",
+                                  asset.type === "routine"
+                                    ? "pt-training-portfolio-asset-row__tag--routine"
+                                    : "pt-training-portfolio-asset-row__tag--rep",
+                                ].join(" ")}
+                              >
+                                {formatPortfolioAssetTypeLabel(asset.type)}
+                              </span>
+                            </div>
                             <button
                               type="button"
                               className="pt-training-modal__secondary-action mobile-focus-ring"
                               onClick={() => {
                                 updatePortfolioFolderEditForm((current) => ({
                                   ...current,
-                                  exercises: current.exercises.filter((item) => item !== exercise),
+                                  assets: current.assets.filter((item) => item.id !== asset.id),
                                 }));
                               }}
                             >
@@ -2431,6 +2826,124 @@ export default function PTTrainingPage() {
                 </div>
               </div>
             )}
+          </section>
+        </div>
+      ) : null}
+
+      {selectedPortfolioFolder && selectedPortfolioAssetRecord ? (
+        <div
+          className="pt-training-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closePortfolioAssetDetail();
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pt-training-portfolio-asset-detail-title"
+            className="pt-training-modal pt-training-portfolio-asset-detail"
+          >
+            <div className="pt-training-modal__header">
+              <div className="mobile-section__copy">
+                <p className="mobile-section__eyebrow">Portfolio Asset</p>
+                <h2
+                  id="pt-training-portfolio-asset-detail-title"
+                  className="mobile-section__title"
+                >
+                  {selectedPortfolioAssetRecord.title}
+                </h2>
+                <p className="mobile-section__description">
+                  {formatUpdatedLabel(selectedPortfolioAssetRecord.updatedAt)}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="pt-training-modal__secondary-action mobile-focus-ring"
+                onClick={closePortfolioAssetDetail}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="pt-training-modal__form pt-training-builder-form">
+              <div className="pt-training-portfolio-assets">
+                <span
+                  className={[
+                    "pt-training-portfolio-asset-row__tag",
+                    selectedPortfolioAssetRecord.type === "routine"
+                      ? "pt-training-portfolio-asset-row__tag--routine"
+                      : "pt-training-portfolio-asset-row__tag--rep",
+                  ].join(" ")}
+                >
+                  {formatPortfolioAssetTypeLabel(selectedPortfolioAssetRecord.type)}
+                </span>
+              </div>
+
+              {selectedPortfolioAssetRecord.type === "routine" ? (
+                <>
+                  {selectedPortfolioAssetRecord.description ? (
+                    <p className="pt-training-builder-form__helper">
+                      {selectedPortfolioAssetRecord.description}
+                    </p>
+                  ) : null}
+                  <p className="pt-training-builder-form__helper">
+                    Fitness targets: {formatSummaryList(selectedPortfolioAssetRecord.fitnessTargets)}
+                  </p>
+                  <p className="pt-training-builder-form__helper">
+                    Fitness attributes: {formatSummaryList(selectedPortfolioAssetRecord.fitnessAttributes)}
+                  </p>
+                  <p className="pt-training-builder-form__helper">
+                    Timed by duration: {selectedPortfolioAssetRecord.timedByDuration ? "Yes" : "No"}
+                  </p>
+                  <p className="pt-training-builder-form__helper">
+                    Set amount: {selectedPortfolioAssetRecord.setAmount || "Not set"}
+                  </p>
+                  <div className="pt-training-builder-form__field">
+                    <label>Exercises</label>
+                    {selectedPortfolioAssetRecord.exercises.length > 0 ? (
+                      <ul className="pt-training-portfolio-list-items">
+                        {selectedPortfolioAssetRecord.exercises.map((exercise) => (
+                          <li key={exercise.id} className="pt-training-portfolio-list-item">
+                            <div className="pt-training-portfolio-asset-row__copy">
+                              <p className="pt-training-portfolio-list-title">{exercise.exerciseName}</p>
+                              <p className="pt-training-portfolio-list-description">
+                                Rep goal: {exercise.repGoal || "Not set"}
+                              </p>
+                              <p className="pt-training-portfolio-list-description">
+                                {exercise.instructions || "No instructions added."}
+                              </p>
+                              <p className="pt-training-portfolio-list-description">
+                                Weights involved: {exercise.weightsInvolved ? "Yes" : "No"}
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="pt-training-builder-form__helper">
+                        No exercises have been added to this routine yet.
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {selectedPortfolioAssetRecord.description ? (
+                    <p className="pt-training-builder-form__helper">
+                      {selectedPortfolioAssetRecord.description}
+                    </p>
+                  ) : null}
+                  <p className="pt-training-builder-form__helper">
+                    Instructions: {selectedPortfolioAssetRecord.instructions || "No instructions added."}
+                  </p>
+                  <p className="pt-training-builder-form__helper">
+                    Main objective: {selectedPortfolioAssetRecord.objective || "No objective added."}
+                  </p>
+                </>
+              )}
+            </div>
           </section>
         </div>
       ) : null}
