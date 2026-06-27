@@ -12,21 +12,30 @@ import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import {
   createLocalPTDraftId,
   createLocalPTExerciseDraft,
-  createLocalPTFolderDraft,
+  createLocalPTPortfolioFolder,
   createLocalPTRoutineDraft,
   readLocalPTCustomFitnessAttributes,
   readLocalPTCustomFitnessTargets,
   readLocalPTExerciseDrafts,
-  readLocalPTFolderDrafts,
+  readLocalPTPinnedPortfolioFolders,
+  readLocalPTPortfolioDisplayMode,
+  readLocalPTPortfolioFolderOverlays,
+  readLocalPTPortfolioFolders,
   readLocalPTRoutineDrafts,
   type LocalPTExerciseDraft,
-  type LocalPTFolderDraft,
+  type LocalPTPortfolioDisplayMode,
+  type LocalPTPortfolioFolder,
+  type LocalPTPortfolioFolderColor,
+  type LocalPTPortfolioFolderOverlay,
   type LocalPTRoutineDraft,
   type LocalPTRoutineDraftPublishTarget,
   writeLocalPTCustomFitnessAttributes,
   writeLocalPTCustomFitnessTargets,
   writeLocalPTExerciseDrafts,
-  writeLocalPTFolderDrafts,
+  writeLocalPTPinnedPortfolioFolders,
+  writeLocalPTPortfolioDisplayMode,
+  writeLocalPTPortfolioFolderOverlays,
+  writeLocalPTPortfolioFolders,
   writeLocalPTRoutineDrafts,
 } from "@/lib/client/pt-training-drafts";
 import { useSessionBootstrap } from "@/lib/client/session";
@@ -42,32 +51,18 @@ type SectionErrors = {
   routines: string | null;
 };
 
-type PortfolioFolderGroup = {
+type PortfolioDirectoryFolder = {
   id: string;
+  source: "bff" | "local";
   title: string;
   description: string;
-  countLabel: string;
-  packageCountLabel: string;
-  routineCountLabel: string;
-  sortOrderLabel: string;
-  packages: Array<{
-    id: string;
-    title: string;
-    description: string;
-    statusLabel: string;
-    durationLabel: string;
-    templateLabel: string;
-  }>;
-  routines: Array<{
-    id: string;
-    title: string;
-    description: string;
-    difficultyLabel: string;
-    estimatedMinutesLabel: string;
-    archiveLabel: string;
-  }>;
+  updatedAt: string;
+  thumbnailDataUrl?: string;
+  color: LocalPTPortfolioFolderColor;
+  tags: string[];
+  exercises: string[];
+  routines: string[];
   searchFields: string[];
-  themeClassName: string;
 };
 
 type BuilderOption = {
@@ -118,6 +113,18 @@ type RoutineExerciseRowErrors = {
   instructions?: string;
 };
 
+type PortfolioFolderEditForm = {
+  title: string;
+  thumbnailDataUrl?: string;
+  color: LocalPTPortfolioFolderColor;
+  tags: string[];
+  tagInput: string;
+  exercises: string[];
+  exerciseInput: string;
+  error: string | null;
+  thumbnailError: string | null;
+};
+
 type RoutineOptionDialogKind = "target" | "attribute" | null;
 type RoutineDraftPublishDialogState = {
   draftId: string;
@@ -137,14 +144,7 @@ const EMPTY_SECTION_ERRORS: SectionErrors = {
   packages: null,
   routines: null,
 };
-
-const PORTFOLIO_THEME_CLASS_NAMES = [
-  "pt-training-portfolio-card--green",
-  "pt-training-portfolio-card--red",
-  "pt-training-portfolio-card--purple",
-  "pt-training-portfolio-card--blue",
-  "pt-training-portfolio-card--amber",
-] as const;
+const PORTFOLIO_DIRECTORY_LIMIT = 5;
 
 const BUILDER_OPTIONS: BuilderOption[] = [
   {
@@ -223,10 +223,10 @@ function PortfolioChevronIcon() {
   );
 }
 
-function CreateFolderPlusIcon() {
+function FolderDirectoryIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M12 5v14M5 12h14" />
+      <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l1.5 2h9A1.5 1.5 0 0 1 20.5 9.5v8A1.5 1.5 0 0 1 19 19H4.5A1.5 1.5 0 0 1 3 17.5z" />
     </svg>
   );
 }
@@ -295,6 +295,10 @@ function formatDraftTimestamp(value: string | undefined) {
   }).format(parsed);
 }
 
+function formatUpdatedLabel(value: string | undefined) {
+  return `Updated ${formatDraftTimestamp(value)}`;
+}
+
 function dedupePublishTargets(targets: LocalPTRoutineDraftPublishTarget[]) {
   const seen = new Set<string>();
   const next: LocalPTRoutineDraftPublishTarget[] = [];
@@ -335,6 +339,10 @@ function formatPublishTargetsSummary(targets: LocalPTRoutineDraftPublishTarget[]
   return `${names.slice(0, 3).join(", ")} +${names.length - 3} more`;
 }
 
+function dedupeFolderEntityValues(values: string[]) {
+  return dedupeStringValues(values);
+}
+
 function createRoutineExerciseRow(): RoutineExerciseRow {
   return {
     id: createLocalPTDraftId(),
@@ -357,16 +365,23 @@ export default function PTTrainingPage() {
   const [sectionErrors, setSectionErrors] = useState<SectionErrors>(EMPTY_SECTION_ERRORS);
   const [loading, setLoading] = useState(true);
   const [searchValue, setSearchValue] = useState("");
-  const [openPortfolioFolderId, setOpenPortfolioFolderId] = useState<string | null>(null);
-  const [folderDrafts, setFolderDrafts] = useState<LocalPTFolderDraft[]>([]);
+  const [localPortfolioFolders, setLocalPortfolioFolders] = useState<LocalPTPortfolioFolder[]>([]);
+  const [portfolioFolderOverlays, setPortfolioFolderOverlays] = useState<LocalPTPortfolioFolderOverlay[]>([]);
+  const [portfolioDisplayMode, setPortfolioDisplayMode] =
+    useState<LocalPTPortfolioDisplayMode>("recent");
+  const [pinnedPortfolioFolderIds, setPinnedPortfolioFolderIds] = useState<string[]>([]);
+  const [portfolioDisplayDialogOpen, setPortfolioDisplayDialogOpen] = useState(false);
+  const [portfolioCreateFolderOpen, setPortfolioCreateFolderOpen] = useState(false);
+  const [portfolioNewFolderName, setPortfolioNewFolderName] = useState("");
+  const [portfolioDisplayError, setPortfolioDisplayError] = useState<string | null>(null);
+  const [selectedPortfolioFolderId, setSelectedPortfolioFolderId] = useState<string | null>(null);
+  const [portfolioFolderDetailEditMode, setPortfolioFolderDetailEditMode] = useState(false);
+  const [portfolioFolderEditForm, setPortfolioFolderEditForm] = useState<PortfolioFolderEditForm | null>(null);
   const [exerciseDrafts, setExerciseDrafts] = useState<LocalPTExerciseDraft[]>([]);
   const [routineDrafts, setRoutineDrafts] = useState<LocalPTRoutineDraft[]>([]);
   const [routineDraftQueueOpen, setRoutineDraftQueueOpen] = useState(false);
   const [customFitnessTargets, setCustomFitnessTargets] = useState<string[]>([]);
   const [customFitnessAttributes, setCustomFitnessAttributes] = useState<string[]>([]);
-  const [createFolderDialogOpen, setCreateFolderDialogOpen] = useState(false);
-  const [folderDraftName, setFolderDraftName] = useState("");
-  const [folderDraftNote, setFolderDraftNote] = useState("");
   const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
   const [exerciseDescription, setExerciseDescription] = useState("");
   const [exerciseInstructions, setExerciseInstructions] = useState("");
@@ -397,7 +412,10 @@ export default function PTTrainingPage() {
   const deferredSearch = useDeferredValue(searchValue);
 
   useEffect(() => {
-    setFolderDrafts(readLocalPTFolderDrafts());
+    setLocalPortfolioFolders(readLocalPTPortfolioFolders());
+    setPortfolioFolderOverlays(readLocalPTPortfolioFolderOverlays());
+    setPortfolioDisplayMode(readLocalPTPortfolioDisplayMode());
+    setPinnedPortfolioFolderIds(readLocalPTPinnedPortfolioFolders());
     setExerciseDrafts(readLocalPTExerciseDrafts());
     setRoutineDrafts(readLocalPTRoutineDrafts());
     setCustomFitnessTargets(readLocalPTCustomFitnessTargets());
@@ -485,7 +503,8 @@ export default function PTTrainingPage() {
 
   useEffect(() => {
     if (
-      !createFolderDialogOpen &&
+      !portfolioDisplayDialogOpen &&
+      !selectedPortfolioFolderId &&
       !exerciseDialogOpen &&
       !routineDialogOpen &&
       !routineOptionDialogKind &&
@@ -539,9 +558,13 @@ export default function PTTrainingPage() {
         return;
       }
 
-      setCreateFolderDialogOpen(false);
-      setFolderDraftName("");
-      setFolderDraftNote("");
+      setPortfolioDisplayDialogOpen(false);
+      setPortfolioCreateFolderOpen(false);
+      setPortfolioNewFolderName("");
+      setPortfolioDisplayError(null);
+      setSelectedPortfolioFolderId(null);
+      setPortfolioFolderDetailEditMode(false);
+      setPortfolioFolderEditForm(null);
       setExerciseDialogOpen(false);
       setExerciseDescription("");
       setExerciseInstructions("");
@@ -570,7 +593,8 @@ export default function PTTrainingPage() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [
-    createFolderDialogOpen,
+    portfolioDisplayDialogOpen,
+    selectedPortfolioFolderId,
     exerciseDialogOpen,
     routineDialogOpen,
     routineOptionDialogKind,
@@ -584,9 +608,9 @@ export default function PTTrainingPage() {
         folders: foldersData,
         packages: packagesData,
         routines: routinesData,
-        selectedFolderId: openPortfolioFolderId,
+        selectedFolderId: null,
       }),
-    [foldersData, openPortfolioFolderId, packagesData, routinesData],
+    [foldersData, packagesData, routinesData],
   );
 
   const query = deferredSearch.trim().toLowerCase();
@@ -600,74 +624,6 @@ export default function PTTrainingPage() {
   const showLoadingState = loading && !view.hasAnyData && partialErrorMessages.length === 0;
   const allSectionsFailed = !loading && !view.hasAnyData && partialErrorMessages.length === 3;
 
-  const portfolioFolders = useMemo<PortfolioFolderGroup[]>(
-    () =>
-      view.folderTiles.map((folder, index) => {
-        const packages = view.packageCards
-          .filter((item) => item.folderId === folder.id)
-          .map((item) => ({
-            id: item.id,
-            title: item.title,
-            description: item.description,
-            statusLabel: item.statusLabel,
-            durationLabel: item.durationLabel,
-            templateLabel: item.templateLabel,
-          }));
-        const routines = view.routineCards
-          .filter((item) => item.folderId === folder.id)
-          .map((item) => ({
-            id: item.id,
-            title: item.title,
-            description: item.description,
-            difficultyLabel: item.difficultyLabel,
-            estimatedMinutesLabel: item.estimatedMinutesLabel,
-            archiveLabel: item.archiveLabel,
-          }));
-
-        return {
-          id: folder.id,
-          title: folder.title,
-          description: folder.description,
-          countLabel: folder.countLabel,
-          packageCountLabel: folder.packageCountLabel,
-          routineCountLabel: folder.routineCountLabel,
-          sortOrderLabel: folder.sortOrderLabel,
-          packages,
-          routines,
-          searchFields: [
-            folder.title,
-            folder.description,
-            folder.countLabel,
-            folder.packageCountLabel,
-            folder.routineCountLabel,
-            folder.sortOrderLabel,
-            ...packages.flatMap((item) => [
-              item.title,
-              item.description,
-              item.statusLabel,
-              item.durationLabel,
-              item.templateLabel,
-            ]),
-            ...routines.flatMap((item) => [
-              item.title,
-              item.description,
-              item.difficultyLabel,
-              item.estimatedMinutesLabel,
-              item.archiveLabel,
-            ]),
-          ],
-          themeClassName:
-            PORTFOLIO_THEME_CLASS_NAMES[index % PORTFOLIO_THEME_CLASS_NAMES.length] ??
-            PORTFOLIO_THEME_CLASS_NAMES[0],
-        };
-      }),
-    [view.folderTiles, view.packageCards, view.routineCards],
-  );
-
-  const filteredPortfolioFolders = hasSearchValue
-    ? portfolioFolders.filter((folder) => matchesTrainingQuery(query, folder.searchFields))
-    : portfolioFolders;
-
   const fitnessTargetOptions = useMemo(
     () => dedupeStringValues([...DEFAULT_FITNESS_TARGETS, ...customFitnessTargets]),
     [customFitnessTargets],
@@ -678,13 +634,116 @@ export default function PTTrainingPage() {
     [customFitnessAttributes],
   );
 
+  const portfolioDirectoryFolders = useMemo<PortfolioDirectoryFolder[]>(() => {
+    const overlayMap = new Map(portfolioFolderOverlays.map((overlay) => [overlay.id, overlay]));
+
+    const bffFolders = view.folderTiles.map((folder, index) => {
+      const overlay = overlayMap.get(folder.id);
+      const packageTitles = view.packageCards
+        .filter((item) => item.folderId === folder.id)
+        .map((item) => item.title);
+      const routineTitles = view.routineCards
+        .filter((item) => item.folderId === folder.id)
+        .map((item) => item.title);
+      const publishedRoutineDrafts = routineDrafts.filter((draft) =>
+        (draft.publishTargets ?? []).some(
+          (target) =>
+            target.id === folder.id ||
+            normalizeOptionValue(target.name) === normalizeOptionValue(folder.title),
+        ),
+      );
+      const exercises = dedupeFolderEntityValues([
+        ...(overlay?.exercises ?? []),
+        ...packageTitles,
+        ...routineTitles,
+        ...publishedRoutineDrafts.flatMap((draft) => draft.exercises.map((exercise) => exercise.exerciseName)),
+        ...publishedRoutineDrafts.map((draft) => draft.routineName),
+      ]);
+      const searchFields = [
+        folder.title,
+        folder.description,
+        ...(overlay?.tags ?? []),
+        ...exercises,
+        ...publishedRoutineDrafts.flatMap((draft) => draft.fitnessTargets),
+        ...publishedRoutineDrafts.flatMap((draft) => draft.fitnessAttributes),
+      ];
+
+      return {
+        id: folder.id,
+        source: "bff" as const,
+        title: folder.title,
+        description: folder.description,
+        updatedAt: overlay?.updatedAt ?? new Date(Date.now() - index * 60_000).toISOString(),
+        thumbnailDataUrl: overlay?.thumbnailDataUrl,
+        color: overlay?.color ?? "grey",
+        tags: overlay?.tags ?? [],
+        exercises,
+        routines: dedupeFolderEntityValues([...packageTitles, ...routineTitles]),
+        searchFields,
+      };
+    });
+
+    const localFolders = localPortfolioFolders.map((folder) => {
+      const publishedRoutineDrafts = routineDrafts.filter((draft) =>
+        (draft.publishTargets ?? []).some(
+          (target) =>
+            target.id === folder.id ||
+            normalizeOptionValue(target.name) === normalizeOptionValue(folder.title),
+        ),
+      );
+      const exercises = dedupeFolderEntityValues([
+        ...folder.exercises,
+        ...publishedRoutineDrafts.flatMap((draft) => draft.exercises.map((exercise) => exercise.exerciseName)),
+        ...publishedRoutineDrafts.map((draft) => draft.routineName),
+      ]);
+
+      return {
+        id: folder.id,
+        source: "local" as const,
+        title: folder.title,
+        description: "Stored locally until PT folder save routes are wired.",
+        updatedAt: folder.updatedAt,
+        thumbnailDataUrl: folder.thumbnailDataUrl,
+        color: folder.color ?? "grey",
+        tags: folder.tags,
+        exercises,
+        routines: publishedRoutineDrafts.map((draft) => draft.routineName),
+        searchFields: [
+          folder.title,
+          ...folder.tags,
+          ...exercises,
+          ...publishedRoutineDrafts.flatMap((draft) => draft.fitnessTargets),
+          ...publishedRoutineDrafts.flatMap((draft) => draft.fitnessAttributes),
+        ],
+      };
+    });
+
+    return [...localFolders, ...bffFolders];
+  }, [localPortfolioFolders, portfolioFolderOverlays, routineDrafts, view.folderTiles, view.packageCards, view.routineCards]);
+
+  const filteredPortfolioFolders = hasSearchValue
+    ? portfolioDirectoryFolders.filter((folder) => matchesTrainingQuery(query, folder.searchFields))
+    : portfolioDirectoryFolders;
+
+  const displayedPortfolioFolders = useMemo(() => {
+    const limitedSource = hasSearchValue
+      ? filteredPortfolioFolders
+      : portfolioDisplayMode === "pinned"
+        ? filteredPortfolioFolders.filter((folder) => pinnedPortfolioFolderIds.includes(folder.id))
+        : [...filteredPortfolioFolders].sort(
+            (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+          );
+
+    return limitedSource.slice(0, PORTFOLIO_DIRECTORY_LIMIT);
+  }, [filteredPortfolioFolders, hasSearchValue, pinnedPortfolioFolderIds, portfolioDisplayMode]);
+
   const portfolioFolderOptions = useMemo(
     () =>
-      view.folderTiles.map((folder) => ({
+      portfolioDirectoryFolders.map((folder) => ({
         id: folder.id,
         title: folder.title,
       })),
-    [view.folderTiles],
+    [portfolioDirectoryFolders],
   );
 
   const routineExerciseSuggestions = useMemo(() => {
@@ -706,21 +765,28 @@ export default function PTTrainingPage() {
     ]);
   }, [exerciseDrafts, routineDrafts, routineRows, view.packageCards, view.routineCards]);
 
+  const portfolioExerciseSuggestions = useMemo(
+    () =>
+      dedupeStringValues([
+        ...exerciseDrafts.map((draft) => draft.description),
+        ...routineDrafts.flatMap((draft) => draft.exercises.map((exercise) => exercise.exerciseName)),
+        ...routineDrafts.map((draft) => draft.routineName),
+        ...view.packageCards.map((item) => item.title),
+        ...view.routineCards.map((item) => item.title),
+        ...portfolioDirectoryFolders.flatMap((folder) => folder.exercises),
+      ]),
+    [exerciseDrafts, portfolioDirectoryFolders, routineDrafts, view.packageCards, view.routineCards],
+  );
+
   const activeRoutineRow = routineRows[activeRoutineExerciseIndex] ?? null;
   const isRoutineEditMode = editingRoutineDraftId !== null;
+  const selectedPortfolioFolder =
+    selectedPortfolioFolderId !== null
+      ? portfolioDirectoryFolders.find((folder) => folder.id === selectedPortfolioFolderId) ?? null
+      : null;
   const publishingRoutineDraft = routineDraftPublishDialog
     ? routineDrafts.find((draft) => draft.id === routineDraftPublishDialog.draftId) ?? null
     : null;
-
-  useEffect(() => {
-    if (!openPortfolioFolderId) {
-      return;
-    }
-
-    if (!filteredPortfolioFolders.some((folder) => folder.id === openPortfolioFolderId)) {
-      setOpenPortfolioFolderId(null);
-    }
-  }, [filteredPortfolioFolders, openPortfolioFolderId]);
 
   useEffect(() => {
     if (activeRoutineExerciseIndex <= routineRows.length - 1) {
@@ -730,27 +796,231 @@ export default function PTTrainingPage() {
     setActiveRoutineExerciseIndex(Math.max(0, routineRows.length - 1));
   }, [activeRoutineExerciseIndex, routineRows.length]);
 
-  function closeCreateFolderDialog() {
-    setCreateFolderDialogOpen(false);
-    setFolderDraftName("");
-    setFolderDraftNote("");
+  function closePortfolioDisplayDialog() {
+    setPortfolioDisplayDialogOpen(false);
+    setPortfolioCreateFolderOpen(false);
+    setPortfolioNewFolderName("");
+    setPortfolioDisplayError(null);
   }
 
-  function handleSaveFolderDraft() {
-    const nextDraft = createLocalPTFolderDraft({
-      name: folderDraftName,
-      note: folderDraftNote,
+  function handlePortfolioDisplayModeChange(mode: LocalPTPortfolioDisplayMode) {
+    setPortfolioDisplayMode(mode);
+    writeLocalPTPortfolioDisplayMode(mode);
+    setPortfolioDisplayError(null);
+  }
+
+  function togglePinnedPortfolioFolder(folderId: string) {
+    setPinnedPortfolioFolderIds((current) => {
+      if (current.includes(folderId)) {
+        const next = current.filter((item) => item !== folderId);
+        writeLocalPTPinnedPortfolioFolders(next);
+        const nextLocalFolders = localPortfolioFolders.map((folder) =>
+          folder.id === folderId ? { ...folder, pinned: false } : folder,
+        );
+        setLocalPortfolioFolders(nextLocalFolders);
+        writeLocalPTPortfolioFolders(nextLocalFolders);
+        setPortfolioDisplayError(null);
+        return next;
+      }
+
+      if (current.length >= PORTFOLIO_DIRECTORY_LIMIT) {
+        setPortfolioDisplayError("Pin up to 5 folders.");
+        return current;
+      }
+
+      const next = [...current, folderId];
+      writeLocalPTPinnedPortfolioFolders(next);
+      const nextLocalFolders = localPortfolioFolders.map((folder) =>
+        folder.id === folderId ? { ...folder, pinned: true } : folder,
+      );
+      setLocalPortfolioFolders(nextLocalFolders);
+      writeLocalPTPortfolioFolders(nextLocalFolders);
+      setPortfolioDisplayError(null);
+      return next;
     });
-    const nextDrafts = [nextDraft, ...folderDrafts];
-    setFolderDrafts(nextDrafts);
-    writeLocalPTFolderDrafts(nextDrafts);
-    closeCreateFolderDialog();
   }
 
-  function removeFolderDraft(draftId: string) {
-    const nextDrafts = folderDrafts.filter((draft) => draft.id !== draftId);
-    setFolderDrafts(nextDrafts);
-    writeLocalPTFolderDrafts(nextDrafts);
+  function handleCreatePortfolioFolder() {
+    const title = portfolioNewFolderName.trim();
+    if (!title) {
+      setPortfolioDisplayError("Folder name is required.");
+      return;
+    }
+
+    const existingTitles = portfolioDirectoryFolders.map((folder) => normalizeOptionValue(folder.title));
+    if (existingTitles.includes(normalizeOptionValue(title))) {
+      setPortfolioDisplayError("That portfolio folder already exists.");
+      return;
+    }
+
+    const nextFolder = createLocalPTPortfolioFolder({
+      title,
+      exercises: [],
+      tags: [],
+    });
+    const nextFolders = [nextFolder, ...localPortfolioFolders];
+    setLocalPortfolioFolders(nextFolders);
+    writeLocalPTPortfolioFolders(nextFolders);
+    setPortfolioNewFolderName("");
+    setPortfolioCreateFolderOpen(false);
+    setPortfolioDisplayError(null);
+  }
+
+  function openPortfolioFolderDetail(folderId: string) {
+    setSelectedPortfolioFolderId(folderId);
+    setPortfolioFolderDetailEditMode(false);
+    setPortfolioFolderEditForm(null);
+  }
+
+  function closePortfolioFolderDetail() {
+    setSelectedPortfolioFolderId(null);
+    setPortfolioFolderDetailEditMode(false);
+    setPortfolioFolderEditForm(null);
+  }
+
+  function openPortfolioFolderEditMode() {
+    if (!selectedPortfolioFolder) {
+      return;
+    }
+
+    setPortfolioFolderDetailEditMode(true);
+    setPortfolioFolderEditForm({
+      title: selectedPortfolioFolder.title,
+      thumbnailDataUrl: selectedPortfolioFolder.thumbnailDataUrl,
+      color: selectedPortfolioFolder.color,
+      tags: [...selectedPortfolioFolder.tags],
+      tagInput: "",
+      exercises: [...selectedPortfolioFolder.exercises],
+      exerciseInput: "",
+      error: null,
+      thumbnailError: null,
+    });
+  }
+
+  function closePortfolioFolderEditMode() {
+    setPortfolioFolderDetailEditMode(false);
+    setPortfolioFolderEditForm(null);
+  }
+
+  function updatePortfolioFolderEditForm(
+    updater: (current: PortfolioFolderEditForm) => PortfolioFolderEditForm,
+  ) {
+    setPortfolioFolderEditForm((current) => (current ? updater(current) : current));
+  }
+
+  function handlePortfolioFolderThumbnailChange(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    if (file.size > 1_000_000) {
+      updatePortfolioFolderEditForm((current) => ({
+        ...current,
+        thumbnailError: "Thumbnail must be 1 MB or smaller.",
+      }));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === "string" ? reader.result : undefined;
+      updatePortfolioFolderEditForm((current) => ({
+        ...current,
+        thumbnailDataUrl: dataUrl,
+        thumbnailError: null,
+      }));
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleAddPortfolioFolderTag() {
+    if (!portfolioFolderEditForm) {
+      return;
+    }
+
+    const tag = portfolioFolderEditForm.tagInput.trim();
+    if (!tag) {
+      return;
+    }
+
+    updatePortfolioFolderEditForm((current) => ({
+      ...current,
+      tags: dedupeStringValues([...current.tags, tag]),
+      tagInput: "",
+      error: null,
+    }));
+  }
+
+  function handleAddPortfolioFolderExercise() {
+    if (!portfolioFolderEditForm) {
+      return;
+    }
+
+    const exerciseName = portfolioFolderEditForm.exerciseInput.trim();
+    if (!exerciseName) {
+      return;
+    }
+
+    updatePortfolioFolderEditForm((current) => ({
+      ...current,
+      exercises: dedupeStringValues([...current.exercises, exerciseName]),
+      exerciseInput: "",
+      error: null,
+    }));
+  }
+
+  function handleSavePortfolioFolderChanges() {
+    if (!selectedPortfolioFolder || !portfolioFolderEditForm) {
+      return;
+    }
+
+    const title = portfolioFolderEditForm.title.trim();
+    if (!title) {
+      updatePortfolioFolderEditForm((current) => ({
+        ...current,
+        error: "Folder title is required.",
+      }));
+      return;
+    }
+
+    if (selectedPortfolioFolder.source === "local") {
+      const nextFolders = localPortfolioFolders.map((folder) =>
+        folder.id === selectedPortfolioFolder.id
+          ? {
+              ...folder,
+              title,
+              thumbnailDataUrl: portfolioFolderEditForm.thumbnailDataUrl,
+              color: portfolioFolderEditForm.color,
+              tags: portfolioFolderEditForm.tags,
+              exercises: portfolioFolderEditForm.exercises,
+              updatedAt: new Date().toISOString(),
+            }
+          : folder,
+      );
+      setLocalPortfolioFolders(nextFolders);
+      writeLocalPTPortfolioFolders(nextFolders);
+    } else {
+      const existingOverlay = portfolioFolderOverlays.find((overlay) => overlay.id === selectedPortfolioFolder.id);
+      const nextOverlay: LocalPTPortfolioFolderOverlay = {
+        id: selectedPortfolioFolder.id,
+        source: "bff",
+        updatedAt: new Date().toISOString(),
+        thumbnailDataUrl: portfolioFolderEditForm.thumbnailDataUrl,
+        color: portfolioFolderEditForm.color,
+        tags: portfolioFolderEditForm.tags,
+        exercises: portfolioFolderEditForm.exercises,
+      };
+      const nextOverlays = existingOverlay
+        ? portfolioFolderOverlays.map((overlay) =>
+            overlay.id === selectedPortfolioFolder.id ? nextOverlay : overlay,
+          )
+        : [nextOverlay, ...portfolioFolderOverlays];
+      setPortfolioFolderOverlays(nextOverlays);
+      writeLocalPTPortfolioFolderOverlays(nextOverlays);
+    }
+
+    setPortfolioFolderDetailEditMode(false);
+    setPortfolioFolderEditForm(null);
   }
 
   function openExerciseDialog() {
@@ -1408,16 +1678,7 @@ export default function PTTrainingPage() {
       greeting={formatDisplayNameFromUser(user)}
       title="PT Training"
       subtitle="Training portfolios and routines stay inside the existing PT BFF layer and use local-only filtering on the frontend."
-      searchLabel="Search PT training"
-      searchPlaceholder="Search training portfolios or routines"
-      searchValue={searchValue}
-      onSearchChange={(nextValue) => {
-        startTransition(() => {
-          setSearchValue(nextValue);
-        });
-      }}
       notificationSlot={<MobileHeaderUtilities settingsHref="/pt/settings" />}
-      topHubAction={<ActionPill href="/pt/clients">Open clients</ActionPill>}
       activePath="/pt/training"
       showAvatar={false}
     >
@@ -1454,187 +1715,99 @@ export default function PTTrainingPage() {
             eyebrow="PT training"
             title="Training Portfolio"
             description="Organize client training routines into custom folder lanes from the existing PT folders route."
+            action={
+              <button
+                type="button"
+                className="pt-training-portfolio-directory__edit mobile-focus-ring"
+                onClick={() => {
+                  setPortfolioDisplayDialogOpen(true);
+                }}
+                aria-haspopup="dialog"
+                aria-controls="pt-training-portfolio-display-dialog"
+                aria-label="Edit training portfolio display"
+              >
+                Edit
+              </button>
+            }
           >
-            <div className="pt-training-create-folder">
-              <div className="pt-training-create-folder-card-wrap">
-                <button
-                  id="pt-training-create-folder-trigger"
-                  type="button"
-                  className="pt-training-create-folder-card mobile-focus-ring"
-                  aria-haspopup="dialog"
-                  aria-controls="pt-training-create-folder-dialog"
-                  onClick={() => {
-                    setCreateFolderDialogOpen(true);
+            <div className="pt-training-portfolio-directory">
+              <div className="pt-training-portfolio-directory__search">
+                <label htmlFor="pt-training-portfolio-search" className="sr-only">
+                  Search training portfolios
+                </label>
+                <input
+                  id="pt-training-portfolio-search"
+                  type="search"
+                  value={searchValue}
+                  placeholder="Search training portfolios or routines"
+                  className="mobile-focus-ring"
+                  onChange={(event) => {
+                    startTransition(() => {
+                      setSearchValue(event.target.value);
+                    });
                   }}
-                >
-                  <span className="pt-training-create-folder-card__icon" aria-hidden="true">
-                    <CreateFolderPlusIcon />
-                  </span>
-                  <span className="pt-training-create-folder-card__label">Create New Folder</span>
-                </button>
+                />
               </div>
-
-              {folderDrafts.length > 0 ? (
-                <div className="pt-training-create-folder-drafts">
-                  <p className="pt-training-create-folder-drafts__title">Local folder drafts</p>
-                  <div className="pt-training-create-folder-drafts__list">
-                    {folderDrafts.map((draft) => (
-                      <MobileCard
-                        key={draft.id}
-                        as="article"
-                        variant="soft"
-                        className="pt-training-local-draft-card"
-                      >
-                        <div className="pt-training-local-draft-card__copy">
-                          <div className="pt-training-local-draft-card__header">
-                            <p className="pt-training-local-draft-card__title">{draft.name}</p>
-                            <span className="pt-training-local-draft-tag">Local draft</span>
-                          </div>
-                          <p className="pt-training-local-draft-card__note">
-                            {draft.note.length > 0 ? draft.note : "No local folder note yet."}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          className="pt-training-local-draft-remove mobile-focus-ring"
-                          onClick={() => {
-                            removeFolderDraft(draft.id);
-                          }}
-                          aria-label={`Remove local folder draft ${draft.name}`}
-                        >
-                          Remove
-                        </button>
-                      </MobileCard>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
             </div>
 
-            {sectionErrors.folders && !view.hasFolders ? (
+            {sectionErrors.folders && !view.hasFolders && localPortfolioFolders.length === 0 ? (
               <TrainingStateCard title="Training Portfolio unavailable" message={sectionErrors.folders} />
-            ) : view.hasFolders ? (
-              filteredPortfolioFolders.length > 0 ? (
-                <div className="pt-training-portfolio" role="list" aria-label="Training portfolio folders">
-                  {filteredPortfolioFolders.map((folder) => {
-                    const isOpen = openPortfolioFolderId === folder.id;
-                    const triggerId = `pt-training-folder-${folder.id}-trigger`;
-                    const panelId = `pt-training-folder-${folder.id}-panel`;
-
-                    return (
-                      <article
-                        key={folder.id}
-                        role="listitem"
-                        className={[
-                          "pt-training-portfolio-card",
-                          folder.themeClassName,
-                          isOpen ? "pt-training-portfolio-card--open" : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                      >
-                        <button
-                          id={triggerId}
-                          type="button"
-                          className="pt-training-portfolio-trigger mobile-focus-ring"
-                          aria-expanded={isOpen}
-                          aria-controls={panelId}
-                          onClick={() => {
-                            setOpenPortfolioFolderId((current) => (current === folder.id ? null : folder.id));
-                          }}
-                        >
-                          <span className="pt-training-portfolio-title">{folder.title}</span>
-                          <span className="pt-training-portfolio-chevron" aria-hidden="true">
-                            <PortfolioChevronIcon />
+            ) : displayedPortfolioFolders.length > 0 ? (
+              <div
+                className="pt-training-portfolio-directory__list"
+                role="list"
+                aria-label="Training portfolio directory"
+              >
+                {displayedPortfolioFolders.map((folder) => (
+                  <div key={folder.id} role="listitem" className="pt-training-folder-row__item">
+                    <button
+                      type="button"
+                      className={`pt-training-folder-row pt-training-folder-row--${folder.color} mobile-focus-ring`}
+                      onClick={() => {
+                        openPortfolioFolderDetail(folder.id);
+                      }}
+                      aria-label={`Open training portfolio ${folder.title}`}
+                    >
+                      <span className="pt-training-folder-row__thumbnail" aria-hidden="true">
+                        {folder.thumbnailDataUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={folder.thumbnailDataUrl} alt="" />
+                        ) : (
+                          <span className="pt-training-folder-row__thumbnail-placeholder">
+                            <FolderDirectoryIcon />
                           </span>
-                        </button>
-
-                        {isOpen ? (
-                          <div
-                            id={panelId}
-                            role="region"
-                            aria-labelledby={triggerId}
-                            className="pt-training-portfolio-panel"
-                          >
-                            <div className="mobile-section__copy">
-                              <p className="mobile-section__description">{folder.description}</p>
-                            </div>
-
-                            <div className="pt-training-portfolio-meta" aria-label={`${folder.title} folder details`}>
-                              <span className="mobile-pill mobile-pill--purple">{folder.packageCountLabel}</span>
-                              <span className="mobile-pill">{folder.routineCountLabel}</span>
-                              <span className="mobile-pill">{folder.sortOrderLabel}</span>
-                            </div>
-
-                            {folder.packages.length === 0 && folder.routines.length === 0 ? (
-                              <p className="pt-training-portfolio-empty">
-                                No training routines are assigned to this folder yet.
-                              </p>
-                            ) : (
-                              <div className="pt-training-portfolio-list">
-                                {folder.packages.length > 0 ? (
-                                  <section className="pt-training-portfolio-list-block">
-                                    <p className="pt-training-portfolio-list-label">Training portfolios</p>
-                                    <ul className="pt-training-portfolio-list-items">
-                                      {folder.packages.map((item) => (
-                                        <li key={item.id} className="pt-training-portfolio-list-item">
-                                          <div className="pt-training-portfolio-list-copy">
-                                            <p className="pt-training-portfolio-list-title">{item.title}</p>
-                                            <p className="pt-training-portfolio-list-description">
-                                              {item.description}
-                                            </p>
-                                          </div>
-                                          <div className="pt-training-portfolio-list-pills">
-                                            <span className="mobile-pill mobile-pill--yellow">{item.statusLabel}</span>
-                                            <span className="mobile-pill">{item.durationLabel}</span>
-                                            <span className="mobile-pill">{item.templateLabel}</span>
-                                          </div>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </section>
-                                ) : null}
-
-                                {folder.routines.length > 0 ? (
-                                  <section className="pt-training-portfolio-list-block">
-                                    <p className="pt-training-portfolio-list-label">Training routines</p>
-                                    <ul className="pt-training-portfolio-list-items">
-                                      {folder.routines.map((item) => (
-                                        <li key={item.id} className="pt-training-portfolio-list-item">
-                                          <div className="pt-training-portfolio-list-copy">
-                                            <p className="pt-training-portfolio-list-title">{item.title}</p>
-                                            <p className="pt-training-portfolio-list-description">
-                                              {item.description}
-                                            </p>
-                                          </div>
-                                          <div className="pt-training-portfolio-list-pills">
-                                            <span className="mobile-pill mobile-pill--yellow">{item.difficultyLabel}</span>
-                                            <span className="mobile-pill">{item.estimatedMinutesLabel}</span>
-                                            <span className="mobile-pill">{item.archiveLabel}</span>
-                                          </div>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </section>
-                                ) : null}
-                              </div>
-                            )}
-                          </div>
+                        )}
+                      </span>
+                      <span className="pt-training-folder-row__copy">
+                        <span className="pt-training-folder-row__title">{folder.title}</span>
+                        <span className="pt-training-folder-row__updated">
+                          {formatUpdatedLabel(folder.updatedAt)}
+                        </span>
+                        {folder.source === "local" ? (
+                          <span className="pt-training-folder-row__source">Stored locally</span>
                         ) : null}
-                      </article>
-                    );
-                  })}
-                </div>
-              ) : (
-                <TrainingStateCard
-                  title="No training portfolio folders match this search."
-                  message={`No loaded PT folders matched "${searchValue.trim()}". Adjust the local filter to see the returned folder lanes again.`}
-                />
-              )
+                      </span>
+                      <span className="pt-training-folder-row__action" aria-hidden="true">
+                        <ExerciseArrowIcon direction="right" />
+                      </span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : hasSearchValue ? (
+              <TrainingStateCard
+                title="No training portfolios match this search."
+                message="Search folder names, tags, exercises, and routine terms locally to find the portfolios you need."
+              />
+            ) : portfolioDisplayMode === "pinned" && filteredPortfolioFolders.length > 0 ? (
+              <TrainingStateCard
+                title="No pinned training portfolios selected yet."
+                message="Open Edit to pin up to 5 portfolio folders for this directory view."
+              />
             ) : (
               <TrainingStateCard
                 title="No training folders yet."
-                message="Training folders will appear here when the current PT folders route returns custom folder records."
+                message="Training folders will appear here when the current PT folders route returns custom folder records or when you create a local portfolio folder."
               />
             )}
           </MobileSection>
@@ -1781,6 +1954,31 @@ export default function PTTrainingPage() {
                                   <p className="pt-training-local-draft-card__portfolio">
                                     Portfolio folders: {formatPublishTargetsSummary(draft.publishTargets ?? [])}
                                   </p>
+                                  {(draft.publishTargets ?? []).length > 0 ? (
+                                    <div className="pt-training-local-draft-card__portfolio-actions">
+                                      {dedupePublishTargets(draft.publishTargets ?? []).map((target) =>
+                                        target.type === "existing-folder" && target.id ? (
+                                          <button
+                                            key={`${target.type}:${target.id}`}
+                                            type="button"
+                                            className="pt-training-local-draft-card__portfolio-button mobile-focus-ring"
+                                            onClick={() => {
+                                              openPortfolioFolderDetail(target.id as string);
+                                            }}
+                                          >
+                                            {target.name}
+                                          </button>
+                                        ) : (
+                                          <span
+                                            key={`${target.type}:${target.id ?? target.name}`}
+                                            className="pt-training-publish-folder-picker__local-tag"
+                                          >
+                                            {target.name}
+                                          </span>
+                                        ),
+                                      )}
+                                    </div>
+                                  ) : null}
                                 </>
                               ) : null}
                             </div>
@@ -1827,79 +2025,409 @@ export default function PTTrainingPage() {
         </>
       ) : null}
 
-      {createFolderDialogOpen ? (
+      {portfolioDisplayDialogOpen ? (
         <div
           className="pt-training-modal-backdrop"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
-              closeCreateFolderDialog();
+              closePortfolioDisplayDialog();
             }
           }}
         >
           <section
-            id="pt-training-create-folder-dialog"
+            id="pt-training-portfolio-display-dialog"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="pt-training-create-folder-dialog-title"
+            aria-labelledby="pt-training-portfolio-display-dialog-title"
             className="pt-training-modal"
           >
             <div className="pt-training-modal__header">
               <div className="mobile-section__copy">
-                <p className="mobile-section__eyebrow">Local folder planning</p>
-                <h2 id="pt-training-create-folder-dialog-title" className="mobile-section__title">
-                  Create New Folder
+                <p className="mobile-section__eyebrow">Local portfolio display</p>
+                <h2 id="pt-training-portfolio-display-dialog-title" className="mobile-section__title">
+                  Edit Training Portfolio Display
                 </h2>
                 <p className="mobile-section__description">
-                  Folder creation is not connected to the PT folders save route yet. This screen can stage the folder name locally for layout planning only.
+                  Folder display preferences and local portfolio folders stay in the browser until PT folder save routes are wired.
                 </p>
               </div>
               <button
                 type="button"
                 className="pt-training-modal__secondary-action mobile-focus-ring"
-                onClick={closeCreateFolderDialog}
+                onClick={closePortfolioDisplayDialog}
               >
                 Close
               </button>
             </div>
 
             <div className="pt-training-modal__form pt-training-builder-form">
-              <div className="field">
-                <label htmlFor="pt-training-folder-draft-name">Folder name</label>
-                <input
-                  id="pt-training-folder-draft-name"
-                  value={folderDraftName}
-                  onChange={(event) => setFolderDraftName(event.target.value)}
-                  placeholder="Strength Builder"
-                />
+              <fieldset className="pt-training-builder-form__field pt-training-builder-form__toggle-field">
+                <legend>Display mode</legend>
+                <div
+                  className="pt-training-builder-form__toggle-group"
+                  role="radiogroup"
+                  aria-label="Training portfolio display mode"
+                >
+                  <label className="pt-training-builder-form__toggle">
+                    <input
+                      type="radio"
+                      name="pt-training-portfolio-display-mode"
+                      checked={portfolioDisplayMode === "recent"}
+                      onChange={() => {
+                        handlePortfolioDisplayModeChange("recent");
+                      }}
+                    />
+                    <span>Most Recent</span>
+                  </label>
+                  <label className="pt-training-builder-form__toggle">
+                    <input
+                      type="radio"
+                      name="pt-training-portfolio-display-mode"
+                      checked={portfolioDisplayMode === "pinned"}
+                      onChange={() => {
+                        handlePortfolioDisplayModeChange("pinned");
+                      }}
+                    />
+                    <span>Pinned</span>
+                  </label>
+                </div>
+              </fieldset>
+
+              {portfolioDisplayMode === "pinned" ? (
+                <div className="pt-training-builder-form__field">
+                  <label>Pinned portfolio folders</label>
+                  <div className="pt-training-publish-folder-picker__list">
+                    {portfolioDirectoryFolders.map((folder) => (
+                      <label key={folder.id} className="pt-training-publish-folder-picker__option">
+                        <input
+                          type="checkbox"
+                          checked={pinnedPortfolioFolderIds.includes(folder.id)}
+                          onChange={() => {
+                            togglePinnedPortfolioFolder(folder.id);
+                          }}
+                        />
+                        <span>{folder.title}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="pt-training-builder-form__field">
+                <button
+                  type="button"
+                  className="pt-training-local-draft-action mobile-focus-ring"
+                  onClick={() => {
+                    setPortfolioCreateFolderOpen((current) => !current);
+                    setPortfolioDisplayError(null);
+                  }}
+                >
+                  Create New Folder
+                </button>
               </div>
-              <div className="field">
-                <label htmlFor="pt-training-folder-draft-note">Folder note</label>
-                <textarea
-                  id="pt-training-folder-draft-note"
-                  value={folderDraftNote}
-                  onChange={(event) => setFolderDraftNote(event.target.value)}
-                  placeholder="Local planning notes for future folder wiring"
-                  rows={4}
-                />
-              </div>
-              <div className="pt-training-modal__actions">
+
+              {portfolioCreateFolderOpen ? (
+                <div className="pt-training-builder-form__field">
+                  <label htmlFor="pt-training-local-portfolio-name">Folder name</label>
+                  <input
+                    id="pt-training-local-portfolio-name"
+                    value={portfolioNewFolderName}
+                    onChange={(event) => {
+                      setPortfolioNewFolderName(event.target.value);
+                      setPortfolioDisplayError(null);
+                    }}
+                    placeholder="Strength Builder"
+                  />
+                </div>
+              ) : null}
+
+              {portfolioDisplayError ? (
+                <p className="pt-training-builder-form__error" role="alert">
+                  {portfolioDisplayError}
+                </p>
+              ) : null}
+
+              <div className="pt-training-modal__actions pt-training-modal__actions--centered">
                 <button
                   type="button"
                   className="pt-training-modal__secondary-action mobile-focus-ring"
-                  onClick={closeCreateFolderDialog}
+                  onClick={closePortfolioDisplayDialog}
                 >
                   Cancel
                 </button>
-                <button
-                  type="button"
-                  className="pt-training-modal__primary-action mobile-focus-ring"
-                  onClick={handleSaveFolderDraft}
-                  disabled={folderDraftName.trim().length === 0}
-                >
-                  Save local draft
-                </button>
+                {portfolioCreateFolderOpen ? (
+                  <button
+                    type="button"
+                    className="pt-training-modal__primary-action mobile-focus-ring"
+                    onClick={handleCreatePortfolioFolder}
+                  >
+                    Add Folder
+                  </button>
+                ) : null}
               </div>
             </div>
+          </section>
+        </div>
+      ) : null}
+
+      {selectedPortfolioFolder ? (
+        <div
+          className="pt-training-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closePortfolioFolderDetail();
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pt-training-folder-detail-title"
+            className="pt-training-modal"
+          >
+            <div className="pt-training-modal__header">
+              <div className="mobile-section__copy">
+                <p className="mobile-section__eyebrow">
+                  {selectedPortfolioFolder.source === "local" ? "Stored locally" : "PT folder detail"}
+                </p>
+                <h2 id="pt-training-folder-detail-title" className="mobile-section__title">
+                  {portfolioFolderDetailEditMode && portfolioFolderEditForm
+                    ? portfolioFolderEditForm.title || selectedPortfolioFolder.title
+                    : selectedPortfolioFolder.title}
+                </h2>
+                <p className="mobile-section__description">
+                  {formatUpdatedLabel(selectedPortfolioFolder.updatedAt)}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="pt-training-modal__secondary-action mobile-focus-ring"
+                onClick={closePortfolioFolderDetail}
+              >
+                Close
+              </button>
+            </div>
+
+            {!portfolioFolderDetailEditMode || !portfolioFolderEditForm ? (
+              <div className="pt-training-modal__form pt-training-builder-form pt-training-folder-detail">
+                {selectedPortfolioFolder.source === "local" ? (
+                  <p className="pt-training-builder-form__helper">
+                    This portfolio folder is stored locally until PT folder save routes are wired.
+                  </p>
+                ) : null}
+                {selectedPortfolioFolder.tags.length > 0 ? (
+                  <div className="pt-training-publish-folder-picker__list">
+                    {selectedPortfolioFolder.tags.map((tag) => (
+                      <span key={tag} className="pt-training-publish-folder-picker__local-tag">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="pt-training-builder-form__field">
+                  <label>Exercises</label>
+                  {selectedPortfolioFolder.exercises.length > 0 ? (
+                    <ul className="pt-training-portfolio-list-items">
+                      {selectedPortfolioFolder.exercises.map((exercise) => (
+                        <li key={exercise} className="pt-training-portfolio-list-item">
+                          <p className="pt-training-portfolio-list-title">{exercise}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="pt-training-builder-form__helper">
+                      No exercises have been added to this portfolio folder yet.
+                    </p>
+                  )}
+                </div>
+                <div className="pt-training-modal__actions pt-training-modal__actions--centered">
+                  <button
+                    type="button"
+                    className="pt-training-modal__secondary-action mobile-focus-ring"
+                    onClick={openPortfolioFolderEditMode}
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="pt-training-modal__form pt-training-builder-form pt-training-folder-edit">
+                {selectedPortfolioFolder.source === "bff" ? (
+                  <p className="pt-training-builder-form__helper">
+                    Edits are stored locally until PT folder save routes are wired.
+                  </p>
+                ) : null}
+
+                <div className="pt-training-builder-form__field">
+                  <label htmlFor="pt-training-folder-edit-title">Folder title</label>
+                  <input
+                    id="pt-training-folder-edit-title"
+                    value={portfolioFolderEditForm.title}
+                    onChange={(event) => {
+                      updatePortfolioFolderEditForm((current) => ({
+                        ...current,
+                        title: event.target.value,
+                        error: null,
+                      }));
+                    }}
+                  />
+                </div>
+
+                <div className="pt-training-builder-form__field">
+                  <label htmlFor="pt-training-folder-edit-thumbnail">Thumbnail image</label>
+                  <input
+                    id="pt-training-folder-edit-thumbnail"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(event) => {
+                      handlePortfolioFolderThumbnailChange(event.target.files?.[0] ?? null);
+                    }}
+                  />
+                  {portfolioFolderEditForm.thumbnailError ? (
+                    <p className="pt-training-builder-form__error" role="alert">
+                      {portfolioFolderEditForm.thumbnailError}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="pt-training-builder-form__field">
+                  <label htmlFor="pt-training-folder-edit-color">Folder color</label>
+                  <select
+                    id="pt-training-folder-edit-color"
+                    value={portfolioFolderEditForm.color}
+                    onChange={(event) => {
+                      updatePortfolioFolderEditForm((current) => ({
+                        ...current,
+                        color: event.target.value as LocalPTPortfolioFolderColor,
+                      }));
+                    }}
+                  >
+                    <option value="grey">Grey</option>
+                    <option value="green">Green</option>
+                    <option value="purple">Purple</option>
+                    <option value="blue">Blue</option>
+                    <option value="amber">Amber</option>
+                  </select>
+                </div>
+
+                <div className="pt-training-builder-form__field">
+                  <label htmlFor="pt-training-folder-edit-tag-input">Tags</label>
+                  <div className="pt-training-folder-edit__inline-actions">
+                    <input
+                      id="pt-training-folder-edit-tag-input"
+                      value={portfolioFolderEditForm.tagInput}
+                      onChange={(event) => {
+                        updatePortfolioFolderEditForm((current) => ({
+                          ...current,
+                          tagInput: event.target.value,
+                        }));
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="pt-training-modal__secondary-action mobile-focus-ring"
+                      onClick={handleAddPortfolioFolderTag}
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {portfolioFolderEditForm.tags.length > 0 ? (
+                    <div className="pt-training-publish-folder-picker__list">
+                      {portfolioFolderEditForm.tags.map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          className="pt-training-publish-folder-picker__local-tag mobile-focus-ring"
+                          onClick={() => {
+                            updatePortfolioFolderEditForm((current) => ({
+                              ...current,
+                              tags: current.tags.filter((item) => item !== tag),
+                            }));
+                          }}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="pt-training-builder-form__field">
+                  <label htmlFor="pt-training-folder-edit-exercise-input">Exercises</label>
+                  <datalist id="pt-training-portfolio-exercise-suggestions">
+                    {portfolioExerciseSuggestions.map((option) => (
+                      <option key={option} value={option} />
+                    ))}
+                  </datalist>
+                  <div className="pt-training-folder-edit__inline-actions">
+                    <input
+                      id="pt-training-folder-edit-exercise-input"
+                      list="pt-training-portfolio-exercise-suggestions"
+                      value={portfolioFolderEditForm.exerciseInput}
+                      onChange={(event) => {
+                        updatePortfolioFolderEditForm((current) => ({
+                          ...current,
+                          exerciseInput: event.target.value,
+                        }));
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="pt-training-modal__secondary-action mobile-focus-ring"
+                      onClick={handleAddPortfolioFolderExercise}
+                    >
+                      Add Exercise
+                    </button>
+                  </div>
+                  {portfolioFolderEditForm.exercises.length > 0 ? (
+                    <ul className="pt-training-portfolio-list-items">
+                      {portfolioFolderEditForm.exercises.map((exercise) => (
+                        <li key={exercise} className="pt-training-portfolio-list-item">
+                          <div className="pt-training-folder-edit__inline-actions">
+                            <p className="pt-training-portfolio-list-title">{exercise}</p>
+                            <button
+                              type="button"
+                              className="pt-training-modal__secondary-action mobile-focus-ring"
+                              onClick={() => {
+                                updatePortfolioFolderEditForm((current) => ({
+                                  ...current,
+                                  exercises: current.exercises.filter((item) => item !== exercise),
+                                }));
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+
+                {portfolioFolderEditForm.error ? (
+                  <p className="pt-training-builder-form__error" role="alert">
+                    {portfolioFolderEditForm.error}
+                  </p>
+                ) : null}
+
+                <div className="pt-training-modal__actions pt-training-modal__actions--centered">
+                  <button
+                    type="button"
+                    className="pt-training-modal__secondary-action mobile-focus-ring"
+                    onClick={closePortfolioFolderEditMode}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="pt-training-modal__primary-action mobile-focus-ring"
+                    onClick={handleSavePortfolioFolderChanges}
+                  >
+                    Save local changes
+                  </button>
+                </div>
+              </div>
+            )}
           </section>
         </div>
       ) : null}

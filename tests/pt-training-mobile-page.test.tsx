@@ -8,7 +8,7 @@ import {
   PT_TRAINING_CUSTOM_FITNESS_ATTRIBUTES_STORAGE_KEY,
   PT_TRAINING_CUSTOM_FITNESS_TARGETS_STORAGE_KEY,
   PT_TRAINING_EXERCISE_DRAFTS_STORAGE_KEY,
-  PT_TRAINING_FOLDER_DRAFTS_STORAGE_KEY,
+  PT_TRAINING_LOCAL_PORTFOLIO_FOLDERS_STORAGE_KEY,
   PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY,
 } from "@/lib/client/pt-training-drafts";
 
@@ -163,6 +163,59 @@ function mockEmptyTrainingFetches() {
   });
 }
 
+function mockTrainingFetchesWithManyFolders() {
+  fetchMock.mockImplementation((input: RequestInfo | URL) => {
+    const url = String(input);
+
+    if (url === "/api/pt/folders") {
+      return jsonResponse({
+        ok: true,
+        data: {
+          items: [
+            { id: "folder-1", name: "Strength", description: "Barbell-first programming", sort_order: 1 },
+            { id: "folder-2", name: "Recovery", description: "Mobility and reset work", sort_order: 2 },
+            { id: "folder-3", name: "Conditioning", description: "Intervals and repeatability", sort_order: 3 },
+            { id: "folder-4", name: "Power", description: "Speed-strength sessions", sort_order: 4 },
+            { id: "folder-5", name: "Hypertrophy", description: "Volume-driven work", sort_order: 5 },
+            { id: "folder-6", name: "Durability", description: "Joint and tissue resilience", sort_order: 6 },
+          ],
+          count: 6,
+        },
+      });
+    }
+
+    if (url === "/api/pt/packages") {
+      return jsonResponse({
+        ok: true,
+        data: {
+          items: [
+            { id: "package-1", folder_id: "folder-1", title: "Strength Camp", description: "Four-week progressive overload block", status: "active", duration_days: 28, is_template: false },
+            { id: "package-2", folder_id: "folder-2", title: "Recovery Reset", description: "Lower-load deload cycle", status: "draft", duration_days: 14, is_template: true },
+            { id: "package-3", folder_id: "folder-3", title: "Conditioning Builder", description: "Engine work", status: "active", duration_days: 21, is_template: false },
+          ],
+          count: 3,
+        },
+      });
+    }
+
+    if (url === "/api/pt/routines") {
+      return jsonResponse({
+        ok: true,
+        data: {
+          items: [
+            { id: "routine-1", folder_id: "folder-1", title: "Deadlift Primer", description: "Posterior-chain prep", difficulty: "advanced", estimated_minutes: 55, is_archived: false },
+            { id: "routine-2", folder_id: "folder-2", title: "Recovery Flow", description: "Breathing and mobility sequence", difficulty: "easy", estimated_minutes: 20, is_archived: false },
+            { id: "routine-3", folder_id: "folder-4", title: "Power Steps", description: "Fast-twitch preparation", difficulty: "medium", estimated_minutes: 35, is_archived: false },
+          ],
+          count: 3,
+        },
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+}
+
 describe("PTTrainingPage mobile experience", () => {
   beforeEach(() => {
     fetchMock.mockReset();
@@ -179,7 +232,7 @@ describe("PTTrainingPage mobile experience", () => {
     vi.stubGlobal("fetch", fetchMock);
   });
 
-  it("renders the portfolio and builder sections, keeps old sections absent, and preserves the real folder accordion", async () => {
+  it("renders the portfolio directory under the header, removes header search/actions, and keeps routine builder access", async () => {
     mockTrainingFetches();
 
     render(React.createElement(PTTrainingPage));
@@ -194,6 +247,9 @@ describe("PTTrainingPage mobile experience", () => {
     expect(screen.getByRole("heading", { name: "PT Training" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/pt/settings");
     expect(screen.getByRole("button", { name: "Sign Out" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Open clients" })).toBeNull();
+    expect(screen.queryByRole("searchbox", { name: "Search PT training" })).toBeNull();
+    expect(screen.queryByText("GO")).toBeNull();
     expect(screen.getAllByRole("heading", { level: 2 })[0]?.textContent).toBe("Training Portfolio");
     expect(screen.queryByRole("heading", { name: "Training overview" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Portfolio cards" })).toBeNull();
@@ -201,81 +257,60 @@ describe("PTTrainingPage mobile experience", () => {
     expect(screen.queryByRole("heading", { name: "Management status" })).toBeNull();
     expect(screen.getByRole("button", { name: "Add an Exercise" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Create a Routine" })).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "Search training portfolios" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit training portfolio display" })).toBeTruthy();
     expect(screen.queryByText("Add A Rep")).toBeNull();
     expect(screen.queryByText("Add A Set")).toBeNull();
     expect(screen.queryByText("Goals and Cues")).toBeNull();
+    expect(screen.queryByText("Local folder drafts")).toBeNull();
+    expect(screen.queryByText("Local draft")).toBeNull();
 
-    const createFolderButton = screen.getByRole("button", { name: "Create New Folder" });
-    expect(createFolderButton.parentElement?.className).toContain("pt-training-create-folder-card-wrap");
-
-    const strengthFolderButton = screen.getByRole("button", { name: "Strength" });
-    const recoveryFolderButton = screen.getByRole("button", { name: "Recovery" });
-    const fetchCallCount = fetchMock.mock.calls.length;
-
-    fireEvent.click(strengthFolderButton);
-
-    await waitFor(() => {
-      expect(strengthFolderButton.getAttribute("aria-expanded")).toBe("true");
-    });
-
-    expect(screen.getByText("Strength Camp")).toBeTruthy();
-    expect(screen.getByText("Deadlift Primer")).toBeTruthy();
-    expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
-
-    fireEvent.click(recoveryFolderButton);
-
-    await waitFor(() => {
-      expect(recoveryFolderButton.getAttribute("aria-expanded")).toBe("true");
-    });
-
-    expect(strengthFolderButton.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.queryByText("Strength Camp")).toBeNull();
-    expect(screen.getByText("Recovery Reset")).toBeTruthy();
-    expect(screen.getByText("Recovery Flow")).toBeTruthy();
-    expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
+    const strengthFolderButton = screen.getByRole("button", { name: "Open training portfolio Strength" });
+    expect(strengthFolderButton.className).toContain("pt-training-folder-row");
+    expect(strengthFolderButton.querySelector(".pt-training-folder-row__thumbnail-placeholder")).toBeTruthy();
+    expect(strengthFolderButton.querySelector(".pt-training-folder-row__action")).toBeTruthy();
+    expect(screen.getAllByText(/Updated /).length).toBeGreaterThan(0);
   });
 
-  it("keeps Create New Folder local-only and separate from the real folder accordion", async () => {
+  it("creates local portfolio folders from the display modal and does not label them as drafts", async () => {
     mockTrainingFetches();
 
     render(React.createElement(PTTrainingPage));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Create New Folder" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Edit training portfolio display" })).toBeTruthy();
     });
 
     const fetchCallCount = fetchMock.mock.calls.length;
 
-    fireEvent.click(screen.getByRole("button", { name: "Create New Folder" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit training portfolio display" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("dialog", { name: "Create New Folder" })).toBeTruthy();
+      expect(screen.getByRole("dialog", { name: "Edit Training Portfolio Display" })).toBeTruthy();
     });
 
-    fireEvent.change(screen.getByLabelText("Folder name"), {
+    const displayDialog = screen.getByRole("dialog", { name: "Edit Training Portfolio Display" });
+    fireEvent.click(within(displayDialog).getByRole("button", { name: "Create New Folder" }));
+    fireEvent.change(within(displayDialog).getByLabelText("Folder name"), {
       target: { value: "Mobility Builder" },
     });
-    fireEvent.change(screen.getByLabelText("Folder note"), {
-      target: { value: "Local-only staging note" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Save local draft" }));
+    fireEvent.click(within(displayDialog).getByRole("button", { name: "Add Folder" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Local folder drafts")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Open training portfolio Mobility Builder" })).toBeTruthy();
     });
 
-    expect(screen.getByText("Mobility Builder")).toBeTruthy();
-    expect(screen.getByText("Local-only staging note")).toBeTruthy();
-    expect(screen.getByText("Local draft")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Mobility Builder" })).toBeNull();
+    expect(screen.getByText("Stored locally")).toBeTruthy();
+    expect(screen.queryByText("Local folder drafts")).toBeNull();
+    expect(screen.queryByText("Local draft")).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
     expect(
-      JSON.parse(window.localStorage.getItem(PT_TRAINING_FOLDER_DRAFTS_STORAGE_KEY) ?? "[]"),
+      JSON.parse(window.localStorage.getItem(PT_TRAINING_LOCAL_PORTFOLIO_FOLDERS_STORAGE_KEY) ?? "[]"),
     ).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          name: "Mobility Builder",
-          note: "Local-only staging note",
+          source: "local",
+          title: "Mobility Builder",
         }),
       ]),
     );
@@ -905,26 +940,117 @@ describe("PTTrainingPage mobile experience", () => {
     expect(screen.getByText("Portfolio folders: Legacy Folder")).toBeTruthy();
   });
 
-  it("filters real folders locally without issuing new requests", async () => {
+  it("shows 5 most recent folders by default, supports pinned display, and enforces the 5-folder pin limit", async () => {
+    mockTrainingFetchesWithManyFolders();
+
+    render(React.createElement(PTTrainingPage));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open training portfolio Strength" })).toBeTruthy();
+    });
+
+    const fetchCallCount = fetchMock.mock.calls.length;
+    expect(screen.queryByRole("button", { name: "Open training portfolio Durability" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit training portfolio display" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Edit Training Portfolio Display" })).toBeTruthy();
+    });
+
+    const displayDialog = screen.getByRole("dialog", { name: "Edit Training Portfolio Display" });
+    fireEvent.click(within(displayDialog).getByRole("radio", { name: "Pinned" }));
+
+    fireEvent.click(within(displayDialog).getByRole("checkbox", { name: "Strength" }));
+    fireEvent.click(within(displayDialog).getByRole("checkbox", { name: "Recovery" }));
+    fireEvent.click(within(displayDialog).getByRole("checkbox", { name: "Conditioning" }));
+    fireEvent.click(within(displayDialog).getByRole("checkbox", { name: "Power" }));
+    fireEvent.click(within(displayDialog).getByRole("checkbox", { name: "Hypertrophy" }));
+    fireEvent.click(within(displayDialog).getByRole("checkbox", { name: "Durability" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Pin up to 5 folders.")).toBeTruthy();
+    });
+
+    fireEvent.click(within(displayDialog).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Edit Training Portfolio Display" })).toBeNull();
+    });
+
+    expect(screen.getByRole("button", { name: "Open training portfolio Strength" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Open training portfolio Durability" })).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
+  });
+
+  it("filters portfolio rows locally by title, tags, and exercises without issuing new requests", async () => {
     mockTrainingFetches();
 
     render(React.createElement(PTTrainingPage));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Strength" })).toBeTruthy();
-      expect(screen.getByRole("button", { name: "Recovery" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Open training portfolio Strength" })).toBeTruthy();
     });
 
-    const searchbox = screen.getByRole("searchbox", { name: "Search PT training" });
     const fetchCallCount = fetchMock.mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Open training portfolio Strength" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Strength" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Folder title")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText("Tags"), {
+      target: { value: "Explosive" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.change(screen.getByLabelText("Exercises"), {
+      target: { value: "Box Jump" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Exercise" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save local changes" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Explosive")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Strength" })).toBeNull();
+    });
+
+    const searchbox = screen.getByRole("searchbox", { name: "Search training portfolios" });
 
     fireEvent.change(searchbox, {
       target: { value: "Recovery" },
     });
 
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Strength" })).toBeNull();
-      expect(screen.getByRole("button", { name: "Recovery" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Open training portfolio Strength" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Open training portfolio Recovery" })).toBeTruthy();
+    });
+
+    fireEvent.change(searchbox, {
+      target: { value: "Explosive" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open training portfolio Strength" })).toBeTruthy();
+    });
+
+    fireEvent.change(searchbox, {
+      target: { value: "Box Jump" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open training portfolio Strength" })).toBeTruthy();
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
