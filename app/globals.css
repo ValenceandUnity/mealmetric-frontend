@@ -4340,12 +4340,13 @@ html[data-theme="light"] .mobile-training-form textarea {
   color: var(--mobile-text-muted);
 }
 
-.pt-training-local-draft-card__portfolio-actions {
+.pt-training-local-draft-card__portfolio-targets {
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
 }
 
+.pt-training-local-draft-card__portfolio-pill,
 .pt-training-local-draft-card__portfolio-button {
   min-height: 2rem;
   padding: 0.35rem 0.7rem;
@@ -4355,6 +4356,15 @@ html[data-theme="light"] .mobile-training-form textarea {
   color: #dbeafe;
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.pt-training-local-draft-card__portfolio-pill {
+  display: inline-flex;
+  align-items: center;
+  box-shadow: none;
+}
+
+.pt-training-local-draft-card__portfolio-button {
   box-shadow: none;
 }
 

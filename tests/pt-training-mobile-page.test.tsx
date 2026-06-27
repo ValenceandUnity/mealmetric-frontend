@@ -861,8 +861,26 @@ describe("PTTrainingPage mobile experience", () => {
 
     expect(screen.getByText("Ready to publish")).toBeTruthy();
     expect(screen.getByText("Portfolio folders: Strength, Recovery, Mobility Builder")).toBeTruthy();
+    const draftEditButton = screen.getByRole("button", { name: "Edit routine draft Updated Builder" });
+    expect(draftEditButton.querySelector("button")).toBeNull();
+    expect(within(draftEditButton).queryByRole("button", { name: "Strength" })).toBeNull();
     expect(screen.getByRole("button", { name: "Strength" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Recovery" })).toBeTruthy();
+    fireEvent.click(screen.getByText("Mobility Builder"));
+    expect(screen.queryByRole("dialog", { name: "Create a Routine" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Strength" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Strength" })).toBeTruthy();
+    });
+
+    expect(screen.queryByRole("dialog", { name: "Create a Routine" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Strength" })).toBeNull();
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Remove local routine draft Updated Builder" }));
 
@@ -871,6 +889,7 @@ describe("PTTrainingPage mobile experience", () => {
     });
 
     expect(screen.getByText("Are you sure you want to Remove this Draft")).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Create a Routine" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.getByText("Updated Builder")).toBeTruthy();
 
