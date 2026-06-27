@@ -687,6 +687,18 @@ function upsertRepAssetIntoAllSingularExercisesFolder(
   });
 }
 
+function findPublishTargetLocalFolderIndex(
+  folders: LocalPTPortfolioFolder[],
+  target: LocalPTRoutineDraftPublishTarget,
+) {
+  return folders.findIndex(
+    (folder) =>
+      folder.id !== SYSTEM_ALL_SINGULAR_EXERCISES_FOLDER_ID &&
+      (folder.id === target.id ||
+        normalizeOptionValue(folder.title) === normalizeOptionValue(target.name)),
+  );
+}
+
 function removeLegacyRoutineExerciseStrings(
   exercises: string[],
   draft: LocalPTRoutineDraft,
@@ -723,6 +735,25 @@ function repairPublishedRoutineDraftAssets(input: {
     let assetPlaced = false;
 
     targets.forEach((target) => {
+      const localFolderIndex = findPublishTargetLocalFolderIndex(nextLocalFolders, target);
+      if (localFolderIndex >= 0) {
+        const folder = nextLocalFolders[localFolderIndex];
+        const nextAssets = appendUniquePortfolioAsset(folder.assets, routineAsset);
+        if (nextAssets !== folder.assets) {
+          nextLocalFolders[localFolderIndex] = {
+            ...folder,
+            source: folder.source,
+            title: target.name.trim() || folder.title,
+            assets: nextAssets,
+            exercises: removeLegacyRoutineExerciseStrings(folder.exercises, draft),
+            updatedAt: routineAsset.updatedAt,
+          };
+          changed = true;
+        }
+        assetPlaced = true;
+        return;
+      }
+
       if (target.type === "existing-folder" && target.id) {
         const overlayIndex = nextOverlays.findIndex((overlay) => overlay.id === target.id);
         if (overlayIndex >= 0) {
@@ -755,30 +786,6 @@ function repairPublishedRoutineDraftAssets(input: {
         ];
         assetPlaced = true;
         changed = true;
-        return;
-      }
-
-      const localFolderIndex = nextLocalFolders.findIndex(
-        (folder) =>
-          folder.id === target.id ||
-          normalizeOptionValue(folder.title) === normalizeOptionValue(target.name),
-      );
-
-      if (localFolderIndex >= 0) {
-        const folder = nextLocalFolders[localFolderIndex];
-        const nextAssets = appendUniquePortfolioAsset(folder.assets, routineAsset);
-      if (nextAssets !== folder.assets) {
-        nextLocalFolders[localFolderIndex] = {
-          ...folder,
-          source: folder.source,
-          title: target.name.trim() || folder.title,
-          assets: nextAssets,
-          exercises: removeLegacyRoutineExerciseStrings(folder.exercises, draft),
-          updatedAt: routineAsset.updatedAt,
-        };
-          changed = true;
-        }
-        assetPlaced = true;
         return;
       }
 
@@ -2685,6 +2692,19 @@ export default function PTTrainingPage() {
     let nextOverlays = [...portfolioFolderOverlays];
 
     selectedTargets.forEach((target) => {
+      const localFolderIndex = findPublishTargetLocalFolderIndex(nextFolders, target);
+      if (localFolderIndex >= 0) {
+        const folder = nextFolders[localFolderIndex];
+        nextFolders[localFolderIndex] = {
+          ...folder,
+          source: folder.source,
+          title: target.name.trim() || folder.title,
+          assets: upsertPortfolioAsset(folder.assets, repAsset),
+          updatedAt,
+        };
+        return;
+      }
+
       if (target.type === "existing-folder" && target.id) {
         const overlayIndex = nextOverlays.findIndex((overlay) => overlay.id === target.id);
         if (overlayIndex >= 0) {
@@ -2709,24 +2729,6 @@ export default function PTTrainingPage() {
           },
           ...nextOverlays,
         ];
-        return;
-      }
-
-      const localFolderIndex = nextFolders.findIndex(
-        (folder) =>
-          folder.id === target.id ||
-          normalizeOptionValue(folder.title) === normalizeOptionValue(target.name),
-      );
-
-      if (localFolderIndex >= 0) {
-        const folder = nextFolders[localFolderIndex];
-        nextFolders[localFolderIndex] = {
-          ...folder,
-          source: folder.source,
-          title: target.name.trim() || folder.title,
-          assets: upsertPortfolioAsset(folder.assets, repAsset),
-          updatedAt,
-        };
         return;
       }
 
@@ -2962,6 +2964,20 @@ export default function PTTrainingPage() {
     let nextOverlays = [...portfolioFolderOverlays];
 
     selectedTargets.forEach((target) => {
+      const localFolderIndex = findPublishTargetLocalFolderIndex(nextFolders, target);
+      if (localFolderIndex >= 0) {
+        const folder = nextFolders[localFolderIndex];
+        nextFolders[localFolderIndex] = {
+          ...folder,
+          source: folder.source,
+          title: target.name.trim() || folder.title,
+          assets: appendUniquePortfolioAsset(folder.assets, routineAsset),
+          exercises: removeLegacyRoutineExerciseStrings(folder.exercises, publishingRoutineDraft),
+          updatedAt,
+        };
+        return;
+      }
+
       if (target.type === "existing-folder" && target.id) {
         const overlayIndex = nextOverlays.findIndex((overlay) => overlay.id === target.id);
         if (overlayIndex >= 0) {
@@ -2987,25 +3003,6 @@ export default function PTTrainingPage() {
           },
           ...nextOverlays,
         ];
-        return;
-      }
-
-      const localFolderIndex = nextFolders.findIndex(
-        (folder) =>
-          folder.id === target.id ||
-          normalizeOptionValue(folder.title) === normalizeOptionValue(target.name),
-      );
-
-      if (localFolderIndex >= 0) {
-        const folder = nextFolders[localFolderIndex];
-        nextFolders[localFolderIndex] = {
-          ...folder,
-          source: folder.source,
-          title: target.name.trim() || folder.title,
-          assets: appendUniquePortfolioAsset(folder.assets, routineAsset),
-          exercises: removeLegacyRoutineExerciseStrings(folder.exercises, publishingRoutineDraft),
-          updatedAt,
-        };
         return;
       }
 
@@ -5415,13 +5412,6 @@ export default function PTTrainingPage() {
                     </button>
                     <button
                       type="button"
-                      className="pt-training-modal__secondary-action mobile-focus-ring"
-                      onClick={closeExerciseDraftFolderPicker}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
                       className="pt-training-modal__primary-action mobile-focus-ring"
                       onClick={closeExerciseDraftFolderPicker}
                     >
@@ -5494,22 +5484,24 @@ export default function PTTrainingPage() {
                 </p>
               ) : null}
 
-              <div className="pt-training-modal__actions pt-training-modal__actions--centered">
-                <button
-                  type="button"
-                  className="pt-training-modal__secondary-action mobile-focus-ring"
-                  onClick={closeExerciseDraftPublishDialog}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="pt-training-modal__primary-action mobile-focus-ring"
-                  onClick={confirmExerciseDraftPublish}
-                >
-                  Publish Exercise
-                </button>
-              </div>
+              {!exerciseDraftPublishDialog.folderPickerOpen ? (
+                <div className="pt-training-modal__actions pt-training-modal__actions--centered">
+                  <button
+                    type="button"
+                    className="pt-training-modal__secondary-action mobile-focus-ring"
+                    onClick={closeExerciseDraftPublishDialog}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="pt-training-modal__primary-action mobile-focus-ring"
+                    onClick={confirmExerciseDraftPublish}
+                  >
+                    Publish Exercise
+                  </button>
+                </div>
+              ) : null}
             </div>
           </section>
         </div>
