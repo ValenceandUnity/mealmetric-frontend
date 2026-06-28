@@ -5096,6 +5096,78 @@ html[data-theme="light"] .mobile-training-form textarea {
   line-height: 1.4;
 }
 
+.pt-training-routine-exercise-tags {
+  min-width: 0;
+}
+
+.pt-training-routine-exercise-tags__input-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.pt-training-routine-exercise-tags__input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.pt-training-routine-exercise-tags__add {
+  flex: 0 0 auto;
+}
+
+.pt-training-routine-exercise-tags__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+}
+
+.pt-training-routine-exercise-tags__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: 100%;
+  min-height: 2rem;
+  padding: 0.2rem 0.3rem 0.2rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  background: rgba(37, 99, 235, 0.16);
+  color: #dbeafe;
+}
+
+.pt-training-routine-exercise-tags__tag-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.pt-training-routine-exercise-tags__tag-remove {
+  flex: 0 0 auto;
+  width: 1.5rem;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  min-height: 1.5rem;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: none;
+}
+
+.pt-training-routine-exercise-tags__detail {
+  display: grid;
+  gap: 0.45rem;
+}
+
 .pt-training-routine-form__add-option-dialog {
   width: min(100%, 22rem);
 }
