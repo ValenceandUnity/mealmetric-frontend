@@ -105,6 +105,8 @@ type RoutineExerciseRow = {
   repGoal: string;
   instructions: string;
   weightsInvolved: boolean;
+  tags: string[];
+  tagInput: string;
   media?: PTTrainingDraftMedia | null;
 };
 
@@ -541,6 +543,7 @@ function buildRoutineAssetFromDraft(
       repGoal: typeof exercise.repGoal === "number" ? String(exercise.repGoal) : "",
       instructions: exercise.instructions,
       weightsInvolved: exercise.weightsInvolved,
+      tags: exercise.tags,
       media: exercise.media,
     })),
     sourceDraftId: draft.id,
@@ -582,6 +585,7 @@ function assetSearchFields(asset: LocalPTPortfolioAsset) {
         exercise.exerciseName,
         exercise.repGoal,
         exercise.instructions,
+        ...exercise.tags,
         exercise.media?.name,
       ]),
     ].filter((value): value is string => Boolean(value));
@@ -626,6 +630,8 @@ function createRoutineExerciseRow(): RoutineExerciseRow {
     repGoal: "",
     instructions: "",
     weightsInvolved: false,
+    tags: [],
+    tagInput: "",
     media: null,
   };
 }
@@ -2151,6 +2157,8 @@ export default function PTTrainingPage() {
             repGoal: typeof exercise.repGoal === "number" ? String(exercise.repGoal) : "",
             instructions: exercise.instructions,
             weightsInvolved: exercise.weightsInvolved,
+            tags: exercise.tags,
+            tagInput: "",
             media: exercise.media ?? null,
           }))
         : [createRoutineExerciseRow()],
@@ -2328,6 +2336,49 @@ export default function PTTrainingPage() {
     setActiveRoutineExerciseIndex(routineRows.length);
   }
 
+  function handleAddRoutineExerciseTag(rowId: string) {
+    setRoutineRows((current) =>
+      current.map((row) => {
+        if (row.id !== rowId) {
+          return row;
+        }
+
+        const trimmed = row.tagInput.trim();
+        if (!trimmed) {
+          return row;
+        }
+
+        if (row.tags.some((tag) => normalizeOptionValue(tag) === normalizeOptionValue(trimmed))) {
+          return {
+            ...row,
+            tagInput: "",
+          };
+        }
+
+        return {
+          ...row,
+          tags: [...row.tags, trimmed],
+          tagInput: "",
+        };
+      }),
+    );
+  }
+
+  function removeRoutineExerciseTag(rowId: string, tag: string) {
+    setRoutineRows((current) =>
+      current.map((row) => {
+        if (row.id !== rowId) {
+          return row;
+        }
+
+        return {
+          ...row,
+          tags: row.tags.filter((item) => normalizeOptionValue(item) !== normalizeOptionValue(tag)),
+        };
+      }),
+    );
+  }
+
   function handleAddRoutineTag() {
     const trimmed = routineTagInput.trim();
     if (!trimmed) {
@@ -2352,6 +2403,7 @@ export default function PTTrainingPage() {
           row.repGoal.trim().length > 0 ||
           row.instructions.trim().length > 0 ||
           row.weightsInvolved ||
+          row.tags.length > 0 ||
           Boolean(row.media),
       )
       .map((row) => ({
@@ -2360,6 +2412,7 @@ export default function PTTrainingPage() {
         repGoal: row.repGoal.trim().length > 0 ? Number(row.repGoal) : undefined,
         instructions: row.instructions,
         weightsInvolved: row.weightsInvolved,
+        tags: row.tags,
         media: row.media ?? null,
       }));
   }
@@ -4033,6 +4086,20 @@ export default function PTTrainingPage() {
                               <p className="pt-training-portfolio-list-description">
                                 Weights involved: {exercise.weightsInvolved ? "Yes" : "No"}
                               </p>
+                              {exercise.tags.length > 0 ? (
+                                <div className="pt-training-routine-exercise-tags__detail">
+                                  <p className="pt-training-portfolio-list-description">Tags</p>
+                                  <div className="pt-training-routine-exercise-tags__list">
+                                    {exercise.tags.map((tag) => (
+                                      <span key={tag} className="pt-training-routine-exercise-tags__tag">
+                                        <span className="pt-training-routine-exercise-tags__tag-label">
+                                          {tag}
+                                        </span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
                               {exercise.media ? (
                                 <div className="pt-training-media-picker__preview">
                                   {renderTrainingMediaPreview(
@@ -5141,6 +5208,53 @@ export default function PTTrainingPage() {
                             {routineRowErrors[activeRoutineRow.id]?.instructions}
                           </p>
                         ) : null}
+                      </div>
+
+                      <div className="pt-training-builder-form__field pt-training-routine-exercise-tags">
+                        <label htmlFor={`pt-training-routine-tag-input-${activeRoutineRow.id}`}>Tags</label>
+                        <div className="pt-training-routine-exercise-tags__input-row">
+                          <input
+                            id={`pt-training-routine-tag-input-${activeRoutineRow.id}`}
+                            className="pt-training-routine-exercise-tags__input"
+                            placeholder="Add exercise tag"
+                            value={activeRoutineRow.tagInput}
+                            onChange={(event) => {
+                              handleRoutineRowChange(activeRoutineRow.id, "tagInput", event.target.value);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="pt-training-modal__secondary-action pt-training-routine-exercise-tags__add mobile-focus-ring"
+                            onClick={() => {
+                              handleAddRoutineExerciseTag(activeRoutineRow.id);
+                            }}
+                          >
+                            Add
+                          </button>
+                        </div>
+                        {activeRoutineRow.tags.length > 0 ? (
+                          <div className="pt-training-routine-exercise-tags__list">
+                            {activeRoutineRow.tags.map((tag) => (
+                              <span key={tag} className="pt-training-routine-exercise-tags__tag">
+                                <span className="pt-training-routine-exercise-tags__tag-label">{tag}</span>
+                                <button
+                                  type="button"
+                                  className="pt-training-routine-exercise-tags__tag-remove mobile-focus-ring"
+                                  aria-label={`Remove ${tag} tag`}
+                                  onClick={() => {
+                                    removeRoutineExerciseTag(activeRoutineRow.id, tag);
+                                  }}
+                                >
+                                  X
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="pt-training-builder-form__helper">
+                            Add local-only tags to help search and organize this exercise row.
+                          </p>
+                        )}
                       </div>
 
                       <fieldset className="pt-training-builder-form__field pt-training-builder-form__toggle-field">

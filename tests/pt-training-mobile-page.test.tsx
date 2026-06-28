@@ -1044,6 +1044,8 @@ describe("PTTrainingPage mobile experience", () => {
       expect(screen.getByText("Routine Exercises")).toBeTruthy();
     });
 
+    expect(screen.getByLabelText("Tags")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add" })).toBeTruthy();
     const pageTwoActions = screen.getByRole("button", { name: "Back" }).closest("div");
     expect(pageTwoActions?.className).toContain("pt-training-modal__actions--centered");
     expect(
@@ -1135,6 +1137,148 @@ describe("PTTrainingPage mobile experience", () => {
 
     expect(screen.queryByRole("dialog", { name: "Add Media" })).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
+  });
+
+  it("adds page-two exercise tags locally, keeps them scoped per exercise row, and saves them with routine drafts", async () => {
+    mockTrainingFetches();
+
+    render(React.createElement(PTTrainingPage));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Create a Routine" })).toBeTruthy();
+    });
+
+    const fetchCallCount = fetchMock.mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Create a Routine" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Create a Routine" })).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText("Routine name"), {
+      target: { value: "Tagged Builder" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Next: Add Exercises" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Routine Exercises")).toBeTruthy();
+    });
+
+    expect(screen.getByLabelText("Exercise")).toBeTruthy();
+    expect(screen.getByLabelText("Rep Goal")).toBeTruthy();
+    expect(screen.getByLabelText("Instructions")).toBeTruthy();
+    expect(screen.getByText("Weights Involved?")).toBeTruthy();
+    expect(screen.getByText("Media")).toBeTruthy();
+    const exerciseTagInput = screen.getByLabelText("Tags") as HTMLInputElement;
+    expect(exerciseTagInput.placeholder).toBe("Add exercise tag");
+    expect(screen.getByRole("button", { name: "Add" })).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Exercise"), {
+      target: { value: "Bench Press" },
+    });
+    fireEvent.change(exerciseTagInput, {
+      target: { value: "Chest" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Chest")).toBeTruthy();
+    });
+
+    expect(exerciseTagInput.value).toBe("");
+    expect(screen.queryByRole("button", { name: "Chest" })).toBeNull();
+    fireEvent.click(screen.getByText("Chest"));
+    fireEvent.click(screen.getByText("Chest").closest(".pt-training-routine-exercise-tags__tag") as HTMLElement);
+
+    await waitFor(() => {
+      expect(screen.getByText("Chest")).toBeTruthy();
+    });
+
+    fireEvent.change(exerciseTagInput, {
+      target: { value: "chest" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(screen.getAllByText("Chest")).toHaveLength(1);
+    expect(exerciseTagInput.value).toBe("");
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Another Exercise" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Exercise 2")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText("Exercise"), {
+      target: { value: "Squat" },
+    });
+    const secondExerciseTagInput = screen.getByLabelText("Tags") as HTMLInputElement;
+    fireEvent.change(secondExerciseTagInput, {
+      target: { value: "Legs" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Legs")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous exercise" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Exercise 1 of 2")).toBeTruthy();
+    });
+
+    expect((screen.getByLabelText("Exercise") as HTMLInputElement).value).toBe("Bench Press");
+    expect(screen.getByText("Chest")).toBeTruthy();
+    expect(screen.queryByText("Legs")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next exercise" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Exercise 2 of 2")).toBeTruthy();
+    });
+
+    expect((screen.getByLabelText("Exercise") as HTMLInputElement).value).toBe("Squat");
+    expect(screen.getByText("Legs")).toBeTruthy();
+    expect(screen.queryByText("Chest")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Legs tag" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Legs")).toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove exercise row" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Exercise 2 of 2")).toBeNull();
+    });
+
+    expect((screen.getByLabelText("Exercise") as HTMLInputElement).value).toBe("Bench Press");
+    expect(screen.getByText("Chest")).toBeTruthy();
+    expect(screen.queryByText("Legs")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Routine Draft" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Training Draft Queue (1)")).toBeTruthy();
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
+    expect(
+      JSON.parse(window.localStorage.getItem(PT_TRAINING_ROUTINE_DRAFTS_STORAGE_KEY) ?? "[]"),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          routineName: "Tagged Builder",
+          exercises: [
+            expect.objectContaining({
+              exerciseName: "Bench Press",
+              tags: ["Chest"],
+            }),
+          ],
+        }),
+      ]),
+    );
   });
 
   it("supports Page 2 autosuggest, centers Add Another Exercise, and shows navigation arrows only after multiple exercises exist", async () => {
@@ -1392,6 +1536,15 @@ describe("PTTrainingPage mobile experience", () => {
     fireEvent.change(screen.getByLabelText("Instructions"), {
       target: { value: "Drive through the full range." },
     });
+    fireEvent.change(screen.getByLabelText("Tags"), {
+      target: { value: "Pressing" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Pressing")).toBeTruthy();
+    });
+
     fireEvent.click(screen.getByRole("button", { name: "Add Media" }));
 
     await waitFor(() => {
@@ -1437,6 +1590,7 @@ describe("PTTrainingPage mobile experience", () => {
         expect.objectContaining({
           exercises: expect.arrayContaining([
             expect.objectContaining({
+              tags: ["Pressing"],
               media: expect.objectContaining({
                 kind: "image",
                 name: "push-up-demo.png",
@@ -1552,6 +1706,7 @@ describe("PTTrainingPage mobile experience", () => {
     expect(within(updatedBuilderDialog).getByText("Push Up")).toBeTruthy();
     expect(within(updatedBuilderDialog).getByText("Rep goal: 12")).toBeTruthy();
     expect(within(updatedBuilderDialog).getByText("Drive through the full range.")).toBeTruthy();
+    expect(within(updatedBuilderDialog).getByText("Pressing")).toBeTruthy();
     expect(within(updatedBuilderDialog).getByText(/builder-cover\.png/)).toBeTruthy();
     expect(within(updatedBuilderDialog).getByText("Media: push-up-demo.png")).toBeTruthy();
     expect(within(updatedBuilderDialog).queryByText(/Set amount:/)).toBeNull();
@@ -1616,6 +1771,14 @@ describe("PTTrainingPage mobile experience", () => {
 
     fireEvent.change(searchbox, {
       target: { value: "Mobility" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open training portfolio Mobility Builder" })).toBeTruthy();
+    });
+
+    fireEvent.change(searchbox, {
+      target: { value: "Pressing" },
     });
 
     await waitFor(() => {

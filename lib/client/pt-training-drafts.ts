@@ -53,6 +53,7 @@ export type LocalPTPortfolioAssetExercise = {
   repGoal: string;
   instructions: string;
   weightsInvolved: boolean;
+  tags: string[];
   media?: PTTrainingDraftMedia | null;
 };
 
@@ -129,6 +130,7 @@ export type LocalPTRoutineExerciseDraft = {
   repGoal?: number;
   instructions: string;
   weightsInvolved: boolean;
+  tags: string[];
   media?: PTTrainingDraftMedia | null;
 };
 
@@ -344,6 +346,7 @@ function normalizePortfolioAssetExercise(
         : exercise.repGoal?.toString().trim() ?? "",
     instructions: exercise.instructions?.trim() ?? "",
     weightsInvolved: Boolean(exercise.weightsInvolved),
+    tags: normalizeStringArray(exercise.tags),
     media: normalizeDraftMedia(exercise.media),
   };
 }
@@ -684,6 +687,7 @@ export function readLocalPTRoutineDrafts(): LocalPTRoutineDraft[] {
             repGoal: typeof exercise.repGoal === "number" ? exercise.repGoal : undefined,
             instructions: exercise.instructions?.trim() ?? "",
             weightsInvolved: Boolean(exercise.weightsInvolved),
+            tags: normalizeStringArray(exercise.tags),
             media: normalizeDraftMedia(exercise.media),
           }))
         : [],
@@ -760,6 +764,7 @@ export function createLocalPTRoutineDraft(input: {
       repGoal: exercise.repGoal,
       instructions: exercise.instructions.trim(),
       weightsInvolved: exercise.weightsInvolved,
+      tags: normalizeStringArray(exercise.tags),
       media: normalizeDraftMedia(exercise.media),
     })),
     createdAt,
