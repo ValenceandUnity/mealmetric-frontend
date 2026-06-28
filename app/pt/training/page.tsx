@@ -97,10 +97,6 @@ type ExerciseFormErrors = {
 
 type RoutineDetailsErrors = {
   routineName?: string;
-  description?: string;
-  fitnessTargets?: string;
-  fitnessAttributes?: string;
-  setAmount?: string;
 };
 
 type RoutineExerciseRow = {
@@ -185,6 +181,9 @@ type ExerciseDraftPublishDialogState = {
 type MediaPickerTargetState =
   | {
       kind: "exercise-draft";
+    }
+  | {
+      kind: "routine-draft";
     }
   | {
       kind: "rep-asset-edit";
@@ -529,12 +528,17 @@ function buildRoutineAssetFromDraft(
     description: draft.description,
     fitnessTargets: draft.fitnessTargets,
     fitnessAttributes: draft.fitnessAttributes,
+    tags: draft.tags,
+    media: draft.media,
     timedByDuration: draft.timedByDuration,
-    setAmount: String(draft.setAmount),
+    setAmount:
+      typeof draft.setAmount === "number" && Number.isFinite(draft.setAmount)
+        ? String(draft.setAmount)
+        : undefined,
     exercises: draft.exercises.map((exercise) => ({
       id: exercise.id,
       exerciseName: exercise.exerciseName,
-      repGoal: String(exercise.repGoal),
+      repGoal: typeof exercise.repGoal === "number" ? String(exercise.repGoal) : "",
       instructions: exercise.instructions,
       weightsInvolved: exercise.weightsInvolved,
       media: exercise.media,
@@ -572,6 +576,8 @@ function assetSearchFields(asset: LocalPTPortfolioAsset) {
       asset.description,
       ...asset.fitnessTargets,
       ...asset.fitnessAttributes,
+      ...asset.tags,
+      asset.media?.name,
       ...asset.exercises.flatMap((exercise) => [
         exercise.exerciseName,
         exercise.repGoal,
@@ -866,8 +872,10 @@ export default function PTTrainingPage() {
   const [routineDescription, setRoutineDescription] = useState("");
   const [fitnessTargets, setFitnessTargets] = useState<string[]>([]);
   const [fitnessAttributes, setFitnessAttributes] = useState<string[]>([]);
+  const [routineTags, setRoutineTags] = useState<string[]>([]);
+  const [routineTagInput, setRoutineTagInput] = useState("");
+  const [routineMedia, setRoutineMedia] = useState<PTTrainingDraftMedia | null>(null);
   const [timedByDuration, setTimedByDuration] = useState(false);
-  const [setAmount, setSetAmount] = useState("");
   const [routineRows, setRoutineRows] = useState<RoutineExerciseRow[]>([createRoutineExerciseRow()]);
   const [activeRoutineExerciseIndex, setActiveRoutineExerciseIndex] = useState(0);
   const [routineDetailsErrors, setRoutineDetailsErrors] = useState<RoutineDetailsErrors>({});
@@ -1121,8 +1129,10 @@ export default function PTTrainingPage() {
       setRoutineDescription("");
       setFitnessTargets([]);
       setFitnessAttributes([]);
+      setRoutineTags([]);
+      setRoutineTagInput("");
+      setRoutineMedia(null);
       setTimedByDuration(false);
-      setSetAmount("");
       setRoutineRows([createRoutineExerciseRow()]);
       setActiveRoutineExerciseIndex(0);
       setRoutineDetailsErrors({});
@@ -1790,6 +1800,11 @@ export default function PTTrainingPage() {
     setMediaPickerTarget({ kind: "exercise-draft" });
   }
 
+  function openMediaPickerForRoutineDraft() {
+    setMediaPickerError(null);
+    setMediaPickerTarget({ kind: "routine-draft" });
+  }
+
   function openMediaPickerForRepAssetEdit() {
     setMediaPickerError(null);
     setMediaPickerTarget({ kind: "rep-asset-edit" });
@@ -1814,6 +1829,10 @@ export default function PTTrainingPage() {
       return exerciseMedia;
     }
 
+    if (mediaPickerTarget.kind === "routine-draft") {
+      return routineMedia;
+    }
+
     if (mediaPickerTarget.kind === "rep-asset-edit") {
       return portfolioRepAssetEditForm?.media ?? null;
     }
@@ -1828,6 +1847,11 @@ export default function PTTrainingPage() {
 
     if (mediaPickerTarget.kind === "exercise-draft") {
       setExerciseMedia(media);
+      return;
+    }
+
+    if (mediaPickerTarget.kind === "routine-draft") {
+      setRoutineMedia(media);
       return;
     }
 
@@ -2082,8 +2106,10 @@ export default function PTTrainingPage() {
     setRoutineDescription("");
     setFitnessTargets([]);
     setFitnessAttributes([]);
+    setRoutineTags([]);
+    setRoutineTagInput("");
+    setRoutineMedia(null);
     setTimedByDuration(false);
-    setSetAmount("");
     setRoutineRows([createRoutineExerciseRow()]);
     setActiveRoutineExerciseIndex(0);
     setRoutineDetailsErrors({});
@@ -2109,14 +2135,16 @@ export default function PTTrainingPage() {
     setRoutineDescription(draft.description);
     setFitnessTargets(draft.fitnessTargets);
     setFitnessAttributes(draft.fitnessAttributes);
+    setRoutineTags(draft.tags);
+    setRoutineTagInput("");
+    setRoutineMedia(draft.media ?? null);
     setTimedByDuration(draft.timedByDuration);
-    setSetAmount(String(draft.setAmount));
     setRoutineRows(
       draft.exercises.length > 0
         ? draft.exercises.map((exercise) => ({
             id: exercise.id,
             exerciseName: exercise.exerciseName,
-            repGoal: String(exercise.repGoal),
+            repGoal: typeof exercise.repGoal === "number" ? String(exercise.repGoal) : "",
             instructions: exercise.instructions,
             weightsInvolved: exercise.weightsInvolved,
             media: exercise.media ?? null,
@@ -2189,7 +2217,6 @@ export default function PTTrainingPage() {
       writeLocalPTCustomFitnessTargets(nextCustomTargets);
       if (routineOptionDialogKind.scope === "routine") {
         setFitnessTargets((current) => [...current, trimmed]);
-        setRoutineDetailsErrors((current) => ({ ...current, fitnessTargets: undefined }));
       } else if (routineOptionDialogKind.scope === "exercise") {
         setExerciseFitnessTargets((current) => [...current, trimmed]);
       } else {
@@ -2218,7 +2245,6 @@ export default function PTTrainingPage() {
     writeLocalPTCustomFitnessAttributes(nextCustomAttributes);
     if (routineOptionDialogKind.scope === "routine") {
       setFitnessAttributes((current) => [...current, trimmed]);
-      setRoutineDetailsErrors((current) => ({ ...current, fitnessAttributes: undefined }));
     } else if (routineOptionDialogKind.scope === "exercise") {
       setExerciseFitnessAttributes((current) => [...current, trimmed]);
     } else {
@@ -2238,51 +2264,13 @@ export default function PTTrainingPage() {
       nextErrors.routineName = "Routine name is required.";
     }
 
-    if (routineDescription.trim().length === 0) {
-      nextErrors.description = "Description is required.";
-    }
-
-    if (fitnessTargets.length === 0) {
-      nextErrors.fitnessTargets = "Select at least one Fitness Target.";
-    }
-
-    if (fitnessAttributes.length === 0) {
-      nextErrors.fitnessAttributes = "Select at least one Fitness Attribute.";
-    }
-
-    if (setAmount.trim().length === 0) {
-      nextErrors.setAmount = "How many Sets? is required.";
-    }
-
     setRoutineDetailsErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
 
   function validateRoutineRows() {
-    const nextErrors: Record<string, RoutineExerciseRowErrors> = {};
-
-    routineRows.forEach((row) => {
-      const rowErrors: RoutineExerciseRowErrors = {};
-
-      if (row.exerciseName.trim().length === 0) {
-        rowErrors.exerciseName = "Exercise is required.";
-      }
-
-      if (row.repGoal.trim().length === 0) {
-        rowErrors.repGoal = "Rep Goal is required.";
-      }
-
-      if (row.instructions.trim().length === 0) {
-        rowErrors.instructions = "Instructions are required.";
-      }
-
-      if (Object.keys(rowErrors).length > 0) {
-        nextErrors[row.id] = rowErrors;
-      }
-    });
-
-    setRoutineRowErrors(nextErrors);
-    return nextErrors;
+    setRoutineRowErrors({});
+    return {} as Record<string, RoutineExerciseRowErrors>;
   }
 
   function handleRoutineNextPage() {
@@ -2336,6 +2324,42 @@ export default function PTTrainingPage() {
     setActiveRoutineExerciseIndex(routineRows.length);
   }
 
+  function handleAddRoutineTag() {
+    const trimmed = routineTagInput.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    setRoutineTags((current) => dedupeStringValues([...current, trimmed]));
+    setRoutineTagInput("");
+  }
+
+  function removeRoutineTag(tag: string) {
+    setRoutineTags((current) =>
+      current.filter((item) => normalizeOptionValue(item) !== normalizeOptionValue(tag)),
+    );
+  }
+
+  function buildRoutineDraftRows() {
+    return routineRows
+      .filter(
+        (row) =>
+          row.exerciseName.trim().length > 0 ||
+          row.repGoal.trim().length > 0 ||
+          row.instructions.trim().length > 0 ||
+          row.weightsInvolved ||
+          Boolean(row.media),
+      )
+      .map((row) => ({
+        id: row.id,
+        exerciseName: row.exerciseName,
+        repGoal: row.repGoal.trim().length > 0 ? Number(row.repGoal) : undefined,
+        instructions: row.instructions,
+        weightsInvolved: row.weightsInvolved,
+        media: row.media ?? null,
+      }));
+  }
+
   function handleRemoveRoutineExerciseRow(rowId: string) {
     const removeIndex = routineRows.findIndex((row) => row.id === rowId);
     const nextRows = routineRows.filter((row) => row.id !== rowId);
@@ -2376,16 +2400,10 @@ export default function PTTrainingPage() {
       description: routineDescription,
       fitnessTargets,
       fitnessAttributes,
+      tags: routineTags,
+      media: routineMedia,
       timedByDuration,
-      setAmount: Number(setAmount),
-      exercises: routineRows.map((row) => ({
-        id: row.id,
-        exerciseName: row.exerciseName,
-        repGoal: Number(row.repGoal),
-        instructions: row.instructions,
-        weightsInvolved: row.weightsInvolved,
-        media: row.media ?? null,
-      })),
+      exercises: buildRoutineDraftRows(),
       createdAt: existingDraft?.createdAt,
       editedAt: overrides?.editedAt ?? new Date().toISOString(),
       publishStatus: overrides?.publishStatus ?? existingDraft?.publishStatus,
@@ -3356,10 +3374,20 @@ export default function PTTrainingPage() {
                               <p className="pt-training-local-draft-card__meta">
                                 Fitness attributes: {formatSummaryList(draft.fitnessAttributes)}
                               </p>
+                              {draft.tags.length > 0 ? (
+                                <p className="pt-training-local-draft-card__meta">
+                                  Tags: {formatSummaryList(draft.tags)}
+                                </p>
+                              ) : null}
                               <p className="pt-training-local-draft-card__note">
-                                Set amount: {draft.setAmount} | Exercise count: {draft.exercises.length}
+                                Exercise count: {draft.exercises.length}
                                 {draft.timedByDuration ? " | Timed by duration: Yes" : " | Timed by duration: No"}
                               </p>
+                              {draft.media ? (
+                                <p className="pt-training-local-draft-card__note">
+                                  Media: {draft.media.name}
+                                </p>
+                              ) : null}
                               {draft.publishStatus === "ready" ? (
                                 <>
                                   <p className="pt-training-local-draft-card__status">
@@ -3954,12 +3982,36 @@ export default function PTTrainingPage() {
                   <p className="pt-training-builder-form__helper">
                     Fitness attributes: {formatSummaryList(selectedPortfolioAssetRecord.fitnessAttributes)}
                   </p>
+                  {selectedPortfolioAssetRecord.tags.length > 0 ? (
+                    <div className="pt-training-builder-form__field">
+                      <label>Tags</label>
+                      <div className="pt-training-folder-edit__tags">
+                        {selectedPortfolioAssetRecord.tags.map((tag) => (
+                          <span key={tag} className="pt-training-folder-edit__tag">
+                            <span className="pt-training-folder-edit__tag-label">{tag}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <p className="pt-training-builder-form__helper">
                     Timed by duration: {selectedPortfolioAssetRecord.timedByDuration ? "Yes" : "No"}
                   </p>
-                  <p className="pt-training-builder-form__helper">
-                    Set amount: {selectedPortfolioAssetRecord.setAmount || "Not set"}
-                  </p>
+                  {selectedPortfolioAssetRecord.media ? (
+                    <div className="pt-training-builder-form__field">
+                      <label>Media</label>
+                      <div className="pt-training-media-picker__preview">
+                        {renderTrainingMediaPreview(
+                          selectedPortfolioAssetRecord.media,
+                          "pt-training-media-picker__preview-media",
+                        )}
+                        <p className="pt-training-builder-form__helper">
+                          {selectedPortfolioAssetRecord.media.name} (
+                          {formatMediaSize(selectedPortfolioAssetRecord.media.size)})
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="pt-training-builder-form__field">
                     <label>Exercises</label>
                     {selectedPortfolioAssetRecord.exercises.length > 0 ? (
@@ -4772,15 +4824,9 @@ export default function PTTrainingPage() {
                       value={routineDescription}
                       onChange={(event) => {
                         setRoutineDescription(event.target.value);
-                        setRoutineDetailsErrors((current) => ({ ...current, description: undefined }));
                       }}
                       rows={4}
                     />
-                    {routineDetailsErrors.description ? (
-                      <p className="pt-training-builder-form__error" role="alert">
-                        {routineDetailsErrors.description}
-                      </p>
-                    ) : null}
                   </div>
 
                   <fieldset className="pt-training-builder-form__field pt-training-routine-form__checkbox-fieldset">
@@ -4814,7 +4860,6 @@ export default function PTTrainingPage() {
                               checked={checked}
                               onChange={() => {
                                 toggleSelection(option, fitnessTargets, setFitnessTargets);
-                                setRoutineDetailsErrors((current) => ({ ...current, fitnessTargets: undefined }));
                               }}
                             />
                             <span>{option}</span>
@@ -4822,11 +4867,6 @@ export default function PTTrainingPage() {
                         );
                       })}
                     </div>
-                    {routineDetailsErrors.fitnessTargets ? (
-                      <p className="pt-training-builder-form__error" role="alert">
-                        {routineDetailsErrors.fitnessTargets}
-                      </p>
-                    ) : null}
                   </fieldset>
 
                   <fieldset className="pt-training-builder-form__field pt-training-routine-form__checkbox-fieldset">
@@ -4860,7 +4900,6 @@ export default function PTTrainingPage() {
                               checked={checked}
                               onChange={() => {
                                 toggleSelection(option, fitnessAttributes, setFitnessAttributes);
-                                setRoutineDetailsErrors((current) => ({ ...current, fitnessAttributes: undefined }));
                               }}
                             />
                             <span>{option}</span>
@@ -4868,12 +4907,76 @@ export default function PTTrainingPage() {
                         );
                       })}
                     </div>
-                    {routineDetailsErrors.fitnessAttributes ? (
-                      <p className="pt-training-builder-form__error" role="alert">
-                        {routineDetailsErrors.fitnessAttributes}
-                      </p>
-                    ) : null}
                   </fieldset>
+
+                  <div className="pt-training-builder-form__field">
+                    <label htmlFor="pt-training-routine-tag-input">Tags</label>
+                    <div className="pt-training-folder-edit__tag-input-row">
+                      <input
+                        id="pt-training-routine-tag-input"
+                        value={routineTagInput}
+                        onChange={(event) => {
+                          setRoutineTagInput(event.target.value);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="pt-training-modal__secondary-action mobile-focus-ring"
+                        onClick={handleAddRoutineTag}
+                      >
+                        Add
+                      </button>
+                    </div>
+                    {routineTags.length > 0 ? (
+                      <div className="pt-training-folder-edit__tags">
+                        {routineTags.map((tag) => (
+                          <span key={tag} className="pt-training-folder-edit__tag">
+                            <span className="pt-training-folder-edit__tag-label">{tag}</span>
+                            <button
+                              type="button"
+                              className="pt-training-folder-edit__tag-remove mobile-focus-ring"
+                              aria-label={`Remove ${tag} tag`}
+                              onClick={() => {
+                                removeRoutineTag(tag);
+                              }}
+                            >
+                              X
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="pt-training-builder-form__helper">
+                        Add local-only tags to help find this routine in Training Portfolio search.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="pt-training-builder-form__field">
+                    <label>Media</label>
+                    <button
+                      type="button"
+                      className="pt-training-modal__secondary-action pt-training-media-picker__trigger mobile-focus-ring"
+                      onClick={openMediaPickerForRoutineDraft}
+                    >
+                      {routineMedia ? "Update Media" : "Add Media"}
+                    </button>
+                    {routineMedia ? (
+                      <div className="pt-training-media-picker__preview">
+                        {renderTrainingMediaPreview(
+                          routineMedia,
+                          "pt-training-media-picker__preview-media",
+                        )}
+                        <p className="pt-training-builder-form__helper">
+                          {routineMedia.name} ({formatMediaSize(routineMedia.size)})
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="pt-training-builder-form__helper">
+                        Add a local image, GIF, or video preview for the overall routine.
+                      </p>
+                    )}
+                  </div>
 
                   <fieldset className="pt-training-builder-form__field pt-training-builder-form__toggle-field">
                     <legend>Timed by duration</legend>
@@ -4902,27 +5005,6 @@ export default function PTTrainingPage() {
                       </label>
                     </div>
                   </fieldset>
-
-                  <div className="pt-training-builder-form__field">
-                    <label htmlFor="pt-training-routine-set-amount">How many Sets?</label>
-                    <input
-                      id="pt-training-routine-set-amount"
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      step="1"
-                      value={setAmount}
-                      onChange={(event) => {
-                        setSetAmount(sanitizeNumericInput(event.target.value));
-                        setRoutineDetailsErrors((current) => ({ ...current, setAmount: undefined }));
-                      }}
-                    />
-                    {routineDetailsErrors.setAmount ? (
-                      <p className="pt-training-builder-form__error" role="alert">
-                        {routineDetailsErrors.setAmount}
-                      </p>
-                    ) : null}
-                  </div>
 
                   {isRoutineEditMode ? (
                     <div className="pt-training-modal__actions pt-training-modal__actions--centered pt-training-routine-form__actions--edit-page-one">
