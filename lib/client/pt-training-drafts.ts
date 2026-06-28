@@ -82,8 +82,10 @@ export type LocalPTPortfolioRoutineAsset = {
   description?: string;
   fitnessTargets: string[];
   fitnessAttributes: string[];
+  tags: string[];
+  media?: PTTrainingDraftMedia | null;
   timedByDuration: boolean;
-  setAmount: string;
+  setAmount?: string;
   exercises: LocalPTPortfolioAssetExercise[];
   sourceDraftId?: string;
   createdAt: string;
@@ -124,7 +126,7 @@ export type LocalPTPortfolioDisplayMode = "recent" | "pinned";
 export type LocalPTRoutineExerciseDraft = {
   id: string;
   exerciseName: string;
-  repGoal: number;
+  repGoal?: number;
   instructions: string;
   weightsInvolved: boolean;
   media?: PTTrainingDraftMedia | null;
@@ -145,8 +147,10 @@ export type LocalPTRoutineDraft = {
   description: string;
   fitnessTargets: string[];
   fitnessAttributes: string[];
+  tags: string[];
+  media?: PTTrainingDraftMedia | null;
   timedByDuration: boolean;
-  setAmount: number;
+  setAmount?: number;
   exercises: LocalPTRoutineExerciseDraft[];
   createdAt: string;
   editedAt?: string;
@@ -361,8 +365,10 @@ function normalizePortfolioAsset(asset: LocalPTPortfolioAsset | null | undefined
       fitnessAttributes: Array.isArray(asset.fitnessAttributes)
         ? asset.fitnessAttributes.map((item) => item.trim()).filter(Boolean)
         : [],
+      tags: normalizeStringArray(asset.tags),
+      media: normalizeDraftMedia(asset.media),
       timedByDuration: Boolean(asset.timedByDuration),
-      setAmount: asset.setAmount?.toString().trim() ?? "",
+      setAmount: asset.setAmount?.toString().trim() || undefined,
       exercises: Array.isArray(asset.exercises)
         ? asset.exercises
             .map((exercise) => normalizePortfolioAssetExercise(exercise))
@@ -444,6 +450,8 @@ export function createLocalPTPortfolioRoutineAsset(input: {
   description?: string;
   fitnessTargets?: string[];
   fitnessAttributes?: string[];
+  tags?: string[];
+  media?: PTTrainingDraftMedia | null;
   timedByDuration?: boolean;
   setAmount?: string;
   exercises?: LocalPTPortfolioAssetExercise[];
@@ -464,8 +472,10 @@ export function createLocalPTPortfolioRoutineAsset(input: {
     fitnessAttributes: Array.isArray(input.fitnessAttributes)
       ? input.fitnessAttributes.map((item) => item.trim()).filter(Boolean)
       : [],
+    tags: normalizeStringArray(input.tags),
+    media: normalizeDraftMedia(input.media),
     timedByDuration: Boolean(input.timedByDuration),
-    setAmount: input.setAmount?.trim() ?? "",
+    setAmount: input.setAmount?.trim() || undefined,
     exercises: Array.isArray(input.exercises)
       ? input.exercises
           .map((exercise) => normalizePortfolioAssetExercise(exercise))
@@ -663,13 +673,15 @@ export function readLocalPTRoutineDrafts(): LocalPTRoutineDraft[] {
       fitnessAttributes: Array.isArray(draft.fitnessAttributes)
         ? draft.fitnessAttributes.map((item) => item.trim()).filter(Boolean)
         : [],
+      tags: normalizeStringArray(draft.tags),
+      media: normalizeDraftMedia(draft.media),
       timedByDuration: Boolean(draft.timedByDuration),
-      setAmount: typeof draft.setAmount === "number" ? draft.setAmount : 0,
+      setAmount: typeof draft.setAmount === "number" ? draft.setAmount : undefined,
       exercises: Array.isArray(draft.exercises)
         ? draft.exercises.map((exercise) => ({
             id: exercise.id,
             exerciseName: exercise.exerciseName?.trim() ?? "",
-            repGoal: typeof exercise.repGoal === "number" ? exercise.repGoal : 0,
+            repGoal: typeof exercise.repGoal === "number" ? exercise.repGoal : undefined,
             instructions: exercise.instructions?.trim() ?? "",
             weightsInvolved: Boolean(exercise.weightsInvolved),
             media: normalizeDraftMedia(exercise.media),
@@ -700,8 +712,10 @@ export function createLocalPTRoutineDraft(input: {
   description: string;
   fitnessTargets: string[];
   fitnessAttributes: string[];
+  tags?: string[];
+  media?: PTTrainingDraftMedia | null;
   timedByDuration: boolean;
-  setAmount: number;
+  setAmount?: number;
   exercises: LocalPTRoutineExerciseDraft[];
   createdAt?: string;
   editedAt?: string;
@@ -736,6 +750,8 @@ export function createLocalPTRoutineDraft(input: {
     description: input.description.trim(),
     fitnessTargets: input.fitnessTargets.map((item) => item.trim()).filter(Boolean),
     fitnessAttributes: input.fitnessAttributes.map((item) => item.trim()).filter(Boolean),
+    tags: normalizeStringArray(input.tags),
+    media: normalizeDraftMedia(input.media),
     timedByDuration: input.timedByDuration,
     setAmount: input.setAmount,
     exercises: input.exercises.map((exercise) => ({
