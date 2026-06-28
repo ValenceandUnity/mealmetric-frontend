@@ -1009,7 +1009,13 @@ describe("PTTrainingPage mobile experience", () => {
       expect(screen.getByRole("dialog", { name: "Add Media" })).toBeTruthy();
     });
 
+    const routineDialog = screen.getByRole("dialog", { name: "Create a Routine" });
     const routinePageOneMediaDialog = screen.getByRole("dialog", { name: "Add Media" });
+    expect(routineDialog).toBeTruthy();
+    expect(routinePageOneMediaDialog.parentElement?.className).toContain("pt-training-media-picker-backdrop");
+    expect(routinePageOneMediaDialog.className).toContain("pt-training-media-picker-dialog");
+    expect(routinePageOneMediaDialog.className).toContain("pt-training-media-picker-dialog--active");
+    expect(routinePageOneMediaDialog.parentElement).not.toBe(routineDialog.parentElement);
     expect(within(routinePageOneMediaDialog).getByLabelText("Upload image or GIF")).toBeTruthy();
     expect(within(routinePageOneMediaDialog).getByLabelText("Upload video")).toBeTruthy();
     const routinePageOneMediaInput =
@@ -1029,6 +1035,8 @@ describe("PTTrainingPage mobile experience", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "Add Media" })).toBeNull();
     });
+
+    expect(screen.getByRole("dialog", { name: "Create a Routine" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Next: Add Exercises" }));
 
@@ -1091,6 +1099,42 @@ describe("PTTrainingPage mobile experience", () => {
         }),
       ]),
     );
+  });
+
+  it("closes any open routine media picker when the parent routine dialog closes", async () => {
+    mockTrainingFetches();
+
+    render(React.createElement(PTTrainingPage));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Create a Routine" })).toBeTruthy();
+    });
+
+    const fetchCallCount = fetchMock.mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Create a Routine" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Create a Routine" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Media" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Add Media" })).toBeTruthy();
+    });
+
+    const routineDialog = screen.getByRole("dialog", { name: "Create a Routine" });
+    expect(screen.getByRole("dialog", { name: "Add Media" })).toBeTruthy();
+
+    fireEvent.click(within(routineDialog).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Create a Routine" })).toBeNull();
+    });
+
+    expect(screen.queryByRole("dialog", { name: "Add Media" })).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
   });
 
   it("supports Page 2 autosuggest, centers Add Another Exercise, and shows navigation arrows only after multiple exercises exist", async () => {
@@ -1282,7 +1326,11 @@ describe("PTTrainingPage mobile experience", () => {
       expect(screen.getByRole("dialog", { name: "Add Media" })).toBeTruthy();
     });
 
+    const routineEditDialog = screen.getByRole("dialog", { name: "Create a Routine" });
     const routinePageOneMediaDialog = screen.getByRole("dialog", { name: "Add Media" });
+    expect(routineEditDialog).toBeTruthy();
+    expect(routinePageOneMediaDialog.parentElement?.className).toContain("pt-training-media-picker-backdrop");
+    expect(routinePageOneMediaDialog.className).toContain("pt-training-media-picker-dialog");
     const routinePageOneMediaInput =
       within(routinePageOneMediaDialog).getByLabelText("Upload image or GIF") as HTMLInputElement;
     fireEvent.change(routinePageOneMediaInput, {
@@ -1300,6 +1348,8 @@ describe("PTTrainingPage mobile experience", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "Add Media" })).toBeNull();
     });
+
+    expect(screen.getByRole("dialog", { name: "Create a Routine" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
 
@@ -1349,6 +1399,9 @@ describe("PTTrainingPage mobile experience", () => {
     });
 
     const routineMediaDialog = screen.getByRole("dialog", { name: "Add Media" });
+    expect(screen.getByRole("dialog", { name: "Create a Routine" })).toBeTruthy();
+    expect(routineMediaDialog.parentElement?.className).toContain("pt-training-media-picker-backdrop");
+    expect(routineMediaDialog.className).toContain("pt-training-media-picker-dialog");
     const routineMediaInput = within(routineMediaDialog).getByLabelText("Upload image or GIF") as HTMLInputElement;
     fireEvent.change(routineMediaInput, {
       target: {
@@ -1365,6 +1418,8 @@ describe("PTTrainingPage mobile experience", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "Add Media" })).toBeNull();
     });
+
+    expect(screen.getByRole("dialog", { name: "Create a Routine" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Save Routine Draft" }));
 

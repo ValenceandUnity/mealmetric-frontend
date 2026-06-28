@@ -4705,6 +4705,10 @@ html[data-theme="light"] .mobile-training-form textarea {
   backdrop-filter: blur(10px);
 }
 
+.pt-training-media-picker-backdrop {
+  z-index: 90;
+}
+
 .pt-training-modal {
   width: min(100%, 28rem);
   max-height: min(36rem, calc(100dvh - var(--mobile-bottom-nav-height) - 2rem));
@@ -4991,6 +4995,15 @@ html[data-theme="light"] .mobile-training-form textarea {
 
 .pt-training-media-picker {
   width: min(100%, 28rem);
+}
+
+.pt-training-media-picker-dialog {
+  position: relative;
+  z-index: 1;
+}
+
+.pt-training-media-picker-dialog--active {
+  box-shadow: 0 36px 72px rgba(2, 6, 23, 0.42);
 }
 
 .pt-training-media-picker__trigger {

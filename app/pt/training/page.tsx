@@ -2123,6 +2123,10 @@ export default function PTTrainingPage() {
   }
 
   function closeRoutineDialog() {
+    if (mediaPickerTarget?.kind === "routine-draft" || mediaPickerTarget?.kind === "routine-row") {
+      closeMediaPicker();
+    }
+
     setRoutineDialogOpen(false);
     resetRoutineDialogState();
   }
@@ -4653,7 +4657,7 @@ export default function PTTrainingPage() {
 
       {mediaPickerTarget ? (
         <div
-          className="pt-training-modal-backdrop"
+          className="pt-training-modal-backdrop pt-training-media-picker-backdrop"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               closeMediaPicker();
@@ -4664,7 +4668,7 @@ export default function PTTrainingPage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="pt-training-media-picker-title"
-            className="pt-training-modal pt-training-media-picker"
+            className="pt-training-modal pt-training-media-picker pt-training-media-picker-dialog pt-training-media-picker-dialog--active"
           >
             <div className="pt-training-modal__header">
               <div className="mobile-section__copy">
