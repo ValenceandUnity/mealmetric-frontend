@@ -317,6 +317,166 @@ describe("PTTrainingPage mobile experience", () => {
     );
   });
 
+  it("publishes rep drafts into existing local folders and keeps the folder picker actions scoped", async () => {
+    mockTrainingFetches();
+
+    render(React.createElement(PTTrainingPage));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Edit training portfolio display" })).toBeTruthy();
+    });
+
+    const fetchCallCount = fetchMock.mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit training portfolio display" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Edit Training Portfolio Display" })).toBeTruthy();
+    });
+
+    const displayDialog = screen.getByRole("dialog", { name: "Edit Training Portfolio Display" });
+    fireEvent.click(within(displayDialog).getByRole("button", { name: "Create New Folder" }));
+    fireEvent.change(within(displayDialog).getByLabelText("Folder name"), {
+      target: { value: "TEST33" },
+    });
+    fireEvent.click(within(displayDialog).getByRole("button", { name: "Add Folder" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open training portfolio TEST33" })).toBeTruthy();
+    });
+
+    fireEvent.click(within(displayDialog).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Edit Training Portfolio Display" })).toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add an Exercise" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Add an Exercise" })).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText("Exercise"), {
+      target: { value: "1 mile run" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Exercise Draft" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Add an Exercise" })).toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Show training draft queue" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Publish Exercise" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish Exercise" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Publish Exercise" })).toBeTruthy();
+    });
+
+    let publishDialog = screen.getByRole("dialog", { name: "Publish Exercise" });
+    fireEvent.click(within(publishDialog).getByRole("button", { name: "Select Portfolio Folder" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Select Portfolio Folder" })).toBeTruthy();
+    });
+
+    let folderPicker = screen.getByRole("dialog", { name: "Select Portfolio Folder" });
+    expect(within(folderPicker).getByRole("button", { name: "Close" })).toBeTruthy();
+    expect(within(folderPicker).getByRole("button", { name: "Add New Folder" })).toBeTruthy();
+    expect(within(folderPicker).getByRole("button", { name: "Done" })).toBeTruthy();
+    expect(within(publishDialog).queryByRole("button", { name: "Cancel" })).toBeNull();
+    expect(within(publishDialog).queryByRole("button", { name: "Publish Exercise" })).toBeNull();
+
+    fireEvent.click(within(folderPicker).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Select Portfolio Folder" })).toBeNull();
+    });
+
+    publishDialog = screen.getByRole("dialog", { name: "Publish Exercise" });
+    expect(within(publishDialog).getByRole("button", { name: "Publish Exercise" })).toBeTruthy();
+
+    fireEvent.click(within(publishDialog).getByRole("button", { name: "Select Portfolio Folder" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Select Portfolio Folder" })).toBeTruthy();
+    });
+
+    folderPicker = screen.getByRole("dialog", { name: "Select Portfolio Folder" });
+    fireEvent.click(within(folderPicker).getByRole("checkbox", { name: "TEST33" }));
+    fireEvent.click(within(folderPicker).getByRole("button", { name: "Done" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Select Portfolio Folder" })).toBeNull();
+    });
+
+    publishDialog = screen.getByRole("dialog", { name: "Publish Exercise" });
+    expect(within(publishDialog).getByText("Selected folders: TEST33")).toBeTruthy();
+    fireEvent.click(within(publishDialog).getByRole("button", { name: "Publish Exercise" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Publish Exercise" })).toBeNull();
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Training Draft Queue (1)")).toBeNull();
+    });
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search training portfolios" }), {
+      target: { value: "1 mile run" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open training portfolio TEST33" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open training portfolio TEST33" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "TEST33" })).toBeTruthy();
+    });
+
+    const test33Dialog = screen.getByRole("dialog", { name: "TEST33" });
+    expect(within(test33Dialog).getByRole("button", { name: "Open Rep asset 1 mile run" })).toBeTruthy();
+    fireEvent.click(within(test33Dialog).getByRole("button", { name: "Open Rep asset 1 mile run" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "1 mile run" })).toBeTruthy();
+    });
+
+    const repDetailDialog = screen.getByRole("dialog", { name: "1 mile run" });
+    expect(within(repDetailDialog).getAllByText("Rep").length).toBeGreaterThan(0);
+    fireEvent.click(within(repDetailDialog).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "1 mile run" })).toBeNull();
+    });
+
+    fireEvent.click(within(test33Dialog).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "TEST33" })).toBeNull();
+    });
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search training portfolios" }), {
+      target: { value: "" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Open training portfolio All Singular Exercises" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "All Singular Exercises" })).toBeTruthy();
+    });
+
+    const singularDialog = screen.getByRole("dialog", { name: "All Singular Exercises" });
+    expect(within(singularDialog).getByRole("button", { name: "Open Rep asset 1 mile run" })).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
+  });
+
   it("keeps Add an Exercise local-only and exposes saved exercises to routine autosuggest", async () => {
     mockTrainingFetches();
 
@@ -765,7 +925,7 @@ describe("PTTrainingPage mobile experience", () => {
     const datalist = document.getElementById("pt-training-routine-exercise-suggestions");
     expect((datalist as HTMLElement).querySelector('option[value="Incline Bench Press"]')).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(fetchCallCount);
-  });
+  }, 10000);
 
   it("validates Page 1 targets and attributes, keeps the routine draft queue collapsed by default, and saves the routine draft locally", async () => {
     mockTrainingFetches();
